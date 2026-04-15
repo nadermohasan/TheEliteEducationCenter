@@ -1,105 +1,481 @@
 import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { CheckCircle, XCircle, RotateCcw } from "lucide-react";
+import { CheckCircle, XCircle, RotateCcw, Award, TrendingDown, Users } from "lucide-react";
+import Footer from './Footer';
 
 export default function QuizResult() {
-  const { state } = useLocation(); // سنمرر البيانات من صفحة الاختبار لهنا
+  const { state } = useLocation();
   const navigate = useNavigate();
   const [result, setResult] = useState(null);
 
   useEffect(() => {
-    if (state) {
+    if (state && state.questions && state.total_questions) {
       setResult(state);
     } else {
-      // لو دخل الصفحة مباشرة بدون بيانات نرجعه للرئيسية
-      navigate('/dashboard');
+      navigate('/dashboard', { replace: true });
     }
   }, [state, navigate]);
 
   if (!result) return null;
 
-  const percentage = Math.round((result.score / result.total_questions) * 100);
+  const score = result.score || 0;
+  const total = result.total_questions || 0;
+  const percentage = total > 0 ? Math.round((score / total) * 100) : 0;
+  const isPass = percentage >= 50;
+
+  const getCircleColor = () => {
+    if (percentage >= 70) return '#10b981';
+    if (percentage >= 50) return '#f59e0b';
+    return '#ef4444';
+  };
 
   return (
-    <div className="result-page-container">
-      <div className="result-card">
-        {/* الدائرة العلوية للنسبة المئوية */}
-        <div className="percentage-circle">
-          <svg viewBox="0 0 36 36" className="circular-chart">
-            <path className="circle-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-            <path className="circle" strokeDasharray={`${percentage}, 100`} d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-            <text x="18" y="20.35" className="percentage">{percentage}%</text>
-          </svg>
+    <div className="result-page">
+      {/* هيدر متناسق مع استجابة كاملة للموبايل */}
+      <header className="dashboard-header">
+        <div className="logo-section">
+          <div className="logo-wrapper-dash">
+            <img src="https://i.imgur.com/p1hg12H.png" alt="شعار المركز" className="logo-img-dash" />
+          </div>
+          <span className="logo-text-dash">مركز النخبة التعليمي</span>
         </div>
+        <div className="user-section"></div>
+      </header>
 
-        <div className="score-summary">
-          <div className="summary-item correct">الإجابات الصحيحة: {result.score}</div>
-          <div className="summary-item wrong">الإجابات الخاطئة: {result.total_questions - result.score}</div>
-        </div>
+      <main className="result-main">
+        <div className="result-card">
+          {/* الدائرة والنسبة والملخص */}
+          <div className="stats-summary">
+            <div className="percentage-wrapper">
+              <div className="percentage-circle">
+                <svg viewBox="0 0 36 36" className="circular-chart">
+                  <path className="circle-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                  <path 
+                    className="circle" 
+                    strokeDasharray={`${percentage}, 100`} 
+                    d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                    style={{ stroke: getCircleColor() }}
+                  />
+                  <text x="18" y="20.35" className="percentage-text">{percentage}%</text>
+                </svg>
+              </div>
+              <div className={`grade-badge ${isPass ? 'pass' : 'fail'}`}>
+                {isPass ? <Award size={18} /> : <TrendingDown size={18} />}
+                <span>{isPass ? 'ناجح' : 'راسب'}</span>
+              </div>
+            </div>
 
-        <h2 className="congrats-text">
-         درجتك النهائية: {result.score}/{result.total_questions}
-          <br />
-          <span>{percentage >= 50 ? 'نــــاجح' : 'راســـب'}</span>
-        </h2>
-
-        <h3 className="details-title">تفاصيل الإجابات</h3>
-        
-        <div className="answers-details-list">
-          {result.questions.map((q, index) => {
-            const isCorrect = result.selectedAnswers[q.id] === q.correct_option;
-            return (
-              <div key={index} className={`detail-item ${isCorrect ? 'correct-bg' : 'wrong-bg'}`}>
-                <div className="detail-header">
-                  <span className="q-num">{index + 1}. {q.question_text}</span>
-                  {isCorrect ? <CheckCircle size={18} color="#27ae60"/> : <XCircle size={18} color="#e74c3c"/>}
-                </div>
-                <div className="answer-comparison">
-                  <p>إجابتك: {q.options[result.selectedAnswers[q.id]] || 'لم يتم الإجابة'}</p>
-                  {!isCorrect && (
-                    <p className="correct-ans">الإجابة الصحيحة: {q.options[q.correct_option]}</p>
-                  )}
+            <div className="score-stats">
+              <div className="stat-box correct">
+                <CheckCircle size={20} />
+                <div>
+                  <span>الإجابات الصحيحة</span>
+                  <strong>{score}</strong>
                 </div>
               </div>
-            );
-          })}
-        </div>
+              <div className="stat-box wrong">
+                <XCircle size={20} />
+                <div>
+                  <span>الإجابات الخاطئة</span>
+                  <strong>{total - score}</strong>
+                </div>
+              </div>
+              <div className="stat-box total">
+                <Users size={20} />
+                <div>
+                  <span>إجمالي الأسئلة</span>
+                  <strong>{total}</strong>
+                </div>
+              </div>
+            </div>
+          </div>
 
-        <button className="retry-btn" onClick={() => navigate('/dashboard')}>
-          <RotateCcw size={18} /> العودة للرئيسية
-        </button>
-      </div>
+          {/* الجدول - نفس تصميم AdminDashboard */}
+          <div className="table-card">
+            <div className="card-header">
+              <h2 className="card-title">
+                <CheckCircle size={20} className="icon-blue" /> تفاصيل الإجابات
+              </h2>
+              <span className="badge-count">{total} سؤال</span>
+            </div>
+            <div className="table-responsive">
+              <table className="modern-table">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>نص السؤال</th>
+                    <th>إجابة الطالب</th>
+                    <th>الإجابة الصحيحة</th>
+                    <th className="text-center">الحالة</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {result.questions && result.questions.length > 0 ? (
+                    result.questions.map((q, index) => {
+                      const userAnswer = result.selectedAnswers?.[q.id];
+                      const isCorrect = userAnswer !== undefined && parseInt(userAnswer) === parseInt(q.correct_option);
+                      const userAnswerText = (userAnswer !== undefined && q.options[userAnswer]) ? q.options[userAnswer] : '—';
+                      
+                      return (
+                        <tr key={index}>
+                          <td className="text-center">{index + 1}</td>
+                          <td className="question-cell">{q.question_text}</td>
+                          <td className={isCorrect ? 'correct-answer-cell' : 'wrong-answer-cell'}>
+                            {userAnswerText}
+                          </td>
+                          <td className="correct-answer-cell">{q.options[q.correct_option]}</td>
+                          <td className="text-center">
+                            <span className={`status-badge ${isCorrect ? 'success' : 'error'}`}>
+                              {isCorrect ? '✓ صحيح' : '✗ خطأ'}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  ) : (
+                    <tr>
+                      <td colSpan="5" className="empty-table">لا توجد أسئلة لعرضها</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <button className="retry-btn" onClick={() => navigate('/dashboard')}>
+            <RotateCcw size={18} /> العودة إلى المواد الدراسية
+          </button>
+        </div>
+      </main>
+
+      <Footer />
 
       <style>{`
-        .result-page-container { background: #f0f7ff; min-height: 100vh; padding: 40px 20px; direction: rtl; font-family: 'Cairo', sans-serif; display: flex; justify-content: center; }
-        .result-card { background: white; width: 100%; max-width: 500px; border-radius: 24px; padding: 30px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); text-align: center; }
-        
-        .percentage-circle { width: 150px; margin: 0 auto 20px; }
-        .circular-chart { display: block; margin: 10px auto; max-width: 100%; max-height: 250px; }
-        .circle-bg { fill: none; stroke: #eee; stroke-width: 2.8; }
-        .circle { fill: none; stroke: #27ae60; stroke-width: 2.8; stroke-linecap: round; transition: stroke-dasharray 1s ease 0s; }
-        .percentage { fill: #2c3e50; font-weight: 700; font-size: 0.5em; text-anchor: middle; }
+        @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap');
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: #f4f7fc; font-family: 'Cairo', sans-serif; }
 
-        .score-summary { display: flex; justify-content: center; gap: 15px; margin-bottom: 25px; }
-        .summary-item { padding: 8px 15px; border-radius: 10px; font-size: 0.85rem; font-weight: 600; }
-        .summary-item.correct { background: #e6f7ee; color: #27ae60; }
-        .summary-item.wrong { background: #fdeaea; color: #e74c3c; }
+        .result-page {
+          direction: rtl;
+          min-height: 100vh;
+          display: flex;
+          flex-direction: column;
+          background: linear-gradient(180deg, #f4f7fc 0%, #e9f0f9 100%);
+        }
 
-        .congrats-text { font-size: 1.2rem; color: #2c3e50; margin-bottom: 30px; }
-        .congrats-text span { font-size: 0.9rem; color: #7f8c8d; }
+        /* الهيدر المتجاوب */
+        .dashboard-header {
+          background: rgba(255,255,255,0.95);
+          padding: 12px 30px;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          border-radius: 0 0 24px 24px;
+          box-shadow: 0 6px 18px rgba(0,0,0,0.04);
+          backdrop-filter: blur(10px);
+          position: sticky;
+          top: 0;
+          z-index: 100;
+        }
+        .logo-section {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+        }
+        .logo-wrapper-dash {
+          background: white;
+          width: 48px;
+          height: 48px;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          overflow: hidden;
+          box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+          border: 1px solid #e2e8f0;
+        }
+        .logo-img-dash { max-width: 90%; max-height: 90%; object-fit: contain; }
+        .logo-text-dash {
+          font-weight: 800;
+          font-size: 1.2rem;
+          color: #1e3a8a;
+          letter-spacing: -0.3px;
+        }
+        .user-section { width: 100px; }
 
-        .details-title { text-align: right; font-size: 1rem; margin-bottom: 15px; border-bottom: 1px solid #eee; padding-bottom: 10px; }
-        .answers-details-list { max-height: 300px; overflow-y: auto; margin-bottom: 25px; padding-left: 5px; }
-        .detail-item { text-align: right; padding: 15px; border-radius: 12px; margin-bottom: 10px; border: 1px solid transparent; }
-        .detail-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; font-weight: 600; font-size: 0.9rem; }
-        .correct-bg { background: #f0fff4; border-color: #c6f6d5; }
-        .wrong-bg { background: #fff5f5; border-color: #fed7d7; }
-        
-        .answer-comparison { font-size: 0.8rem; color: #4a5568; }
-        .correct-ans { color: #27ae60; font-weight: 700; margin-top: 4px; }
+        /* المحتوى الرئيسي */
+        .result-main {
+          flex: 1;
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          padding: 40px 20px;
+          max-width: 1280px;
+          margin: 0 auto;
+          width: 100%;
+        }
+        .result-card {
+          background: white;
+          border-radius: 32px;
+          padding: 40px;
+          width: 100%;
+          box-shadow: 0 20px 35px -12px rgba(0,0,0,0.08);
+          transition: transform 0.2s;
+        }
 
-        .retry-btn { width: 100%; padding: 12px; background: #3b82f6; color: white; border: none; border-radius: 12px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; font-weight: 700; transition: 0.3s; }
-        .retry-btn:hover { background: #2563eb; }
+        /* قسم الإحصائيات العلوي */
+        .stats-summary {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          gap: 40px;
+          margin-bottom: 40px;
+          flex-wrap: wrap;
+        }
+        .percentage-wrapper {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 12px;
+        }
+        .percentage-circle {
+          width: 130px;
+        }
+        .circular-chart {
+          display: block;
+          width: 100%;
+        }
+        .circle-bg {
+          fill: none;
+          stroke: #e2e8f0;
+          stroke-width: 2.8;
+        }
+        .circle {
+          fill: none;
+          stroke-width: 2.8;
+          stroke-linecap: round;
+          transition: stroke-dasharray 1s ease;
+        }
+        .percentage-text {
+          fill: #1e293b;
+          font-weight: 800;
+          font-size: 0.5em;
+          text-anchor: middle;
+          dominant-baseline: middle;
+        }
+        .grade-badge {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          padding: 6px 18px;
+          border-radius: 40px;
+          font-weight: 700;
+          font-size: 0.9rem;
+        }
+        .grade-badge.pass {
+          background: #e6f7ee;
+          color: #10b981;
+        }
+        .grade-badge.fail {
+          background: #fef2f2;
+          color: #ef4444;
+        }
+
+        .score-stats {
+          display: flex;
+          gap: 20px;
+          flex-wrap: wrap;
+        }
+        .stat-box {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          background: #f8fafc;
+          padding: 12px 20px;
+          border-radius: 20px;
+          min-width: 140px;
+        }
+        .stat-box.correct { background: #f0fdf4; border: 1px solid #bbf7d0; }
+        .stat-box.wrong { background: #fef2f2; border: 1px solid #fecaca; }
+        .stat-box.total { background: #eff6ff; border: 1px solid #bfdbfe; }
+        .stat-box div {
+          display: flex;
+          flex-direction: column;
+        }
+        .stat-box span {
+          font-size: 0.75rem;
+          color: #64748b;
+        }
+        .stat-box strong {
+          font-size: 1.4rem;
+          font-weight: 800;
+          color: #1e293b;
+        }
+        .stat-box.correct strong { color: #10b981; }
+        .stat-box.wrong strong { color: #ef4444; }
+        .stat-box.total strong { color: #3b82f6; }
+
+        /* الجدول - مطابق تماماً لـ AdminDashboard */
+        .table-card {
+          background: #ffffff;
+          border-radius: 20px;
+          box-shadow: 0 10px 30px rgba(0,0,0,0.03);
+          overflow: hidden;
+          margin: 30px 0;
+        }
+        .card-header {
+          padding: 20px 25px;
+          border-bottom: 1px solid #f1f5f9;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        }
+        .card-title {
+          margin: 0;
+          font-size: 1.1rem;
+          color: #1e293b;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+        .icon-blue { color: #3b82f6; }
+        .badge-count {
+          background: #eff6ff;
+          color: #3b82f6;
+          padding: 4px 12px;
+          border-radius: 20px;
+          font-size: 0.85rem;
+          font-weight: 700;
+        }
+        .table-responsive {
+          width: 100%;
+          overflow-x: auto;
+        }
+        .modern-table {
+          width: 100%;
+          border-collapse: collapse;
+          min-width: 700px;
+          text-align: right;
+        }
+        .modern-table th {
+          background: #f8fafc;
+          padding: 14px 18px;
+          color: #475569;
+          font-weight: 700;
+          font-size: 0.9rem;
+          border-bottom: 2px solid #e2e8f0;
+        }
+        .modern-table td {
+          padding: 14px 18px;
+          border-bottom: 1px solid #f1f5f9;
+          color: #334155;
+          vertical-align: middle;
+        }
+        .modern-table tbody tr:hover {
+          background: #fbfcfd;
+        }
+        .text-center {
+          text-align: center !important;
+        }
+        .question-cell {
+          font-weight: 600;
+          max-width: 300px;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+        .correct-answer-cell {
+          color: #10b981;
+          font-weight: 600;
+        }
+        .wrong-answer-cell {
+          color: #ef4444;
+          font-weight: 500;
+        }
+        .status-badge {
+          display: inline-block;
+          padding: 4px 12px;
+          border-radius: 30px;
+          font-size: 0.8rem;
+          font-weight: 700;
+        }
+        .status-badge.success {
+          background: #e6f7ee;
+          color: #10b981;
+        }
+        .status-badge.error {
+          background: #fef2f2;
+          color: #ef4444;
+        }
+        .empty-table {
+          text-align: center;
+          padding: 40px;
+          color: #64748b;
+        }
+
+        /* زر العودة */
+        .retry-btn {
+          width: 100%;
+          background: #3b82f6;
+          color: white;
+          border: none;
+          padding: 14px;
+          border-radius: 16px;
+          font-weight: 700;
+          font-size: 1rem;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 10px;
+          cursor: pointer;
+          transition: all 0.2s;
+          font-family: 'Cairo', sans-serif;
+          box-shadow: 0 4px 12px rgba(59,130,246,0.25);
+          margin-top: 20px;
+        }
+        .retry-btn:hover {
+          background: #2563eb;
+          transform: translateY(-2px);
+          box-shadow: 0 6px 16px rgba(59,130,246,0.3);
+        }
+
+        /* استجابة الموبايل */
+        @media (max-width: 768px) {
+          .result-card { padding: 25px; }
+          .stats-summary { flex-direction: column; align-items: stretch; gap: 20px; }
+          .score-stats { justify-content: center; }
+          .stat-box { justify-content: center; }
+          
+          /* جعل الهيدر بحيث يكون اللوجو في المنتصف */
+          .dashboard-header {
+            justify-content: center;
+            padding: 10px 20px;
+          }
+          .logo-section {
+            justify-content: center;
+          }
+          .logo-text-dash {
+            display: inline-block; /* نبقيه على الموبايل لأن المساحة متاحة الآن */
+            font-size: 1rem;
+          }
+          .user-section {
+            display: none; /* نختفي المساحة الفارغة */
+          }
+          
+          .card-header { flex-direction: column; align-items: flex-start; gap: 10px; }
+          .modern-table th, .modern-table td { padding: 10px 12px; font-size: 0.85rem; }
+          .question-cell { max-width: 180px; }
+        }
+
+        /* للشاشات الصغيرة جداً */
+        @media (max-width: 480px) {
+          .logo-text-dash {
+            display: none; /* نخفي النص ونبقي اللوجو فقط */
+          }
+          .dashboard-header {
+            padding: 10px 15px;
+          }
+        }
       `}</style>
     </div>
   );

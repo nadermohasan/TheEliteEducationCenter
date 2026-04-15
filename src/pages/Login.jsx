@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
+import Footer from './Footer';
 
 export default function Auth() {
   const [isLoginView, setIsLoginView] = useState(true);
@@ -15,17 +16,18 @@ export default function Auth() {
   
   const from = location.state?.from || '/dashboard';
 
+  // التحقق من دور المستخدم والتوجيه المناسب
   const checkRoleAndRedirect = async (userId) => {
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select('role')
       .eq('id', userId)
-      .single();
+      .maybeSingle(); // استخدام maybeSingle لتجنب الخطأ إذا لم يوجد
 
     if (profileError || !profile) {
       setError('تعذر جلب بيانات الصلاحيات، راجع الإدارة.');
       setLoading(false);
-      return;
+      return false;
     }
 
     if (profile.role === 'admin') {
@@ -35,6 +37,31 @@ export default function Auth() {
     } else {
       navigate(from, { replace: true });
     }
+    return true;
+  };
+
+  // محاولة إنشاء البروفايل بشكل آمن (إذا كان غير موجود)
+  const ensureProfile = async (userId, usernameValue, fullNameValue) => {
+    const { data: existing, error: fetchError } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('id', userId)
+      .maybeSingle();
+
+    if (fetchError) throw fetchError;
+
+    if (!existing) {
+      const { error: insertError } = await supabase
+        .from('profiles')
+        .insert([{
+          id: userId,
+          username: usernameValue,
+          name: fullNameValue,
+          role: 'student'
+        }]);
+      if (insertError) throw insertError;
+    }
+    return true;
   };
 
   const handleSubmit = async (e) => {
@@ -50,6 +77,7 @@ export default function Auth() {
     const email = `${username.toLowerCase().replace(/\s/g, '')}@nokhba.local`;
 
     if (isLoginView) {
+      // تسجيل الدخول
       const { data: authData, error: signInError } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -59,10 +87,17 @@ export default function Auth() {
         setError('اسم المستخدم أو كلمة المرور غير صحيحة.');
         setLoading(false);
       } else if (authData.user) {
-        checkRoleAndRedirect(authData.user.id);
+        // محاولة إنشاء البروفايل إذا كان غير موجود (لحسابات قديمة أو تم إنشاؤها يدوياً)
+        try {
+          await ensureProfile(authData.user.id, username, fullName || username);
+          await checkRoleAndRedirect(authData.user.id);
+        } catch (err) {
+          setError('حدث خطأ في تجهيز حسابك. يرجى المحاولة مرة أخرى.');
+          setLoading(false);
+        }
       }
-
     } else {
+      // تسجيل حساب جديد
       if (!fullName.trim()) {
         setError('الرجاء إدخال الاسم الرباعي');
         setLoading(false);
@@ -78,22 +113,17 @@ export default function Auth() {
         setError('حدث خطأ: اسم المستخدم قد يكون محجوزاً مسبقاً.');
         setLoading(false);
       } else if (authData.user) {
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .insert([
-            {
-              id: authData.user.id,
-              username: username,
-              name: fullName,
-              role: 'student'
-            }
-          ]);
-
-        if (profileError) {
-          setError('تم إنشاء الحساب ولكن فشل حفظ البروفايل.');
+        try {
+          await ensureProfile(authData.user.id, username, fullName);
+          await checkRoleAndRedirect(authData.user.id);
+        } catch (profileError) {
+          // فشل إنشاء البروفايل: نحاول حذف المستخدم (يتطلب service role - بديل آمن: نطلب من المستخدم إعادة المحاولة)
+          console.error('فشل إنشاء البروفايل:', profileError);
+          // محاولة تنظيف: حذف المستخدم عبر API (لن يعمل بدون service role key، لذا نكتفي بإبلاغ المستخدم)
+          setError('تم إنشاء الحساب ولكن فشل حفظ الملف الشخصي. يرجى التواصل مع الدعم الفني.');
+          // تسجيل خروج المستخدم لتجنب الدخول بحساب غير مكتمل
+          await supabase.auth.signOut();
           setLoading(false);
-        } else {
-          checkRoleAndRedirect(authData.user.id);
         }
       }
     }
@@ -103,10 +133,10 @@ export default function Auth() {
     <div className="auth-page-container">
       <div className="top-logo-container">
         <div className="top-logo-content">
-          <span className="logo-text">مركز النخبة التعليمي</span>
           <div className="logo-image-wrapper">
             <img src="https://i.imgur.com/p1hg12H.png" alt="شعار مركز النخبة" className="logo-image" />
           </div>
+          <span className="logo-text">مركز النخبة التعليمي</span>
         </div>
       </div>
 
@@ -139,7 +169,7 @@ export default function Auth() {
             </div>
           )}
 
-          {/* اسم المستخدم - تم تحديث الأيقونة لتكون User Icon */}
+          {/* اسم المستخدم */}
           <div className="input-group">
             <label>
               اسم المستخدم
@@ -192,11 +222,12 @@ export default function Auth() {
           )}
         </div>
       </div>
+      <Footer />
 
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700&display=swap');
         body, html { margin: 0; padding: 0; font-family: 'Cairo', sans-serif; }
-        .auth-page-container { min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; direction: rtl; background: linear-gradient(135deg, #eef5ff 0%, #d8e8fc 100%); position: relative; padding: 20px; box-sizing: border-box; }
+        .auth-page-container { min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; direction: rtl; background: linear-gradient(135deg, #eef5ff 0%, #d8e8fc 100%); position: relative; padding: 20px; box-sizing: border-box; }
         .top-logo-container { position: absolute; top: 30px; display: flex; justify-content: center; width: 100%; z-index: 5; }
         .top-logo-content { display: flex; align-items: center; gap: 15px; color: #1a4f8b; }
         .logo-text { font-size: 24px; font-weight: 700; }
