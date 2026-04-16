@@ -207,14 +207,14 @@ export default function QuizPage() {
       }]);
 
       if (resultError) throw resultError;
-
+       /*
       const { error: updateError } = await supabase
         .from('attempts')
         .update({ status: 'completed' })
         .eq('id', activeAttempt.id);
 
       if (updateError) console.error('فشل تحديث حالة المحاولة:', updateError);
-
+      */
       navigate('/result', {
         state: { 
           score: finalScore, 

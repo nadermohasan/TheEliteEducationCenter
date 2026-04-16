@@ -151,7 +151,6 @@ export default function AdminDashboard() {
           <div>
             <h1 className="page-title">إدارة الطلاب</h1>
           </div>
-          {/* تم حذف الزر من هنا */}
         </div>
 
         {/* بطاقات إحصائية سريعة */}
@@ -203,7 +202,6 @@ export default function AdminDashboard() {
             <h2 className="card-title">
               <Users size={20} className="icon-blue" /> قائمة الطلاب
             </h2>
-            {/* الزر الآن داخل الهيدر الخاص بالجدول */}
             <div className="card-header-actions">
                 <span className="badge-count">{filteredUsers.length} طالب</span>
                 <button className="refresh-btn-table" onClick={() => { fetchUsers(); fetchStats(); }}>
@@ -307,6 +305,7 @@ export default function AdminDashboard() {
           font-weight: 800;
           color: #0f172a;
           margin-bottom: 6px;
+          text-align: right;
         }
         .page-subtitle {
           font-size: 1rem;
@@ -352,7 +351,7 @@ export default function AdminDashboard() {
         .stat-content {
           display: flex;
           flex-direction: column;
-          align-items: center; /* حل مشكلة المحاذاة */
+          align-items: center;
           flex: 1;
           text-align: center;
         }
@@ -436,7 +435,7 @@ export default function AdminDashboard() {
           font-weight: 700;
         }
 
-        /* زر التحديث الجديد */
+        /* زر التحديث */
         .refresh-btn-table {
           display: flex;
           align-items: center;
@@ -558,27 +557,48 @@ export default function AdminDashboard() {
           margin: 0 auto 20px;
         }
 
+        /* تجاوب مع شاشات الموبايل */
         @media (max-width: 768px) {
-          .dashboard-main { padding: 0 16px 24px; }
-          .page-header { margin-bottom: 20px; }
-          .page-title { font-size: 1.6rem; }
+          .dashboard-main {
+            padding: 0 16px 24px;
+          }
+          .page-header {
+    flex-direction: column;
+    align-items: center;     /* توسيط العنوان أفقياً */
+    padding-right: 0;
+    margin-bottom: 20px;
+  }
+  .page-title {
+    font-size: 1.6rem;
+    text-align: center;     /* توسيط النص */
+    width: 100%;
+  }
           
-          .stats-grid { grid-template-columns: 1fr; }
-          .stat-card { justify-content: flex-start; }
-          .stat-content { align-items: flex-start; text-align: right; }
+          .stats-grid {
+            grid-template-columns: 1fr;
+          }
+          .stat-card {
+            justify-content: flex-start;
+          }
+          .stat-content {
+            align-items: flex-start;
+            text-align: right;
+          }
           
-          .card-header { padding: 15px; }
-          .card-header-actions { gap: 8px; }
-          .refresh-btn-table span { display: none; } /* إخفاء نص تحديث في الموبايل */
+          .card-header {
+            padding: 15px;
+          }
+          .card-header-actions {
+            gap: 8px;
+          }
+          .refresh-btn-table span {
+            display: none;  /* إخفاء نص "تحديث" في الموبايل */
+          }
           
-          .modern-table th, .modern-table td { padding: 12px; }
-        .page-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          margin-bottom: 32px;
-          padding-right: 35%;
-        }
+          .modern-table th,
+          .modern-table td {
+            padding: 12px;
+          }
         }
       `}</style>
     </div>

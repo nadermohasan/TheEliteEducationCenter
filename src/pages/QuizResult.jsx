@@ -24,9 +24,9 @@ export default function QuizResult() {
   const percentage = total > 0 ? Math.round((score / total) * 100) : 0;
   const isPass = percentage >= 50;
   
-  // ✅ استخراج الاسم الأول من الاسم الكامل
+  // ✅ استخراج الاسم الكامل لتمريره إلى Navbar
+  // الـ Navbar سيهتم بعرض الاسم الأول والأخير بناءً على المنطق الذي وضعته فيه
   const fullName = result.studentName || 'طالب';
-  const firstName = fullName.split(' ')[0];
 
   const getCircleColor = () => {
     if (percentage >= 70) return '#10b981';
@@ -36,7 +36,8 @@ export default function QuizResult() {
 
   return (
     <div className="result-page">
-      <Navbar userName={firstName} />
+      {/* نمرر fullName ليعالجه الـ Navbar داخلياً */}
+      <Navbar userName={fullName} />
 
       <main className="result-main">
         <div className="result-card">
@@ -159,7 +160,6 @@ export default function QuizResult() {
           background: linear-gradient(180deg, #f4f7fc 0%, #e9f0f9 100%);
         }
 
-        /* المحتوى الرئيسي */
         .result-main {
           flex: 1;
           display: flex;
@@ -176,10 +176,8 @@ export default function QuizResult() {
           padding: 40px;
           width: 100%;
           box-shadow: 0 20px 35px -12px rgba(0,0,0,0.08);
-          transition: transform 0.2s;
         }
 
-        /* قسم الإحصائيات العلوي */
         .stats-summary {
           display: flex;
           justify-content: space-between;
@@ -228,14 +226,8 @@ export default function QuizResult() {
           font-weight: 700;
           font-size: 0.9rem;
         }
-        .grade-badge.pass {
-          background: #e6f7ee;
-          color: #10b981;
-        }
-        .grade-badge.fail {
-          background: #fef2f2;
-          color: #ef4444;
-        }
+        .grade-badge.pass { background: #e6f7ee; color: #10b981; }
+        .grade-badge.fail { background: #fef2f2; color: #ef4444; }
 
         .score-stats {
           display: flex;
@@ -254,24 +246,13 @@ export default function QuizResult() {
         .stat-box.correct { background: #f0fdf4; border: 1px solid #bbf7d0; }
         .stat-box.wrong { background: #fef2f2; border: 1px solid #fecaca; }
         .stat-box.total { background: #eff6ff; border: 1px solid #bfdbfe; }
-        .stat-box div {
-          display: flex;
-          flex-direction: column;
-        }
-        .stat-box span {
-          font-size: 0.75rem;
-          color: #64748b;
-        }
-        .stat-box strong {
-          font-size: 1.4rem;
-          font-weight: 800;
-          color: #1e293b;
-        }
+        .stat-box div { display: flex; flex-direction: column; }
+        .stat-box span { font-size: 0.75rem; color: #64748b; }
+        .stat-box strong { font-size: 1.4rem; font-weight: 800; color: #1e293b; }
         .stat-box.correct strong { color: #10b981; }
         .stat-box.wrong strong { color: #ef4444; }
         .stat-box.total strong { color: #3b82f6; }
 
-        /* الجدول */
         .table-card {
           background: #ffffff;
           border-radius: 20px;
@@ -303,10 +284,7 @@ export default function QuizResult() {
           font-size: 0.85rem;
           font-weight: 700;
         }
-        .table-responsive {
-          width: 100%;
-          overflow-x: auto;
-        }
+        .table-responsive { width: 100%; overflow-x: auto; }
         .modern-table {
           width: 100%;
           border-collapse: collapse;
@@ -327,12 +305,7 @@ export default function QuizResult() {
           color: #334155;
           vertical-align: middle;
         }
-        .modern-table tbody tr:hover {
-          background: #fbfcfd;
-        }
-        .text-center {
-          text-align: center !important;
-        }
+        .text-center { text-align: center !important; }
         .question-cell {
           font-weight: 600;
           max-width: 300px;
@@ -340,14 +313,8 @@ export default function QuizResult() {
           overflow: hidden;
           text-overflow: ellipsis;
         }
-        .correct-answer-cell {
-          color: #10b981;
-          font-weight: 600;
-        }
-        .wrong-answer-cell {
-          color: #ef4444;
-          font-weight: 500;
-        }
+        .correct-answer-cell { color: #10b981; font-weight: 600; }
+        .wrong-answer-cell { color: #ef4444; font-weight: 500; }
         .status-badge {
           display: inline-block;
           padding: 4px 12px;
@@ -355,21 +322,9 @@ export default function QuizResult() {
           font-size: 0.8rem;
           font-weight: 700;
         }
-        .status-badge.success {
-          background: #e6f7ee;
-          color: #10b981;
-        }
-        .status-badge.error {
-          background: #fef2f2;
-          color: #ef4444;
-        }
-        .empty-table {
-          text-align: center;
-          padding: 40px;
-          color: #64748b;
-        }
+        .status-badge.success { background: #e6f7ee; color: #10b981; }
+        .status-badge.error { background: #fef2f2; color: #ef4444; }
 
-        /* زر العودة */
         .retry-btn {
           width: 100%;
           background: #3b82f6;
@@ -395,7 +350,6 @@ export default function QuizResult() {
           box-shadow: 0 6px 16px rgba(59,130,246,0.3);
         }
 
-        /* استجابة الموبايل */
         @media (max-width: 768px) {
           .result-card { padding: 25px; }
           .stats-summary { flex-direction: column; align-items: stretch; gap: 20px; }
