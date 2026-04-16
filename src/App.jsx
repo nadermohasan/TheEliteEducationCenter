@@ -4,7 +4,7 @@ import AdminDashboard from './pages/AdminDashboard';
 import TeacherDashboard from './pages/TeacherDashboard';
 import Dashboard from "./pages/Dashboard";
 import QuizPage from './pages/QuizPage';
-import QuizResult from './pages/QuizResult'; // إضافة استيراد صفحة النتائج
+import QuizResult from './pages/QuizResult';
 
 export default function App() {
   return (

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { CheckCircle, XCircle, RotateCcw, Award, TrendingDown, Users } from "lucide-react";
 import Footer from './Footer';
+import Navbar from './Navbar';
 
 export default function QuizResult() {
   const { state } = useLocation();
@@ -22,6 +23,10 @@ export default function QuizResult() {
   const total = result.total_questions || 0;
   const percentage = total > 0 ? Math.round((score / total) * 100) : 0;
   const isPass = percentage >= 50;
+  
+  // ✅ استخراج الاسم الأول من الاسم الكامل
+  const fullName = result.studentName || 'طالب';
+  const firstName = fullName.split(' ')[0];
 
   const getCircleColor = () => {
     if (percentage >= 70) return '#10b981';
@@ -31,16 +36,7 @@ export default function QuizResult() {
 
   return (
     <div className="result-page">
-      {/* هيدر متناسق مع استجابة كاملة للموبايل */}
-      <header className="dashboard-header">
-        <div className="logo-section">
-          <div className="logo-wrapper-dash">
-            <img src="https://i.imgur.com/p1hg12H.png" alt="شعار المركز" className="logo-img-dash" />
-          </div>
-          <span className="logo-text-dash">مركز النخبة التعليمي</span>
-        </div>
-        <div className="user-section"></div>
-      </header>
+      <Navbar userName={firstName} />
 
       <main className="result-main">
         <div className="result-card">
@@ -90,7 +86,7 @@ export default function QuizResult() {
             </div>
           </div>
 
-          {/* الجدول - نفس تصميم AdminDashboard */}
+          {/* الجدول */}
           <div className="table-card">
             <div className="card-header">
               <h2 className="card-title">
@@ -162,46 +158,6 @@ export default function QuizResult() {
           flex-direction: column;
           background: linear-gradient(180deg, #f4f7fc 0%, #e9f0f9 100%);
         }
-
-        /* الهيدر المتجاوب */
-        .dashboard-header {
-          background: rgba(255,255,255,0.95);
-          padding: 12px 30px;
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          border-radius: 0 0 24px 24px;
-          box-shadow: 0 6px 18px rgba(0,0,0,0.04);
-          backdrop-filter: blur(10px);
-          position: sticky;
-          top: 0;
-          z-index: 100;
-        }
-        .logo-section {
-          display: flex;
-          align-items: center;
-          gap: 12px;
-        }
-        .logo-wrapper-dash {
-          background: white;
-          width: 48px;
-          height: 48px;
-          border-radius: 50%;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          overflow: hidden;
-          box-shadow: 0 4px 10px rgba(0,0,0,0.08);
-          border: 1px solid #e2e8f0;
-        }
-        .logo-img-dash { max-width: 90%; max-height: 90%; object-fit: contain; }
-        .logo-text-dash {
-          font-weight: 800;
-          font-size: 1.2rem;
-          color: #1e3a8a;
-          letter-spacing: -0.3px;
-        }
-        .user-section { width: 100px; }
 
         /* المحتوى الرئيسي */
         .result-main {
@@ -315,7 +271,7 @@ export default function QuizResult() {
         .stat-box.wrong strong { color: #ef4444; }
         .stat-box.total strong { color: #3b82f6; }
 
-        /* الجدول - مطابق تماماً لـ AdminDashboard */
+        /* الجدول */
         .table-card {
           background: #ffffff;
           border-radius: 20px;
@@ -445,36 +401,9 @@ export default function QuizResult() {
           .stats-summary { flex-direction: column; align-items: stretch; gap: 20px; }
           .score-stats { justify-content: center; }
           .stat-box { justify-content: center; }
-          
-          /* جعل الهيدر بحيث يكون اللوجو في المنتصف */
-          .dashboard-header {
-            justify-content: center;
-            padding: 10px 20px;
-          }
-          .logo-section {
-            justify-content: center;
-          }
-          .logo-text-dash {
-            display: inline-block; /* نبقيه على الموبايل لأن المساحة متاحة الآن */
-            font-size: 1rem;
-          }
-          .user-section {
-            display: none; /* نختفي المساحة الفارغة */
-          }
-          
           .card-header { flex-direction: column; align-items: flex-start; gap: 10px; }
           .modern-table th, .modern-table td { padding: 10px 12px; font-size: 0.85rem; }
           .question-cell { max-width: 180px; }
-        }
-
-        /* للشاشات الصغيرة جداً */
-        @media (max-width: 480px) {
-          .logo-text-dash {
-            display: none; /* نخفي النص ونبقي اللوجو فقط */
-          }
-          .dashboard-header {
-            padding: 10px 15px;
-          }
         }
       `}</style>
     </div>

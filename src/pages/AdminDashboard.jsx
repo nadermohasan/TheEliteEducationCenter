@@ -2,17 +2,8 @@ import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '../supabaseClient';
 import { useNavigate } from 'react-router-dom';
 import Footer from './Footer';
+import Navbar from './Navbar';
 import { Users, CheckCircle, Search, TrendingUp, RefreshCw } from 'lucide-react';
-
-// أيقونة الخروج
-const LogoutIcon = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
-       strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-    <polyline points="16 17 21 12 16 7" />
-    <line x1="21" y1="12" x2="9" y2="12" />
-  </svg>
-);
 
 export default function AdminDashboard() {
   const [users, setUsers] = useState([]);
@@ -78,22 +69,15 @@ export default function AdminDashboard() {
     fetchStats();
   }, [fetchUsers, fetchAdminProfile, fetchStats]);
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    navigate('/');
-  };
-
   const handleActivateAttempt = async (studentId) => {
     setProcessingId(studentId);
     try {
-      // إنهاء المحاولات النشطة السابقة
       await supabase
         .from('attempts')
         .update({ status: 'completed' })
         .eq('student_id', studentId)
         .eq('status', 'active');
 
-      // إنشاء محاولة جديدة
       const { data: newAttempt, error: attemptError } = await supabase
         .from('attempts')
         .insert([{ student_id: studentId, status: 'active' }])
@@ -102,13 +86,11 @@ export default function AdminDashboard() {
 
       if (attemptError) throw attemptError;
 
-      // جلب جميع المواد
       const { data: subjects } = await supabase.from('subjects').select('id');
       if (!subjects || subjects.length === 0) {
         throw new Error('لا توجد مواد مسجلة في النظام');
       }
 
-      // جلب أسئلة جميع المواد بالتوازي
       const questionsPromises = subjects.map(subject =>
         supabase
           .from('questions')
@@ -117,7 +99,6 @@ export default function AdminDashboard() {
       );
       const questionsResults = await Promise.all(questionsPromises);
 
-      // تجهيز بيانات الإدراج
       let allInsertData = [];
       for (let i = 0; i < subjects.length; i++) {
         const qs = questionsResults[i].data;
@@ -154,7 +135,7 @@ export default function AdminDashboard() {
   const filteredUsers = users.filter(u =>
     u.name?.includes(searchTerm) || u.username?.includes(searchTerm)
   );
-  const displayName = adminProfile?.name || 'مدير النظام';
+
   const todayNewStudents = users.filter(u => {
     const createdDate = new Date(u.created_at);
     const today = new Date();
@@ -163,42 +144,14 @@ export default function AdminDashboard() {
 
   return (
     <div className="dashboard-container">
-      {/* الهيدر العلوي */}
-      <header className="dashboard-header">
-        <button onClick={handleLogout} className="logout-button">
-          <span>خروج</span>
-          <span className="logout-icon"><LogoutIcon/></span>
-        </button>
+      <Navbar userName={adminProfile?.name || 'مدير النظام'} />
 
-        <div className="logo-section">
-          <div className="logo-wrapper-dash">
-            <img src="https://i.imgur.com/p1hg12H.png" alt="شعار المركز" className="logo-img-dash"/>
-          </div>
-          <span className="logo-text-dash">مركز النخبة التعليمي</span>
-        </div>
-
-        <div className="user-section">
-          <div className="user-info">
-            <span className="user-name">{displayName}</span>
-            <img
-              src={`https://api.dicebear.com/7.x/avataaars-neutral/svg?seed=${displayName}`}
-              alt="Avatar"
-              className="user-avatar"
-            />
-          </div>
-        </div>
-      </header>
-
-      {/* المحتوى الرئيسي */}
       <main className="dashboard-main">
         <div className="page-header">
           <div>
             <h1 className="page-title">إدارة الطلاب</h1>
-            <p className="page-subtitle">تفعيل محاولات الاختبار للطلاب المسجلين</p>
           </div>
-          <button className="refresh-btn" onClick={() => { fetchUsers(); fetchStats(); }}>
-            <RefreshCw size={18} /> تحديث
-          </button>
+          {/* تم حذف الزر من هنا */}
         </div>
 
         {/* بطاقات إحصائية سريعة */}
@@ -250,7 +203,13 @@ export default function AdminDashboard() {
             <h2 className="card-title">
               <Users size={20} className="icon-blue" /> قائمة الطلاب
             </h2>
-            <span className="badge-count">{filteredUsers.length} طالب</span>
+            {/* الزر الآن داخل الهيدر الخاص بالجدول */}
+            <div className="card-header-actions">
+                <span className="badge-count">{filteredUsers.length} طالب</span>
+                <button className="refresh-btn-table" onClick={() => { fetchUsers(); fetchStats(); }}>
+                    <RefreshCw size={16} /> <span>تحديث</span>
+                </button>
+            </div>
           </div>
           <div className="table-responsive">
             {loading ? (
@@ -328,81 +287,6 @@ export default function AdminDashboard() {
           flex-direction: column;
         }
 
-        /* --- الهيدر --- */
-        .dashboard-header {
-          background-color: #ffffff;
-          padding: 12px 30px;
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          border-radius: 0 0 24px 24px;
-          box-shadow: 0 6px 18px rgba(0,0,0,0.04);
-          margin-bottom: 28px;
-          position: sticky;
-          top: 0;
-          z-index: 1000;
-          background: rgba(255,255,255,0.95);
-        }
-
-        .logo-section { 
-          display: flex; 
-          align-items: center; 
-          gap: 12px; 
-        }
-        .logo-wrapper-dash {
-          background-color: white;
-          width: 48px;
-          height: 48px;
-          border-radius: 50%;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          overflow: hidden;
-          box-shadow: 0 4px 10px rgba(0,0,0,0.08);
-          border: 1px solid #e2e8f0;
-        }
-        .logo-img-dash { max-width: 90%; max-height: 90%; object-fit: contain; }
-        .logo-text-dash { 
-          font-weight: 800; 
-          font-size: 1.2rem; 
-          color: #1e3a8a; 
-          letter-spacing: -0.3px;
-        }
-
-        .user-section { display: flex; align-items: center; gap: 20px; }
-        .user-info { display: flex; align-items: center; gap: 12px; }
-        .user-name { font-weight: 600; color: #334155; font-size: 1rem; }
-        .user-avatar { 
-          width: 44px; 
-          height: 44px; 
-          border-radius: 50%; 
-          background-color: #f1f5f9; 
-          border: 2px solid #e2e8f0; 
-        }
-
-        .logout-button {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          background-color: #ffffff;
-          border: 1px solid #e2e8f0;
-          color: #475569;
-          padding: 8px 18px;
-          border-radius: 30px;
-          font-family: 'Cairo', sans-serif;
-          font-size: 0.95rem;
-          font-weight: 600;
-          cursor: pointer;
-          transition: all 0.25s;
-        }
-        .logout-button:hover { 
-          background-color: #fef2f2; 
-          color: #dc2626; 
-          border-color: #fecaca; 
-        }
-        .logout-icon { width: 18px; height: 18px; display: flex; }
-
-        /* --- المحتوى الرئيسي --- */
         .dashboard-main {
           flex: 1;
           width: 100%;
@@ -416,6 +300,7 @@ export default function AdminDashboard() {
           justify-content: space-between;
           align-items: center;
           margin-bottom: 32px;
+          padding-right: 42%;
         }
         .page-title {
           font-size: 2rem;
@@ -427,29 +312,11 @@ export default function AdminDashboard() {
           font-size: 1rem;
           color: #64748b;
         }
-        .refresh-btn {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          background: white;
-          border: 1px solid #e2e8f0;
-          padding: 10px 20px;
-          border-radius: 12px;
-          font-family: 'Cairo';
-          font-weight: 600;
-          color: #475569;
-          cursor: pointer;
-          transition: 0.2s;
-        }
-        .refresh-btn:hover {
-          background: #f8fafc;
-          border-color: #cbd5e1;
-        }
 
         /* بطاقات الإحصائيات */
         .stats-grid {
           display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+          grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
           gap: 20px;
           margin-bottom: 32px;
         }
@@ -476,24 +343,30 @@ export default function AdminDashboard() {
           align-items: center;
           justify-content: center;
           color: white;
+          flex-shrink: 0;
         }
         .stat-icon-wrapper.blue { background: linear-gradient(145deg, #3b82f6, #2563eb); }
         .stat-icon-wrapper.green { background: linear-gradient(145deg, #10b981, #059669); }
         .stat-icon-wrapper.purple { background: linear-gradient(145deg, #8b5cf6, #7c3aed); }
+        
         .stat-content {
           display: flex;
           flex-direction: column;
+          align-items: center; /* حل مشكلة المحاذاة */
+          flex: 1;
+          text-align: center;
         }
         .stat-label {
           font-size: 0.9rem;
-          font-weight: 500;
+          font-weight: 600;
           color: #64748b;
+          margin-bottom: 4px;
         }
         .stat-number {
           font-size: 2rem;
           font-weight: 800;
           color: #1e293b;
-          line-height: 1.2;
+          line-height: 1;
         }
 
         /* حقل البحث */
@@ -525,7 +398,7 @@ export default function AdminDashboard() {
           box-shadow: 0 0 0 4px rgba(59,130,246,0.1);
         }
 
-        /* بطاقة الجدول (مثل TeacherDashboard) */
+        /* بطاقة الجدول */
         .table-card {
           background: #ffffff;
           border-radius: 20px;
@@ -534,15 +407,20 @@ export default function AdminDashboard() {
           margin-bottom: 30px;
         }
         .card-header {
-          padding: 25px 30px;
+          padding: 20px 25px;
           border-bottom: 1px solid #f1f5f9;
           display: flex;
           justify-content: space-between;
           align-items: center;
         }
+        .card-header-actions {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+        }
         .card-title {
           margin: 0;
-          font-size: 1.2rem;
+          font-size: 1.1rem;
           color: #1e293b;
           display: flex;
           align-items: center;
@@ -552,11 +430,34 @@ export default function AdminDashboard() {
         .badge-count {
           background: #eff6ff;
           color: #3b82f6;
-          padding: 6px 14px;
+          padding: 4px 12px;
           border-radius: 20px;
-          font-size: 0.9rem;
+          font-size: 0.85rem;
           font-weight: 700;
         }
+
+        /* زر التحديث الجديد */
+        .refresh-btn-table {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          background: #f8fafc;
+          border: 1px solid #e2e8f0;
+          padding: 6px 12px;
+          border-radius: 10px;
+          font-family: 'Cairo';
+          font-weight: 600;
+          font-size: 0.85rem;
+          color: #475569;
+          cursor: pointer;
+          transition: 0.2s;
+        }
+        .refresh-btn-table:hover {
+          background: #eff6ff;
+          color: #3b82f6;
+          border-color: #3b82f6;
+        }
+
         .table-responsive {
           width: 100%;
           overflow-x: auto;
@@ -584,11 +485,8 @@ export default function AdminDashboard() {
         .modern-table tbody tr:hover {
           background: #fbfcfd;
         }
-        .text-center {
-          text-align: center !important;
-        }
+        .text-center { text-align: center !important; }
 
-        /* خلية المستخدم */
         .user-cell {
           display: flex;
           align-items: center;
@@ -611,7 +509,6 @@ export default function AdminDashboard() {
           color: #1e293b;
         }
 
-        /* زر التفعيل في الجدول */
         .activate-btn-table {
           background: #3b82f6;
           color: white;
@@ -646,20 +543,10 @@ export default function AdminDashboard() {
         }
         @keyframes spin { to { transform: rotate(360deg); } }
 
-        /* حالات فارغة وتحميل */
         .empty-state {
           padding: 60px 20px;
           text-align: center;
           color: #64748b;
-        }
-        .empty-icon {
-          font-size: 3rem;
-          margin-bottom: 16px;
-          opacity: 0.6;
-        }
-        .empty-state h3 {
-          color: #1e293b;
-          margin-bottom: 8px;
         }
         .loading-spinner {
           width: 40px;
@@ -671,43 +558,27 @@ export default function AdminDashboard() {
           margin: 0 auto 20px;
         }
 
-        /* تجاوب */
         @media (max-width: 768px) {
-          .dashboard-header {
-            padding: 10px 16px;
-          }
-          .logo-text-dash {
-            display: none;
-          }
-          .page-header {
-            flex-direction: column;
-            gap: 16px;
-            align-items: flex-start;
-          }
-          .page-title {
-            font-size: 1.6rem;
-          }
-          .stats-grid {
-            grid-template-columns: 1fr;
-          }
-          .card-header {
-            flex-direction: column;
-            gap: 12px;
-            align-items: flex-start;
-          }
-          .modern-table th,
-          .modern-table td {
-            padding: 12px 15px;
-          }
-          .user-avatar-small {
-            width: 28px;
-            height: 28px;
-            font-size: 0.8rem;
-          }
-          .activate-btn-table {
-            padding: 6px 12px;
-            font-size: 0.75rem;
-          }
+          .dashboard-main { padding: 0 16px 24px; }
+          .page-header { margin-bottom: 20px; }
+          .page-title { font-size: 1.6rem; }
+          
+          .stats-grid { grid-template-columns: 1fr; }
+          .stat-card { justify-content: flex-start; }
+          .stat-content { align-items: flex-start; text-align: right; }
+          
+          .card-header { padding: 15px; }
+          .card-header-actions { gap: 8px; }
+          .refresh-btn-table span { display: none; } /* إخفاء نص تحديث في الموبايل */
+          
+          .modern-table th, .modern-table td { padding: 12px; }
+        .page-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 32px;
+          padding-right: 35%;
+        }
         }
       `}</style>
     </div>

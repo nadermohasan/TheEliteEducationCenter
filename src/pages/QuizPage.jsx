@@ -3,6 +3,111 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 import Footer from './Footer';
 
+// --- مكون شاشة التحميل الجديد ---
+const LoadingScreen = () => (
+  <div className="loading-overlay">
+    <div className="loading-content">
+      <div className="status-section">
+        <h2 className="loading-title">يرجى الانتظار</h2>
+        <div className="loading-bar-container">
+          <div className="loading-bar-shimmer"></div>
+        </div>
+        <p className="loading-text">جاري تحضير محاولة الاختبار...</p>
+      </div>
+    </div>
+
+    <style>{`
+      @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap');
+
+      .loading-overlay {
+        position: fixed;
+        inset: 0;
+        background: #f8fafc;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+        direction: rtl;
+        font-family: 'Cairo', sans-serif;
+        overflow: hidden;
+      }
+
+      .loading-overlay::before {
+        content: '';
+        position: absolute;
+        width: 150%;
+        height: 150%;
+        background: radial-gradient(circle at center, rgba(59, 130, 246, 0.05) 0%, transparent 70%);
+        animation: rotateBg 10s linear infinite;
+      }
+
+      @keyframes rotateBg {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+      }
+
+      .loading-content {
+        position: relative;
+        text-align: center;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 20px; 
+      }
+
+      .loading-title {
+        color: #1e293b; 
+        font-size: 1.8rem;
+        font-weight: 700;
+        margin-bottom: 15px;
+        letter-spacing: 0.5px;
+      }
+
+      .loading-text {
+        color: #64748b; 
+        font-size: 1rem;
+        margin-top: 15px;
+        animation: fadeInOut 2s infinite;
+      }
+
+      .loading-bar-container {
+        width: 260px;
+        height: 6px;
+        background: #e2e8f0; 
+        border-radius: 10px;
+        position: relative;
+        overflow: hidden;
+        margin: 0 auto;
+      }
+
+      .loading-bar-shimmer {
+        position: absolute;
+        top: 0;
+        left: 0;
+        height: 100%;
+        width: 40%;
+        background: linear-gradient(90deg, transparent, #3b82f6, transparent);
+        animation: shimmer 1.5s infinite ease-in-out;
+      }
+
+      @keyframes shimmer {
+        0% { left: -50%; }
+        100% { left: 150%; }
+      }
+
+      @keyframes fadeInOut {
+        0%, 100% { opacity: 0.7; }
+        50% { opacity: 1; }
+      }
+
+      @media (max-width: 480px) {
+        .loading-title { font-size: 1.5rem; }
+        .loading-bar-container { width: 200px; }
+      }
+    `}</style>
+  </div>
+);
+
 export default function QuizPage() {
   const { subjectId } = useParams();
   const navigate = useNavigate();
@@ -45,6 +150,21 @@ export default function QuizPage() {
       if (!user) {
         navigate('/login');
         return false;
+      }
+      
+      let studentName = 'طالب';
+      try {
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('name')
+          .eq('id', user.id)
+          .maybeSingle();
+          
+        if (!profileError && profile?.name) {
+          studentName = profile.name;
+        }
+      } catch (err) {
+        console.warn('تعذر جلب اسم الطالب:', err);
       }
       
       const currentBlocks = blocksRef.current;
@@ -100,7 +220,8 @@ export default function QuizPage() {
           score: finalScore, 
           total_questions: allQuestions.length, 
           questions: allQuestions, 
-          selectedAnswers: currentAnswers 
+          selectedAnswers: currentAnswers,
+          studentName: studentName 
         },
         replace: true
       });
@@ -240,7 +361,8 @@ export default function QuizPage() {
       console.error(err);
       setError('error');
     } finally {
-      setLoading(false);
+      // نترك تأخيراً بسيطاً لضمان سلاسة الانتقال البصري
+      setTimeout(() => setLoading(false), 800);
     }
   }, [navigate, numericSubjectId]);
 
@@ -275,21 +397,12 @@ export default function QuizPage() {
     setSelectedAnswers(prev => ({ ...prev, [questionId]: answerIndex }));
   };
 
-  const currentBlock = blocks[currentBlockIndex];
-  const totalBlocks = blocks.length;
+  // --- التحكم في المخرجات بناءً على الحالة ---
 
-  let totalQuestionsCount = 0;
-  blocks.forEach(block => {
-    if (block.type === 'passage') totalQuestionsCount += block.questions.length;
-    else totalQuestionsCount += 1;
-  });
-  const answeredCount = Object.keys(selectedAnswers).length;
-  const progress = totalQuestionsCount > 0 ? (answeredCount / totalQuestionsCount) * 100 : 0;
-
-  const optionLabels = isEnglishSubject ? ['A', 'B', 'C', 'D'] : ['أ', 'ب', 'ج', 'د'];
-
-  if (loading) return null;
+  // 1. حالة التحميل
+  if (loading) return <LoadingScreen />;
   
+  // 2. حالة الخطأ (بعد انتهاء التحميل)
   if (error) {
     return (
       <div className="quiz-page-wrapper" style={{ direction: isEnglishSubject ? 'ltr' : 'rtl' }}>
@@ -337,8 +450,38 @@ export default function QuizPage() {
     );
   }
 
+  const currentBlock = blocks[currentBlockIndex];
   if (!currentBlock) return null;
 
+  // حساب المتغيرات الجديدة لعرض الترقيم بشكل صحيح
+  const totalBlocks = blocks.length;
+  
+  // عدد القطع الفعلي (فقط الكتل من نوع passage)
+  const passagesCount = blocks.filter(block => block.type === 'passage').length;
+  
+  // إجمالي عدد الأسئلة الكلي
+  const totalQuestionsCount = blocks.reduce((acc, block) => {
+    return acc + (block.type === 'passage' ? block.questions.length : 1);
+  }, 0);
+  
+  // رقم السؤال الحالي (بالنسبة لإجمالي الأسئلة)
+  let currentQuestionNumber = 0;
+  for (let i = 0; i < currentBlockIndex; i++) {
+    const block = blocks[i];
+    if (block.type === 'passage') {
+      currentQuestionNumber += block.questions.length;
+    } else {
+      currentQuestionNumber += 1;
+    }
+  }
+  // السؤال الأول في الكتلة الحالية
+  currentQuestionNumber = currentQuestionNumber + 1;
+
+  const answeredCount = Object.keys(selectedAnswers).length;
+  const progress = totalQuestionsCount > 0 ? (answeredCount / totalQuestionsCount) * 100 : 0;
+  const optionLabels = isEnglishSubject ? ['A', 'B', 'C', 'D'] : ['أ', 'ب', 'ج', 'د'];
+
+  // 3. حالة الصفحة الرئيسية للاختبار
   return (
     <div className="quiz-page-wrapper" style={{ direction: isEnglishSubject ? 'ltr' : 'rtl' }}>
       <header className="quiz-header">
@@ -366,10 +509,13 @@ export default function QuizPage() {
           <div className="question-card">
             <div className="q-header">
               <span className="q-number">
-                {isEnglishSubject && currentBlock.type === 'passage' 
-                  ? `القطعة ${currentBlockIndex + 1} من ${totalBlocks} • تحتوي على ${currentBlock.questions.length} أسئلة`
-                  : `السؤال ${currentBlockIndex + 1} من ${totalBlocks}`
-                }
+                {isEnglishSubject && currentBlock.type === 'passage' ? (
+                  <>
+                    القطعة {currentBlockIndex + 1} من {passagesCount} • السؤال {currentQuestionNumber} من {totalQuestionsCount}
+                  </>
+                ) : (
+                  `السؤال ${currentQuestionNumber} من ${totalQuestionsCount}`
+                )}
               </span>
             </div>
 
@@ -443,7 +589,7 @@ export default function QuizPage() {
                 if (block.type === 'passage') {
                   const allAnswered = block.questions.every(q => selectedAnswers[q.id] !== undefined);
                   isCompleted = allAnswered;
-                  label = `📄 ${idx+1}`;
+                  label = `${idx+1}`;
                 } else {
                   isCompleted = selectedAnswers[block.question.id] !== undefined;
                   label = `${idx+1}`;
@@ -497,7 +643,6 @@ export default function QuizPage() {
         .q-header { margin-bottom: 24px; }
         .q-number { background: #f0fdf4; color: #16a34a; padding: 8px 18px; border-radius: 100px; font-weight: 700; font-size: 0.95rem; display: inline-block; border: 1px solid #dcfce7; }
         
-        /* Passage box responsive to direction */
         .passage-box { 
           background: #f8fafc; 
           padding: 30px; 
@@ -530,7 +675,6 @@ export default function QuizPage() {
         .question-image { max-width: 100%; max-height: 350px; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.08); border: 1px solid #f1f5f9; }
         .options-grid { display: flex; flex-direction: column; gap: 14px; }
 
-        /* Default option styling (Arabic: label on right, text middle, circle left) */
         .option-item {
           display: flex;
           align-items: center;
@@ -593,11 +737,9 @@ export default function QuizPage() {
           transform: translate(-50%, -50%);
         }
 
-        /* English specific layout: keep default order (label, value, circle) but adjust text alignment */
         .english-options .option-value {
           text-align: left;
         }
-        /* No flex-direction change, just text alignment */
 
         .quiz-nav-controls { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-top: 40px; padding-top: 20px; border-top: 1px solid #eef2f6; }
         .nav-btn { padding: 14px 36px; border-radius: 16px; border: 1.5px solid #e2e8f0; background: white; font-family: 'Cairo'; font-weight: 700; cursor: pointer; transition: all 0.2s ease; color: #475569; font-size: 1.05rem; }

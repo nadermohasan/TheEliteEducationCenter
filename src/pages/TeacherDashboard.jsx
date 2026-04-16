@@ -4,14 +4,7 @@ import { supabase } from '../supabaseClient';
 import { PlusCircle, Trash2, BookOpen, Edit2, X, UploadCloud, CheckCircle2, FileText, Upload, Download, FileSpreadsheet, FileJson, AlertCircle, Search, Image as ImageIcon } from "lucide-react";
 import * as XLSX from 'xlsx';
 import Footer from './Footer';
-
-const LogoutIcon = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-    <polyline points="16 17 21 12 16 7" />
-    <line x1="21" y1="12" x2="9" y2="12" />
-  </svg>
-);
+import Navbar from './Navbar';
 
 // دوال تحويل الإجابة الصحيحة للرفع الجماعي
 const mapCorrectOption = (value, isEnglish = false) => {
@@ -237,11 +230,6 @@ export default function TeacherDashboard() {
     } catch (error) { alert("خطأ أثناء الحذف: " + error.message); }
   };
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    navigate('/login');
-  };
-
   const loadQuestionForEdit = (question) => {
     const options = question.options || ['', '', '', ''];
     setFormData({
@@ -333,7 +321,7 @@ export default function TeacherDashboard() {
     reader.readAsText(file);
   };
 
-  // ✅ الدالة المعدلة لتدعم المادة بـ contains والإجابة الصحيحة كنص كامل
+  // الدالة المعدلة لتدعم المادة بـ contains والإجابة الصحيحة كنص كامل
 const validateBulkData = async (rows) => {
   const errors = [];
   const validRows = [];
@@ -432,7 +420,7 @@ const validateBulkData = async (rows) => {
 
   setBulkErrors(errors);
   setBulkPreview(validRows);
-};  // ← هنا تنتهي الدالة، لا يوجد شيء بعدها
+};
 
   const handleBulkSubmit = async () => {
     if (bulkPreview.length === 0) { alert('لا توجد بيانات صالحة للرفع'); return; }
@@ -496,7 +484,7 @@ const validateBulkData = async (rows) => {
     XLSX.writeFile(wb, 'نموذج_رفع_الأسئلة.xlsx');
   };
 
-  const displayName = teacherProfile?.name || 'معلم';
+  const firstName = teacherProfile?.name?.split(' ')[0] || 'معلم';
   const filteredQuestions = questions.filter(q => q.question_text?.includes(searchTerm) || q.subjects?.name?.includes(searchTerm));
 
   const isEnglishSubject = () => {
@@ -541,16 +529,7 @@ const validateBulkData = async (rows) => {
 
   return (
     <div className="teacher-container">
-      <header className="dashboard-header">
-        <button onClick={handleLogout} className="logout-button"><span>خروج</span><span className="logout-icon"><LogoutIcon/></span></button>
-        <div className="logo-section">
-          <div className="logo-wrapper-dash"><img src="https://i.imgur.com/p1hg12H.png" alt="شعار المركز" className="logo-img-dash"/></div>
-          <span className="logo-text-dash">مركز النخبة التعليمي</span>
-        </div>
-        <div className="user-section">
-          <div className="user-info"><span className="user-name">{displayName}</span><img src={`https://api.dicebear.com/7.x/avataaars-neutral/svg?seed=${displayName}`} alt="Avatar" className="user-avatar"/></div>
-        </div>
-      </header>
+      <Navbar userName={teacherProfile?.name || 'معلم'} />
 
       <main className="teacher-main">
         <div className="page-header">
@@ -737,18 +716,6 @@ const validateBulkData = async (rows) => {
         * { box-sizing: border-box; margin: 0; }
         body { margin: 0; background-color: #f4f7fe; font-family: 'Cairo', sans-serif; }
         .teacher-container { direction: rtl; min-height: 100vh; display: flex; flex-direction: column; background: linear-gradient(180deg, #f4f7fc 0%, #e9f0f9 100%); }
-        .dashboard-header { background-color: #ffffff; padding: 12px 30px; display: flex; justify-content: space-between; align-items: center; border-radius: 0 0 24px 24px; box-shadow: 0 6px 18px rgba(0,0,0,0.04); position: sticky; top: 0; z-index: 1000; backdrop-filter: blur(10px); background: rgba(255,255,255,0.95); }
-        .logo-section { display: flex; align-items: center; gap: 12px; }
-        .logo-wrapper-dash { background-color: white; width: 48px; height: 48px; border-radius: 50%; display: flex; align-items: center; justify-content: center; overflow: hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.08); border: 1px solid #e2e8f0; }
-        .logo-img-dash { max-width: 90%; max-height: 90%; object-fit: contain; }
-        .logo-text-dash { font-weight: 800; font-size: 1.2rem; color: #1e3a8a; letter-spacing: -0.3px; }
-        .user-section { display: flex; align-items: center; gap: 20px; }
-        .user-info { display: flex; align-items: center; gap: 12px; }
-        .user-name { font-weight: 600; color: #334155; font-size: 1rem; }
-        .user-avatar { width: 44px; height: 44px; border-radius: 50%; background-color: #f1f5f9; border: 2px solid #e2e8f0; }
-        .logout-button { display: flex; align-items: center; gap: 8px; background-color: #ffffff; border: 1px solid #e2e8f0; color: #475569; padding: 8px 18px; border-radius: 30px; font-family: 'Cairo', sans-serif; font-size: 0.95rem; font-weight: 600; cursor: pointer; transition: all 0.25s; }
-        .logout-button:hover { background-color: #fef2f2; color: #dc2626; border-color: #fecaca; }
-        .logout-icon { width: 18px; height: 18px; display: flex; }
         .teacher-main { flex: 1; width: 100%; max-width: 1280px; margin: 0 auto; padding: 32px 24px; }
         .page-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 32px; }
         .page-title { font-size: 2rem; font-weight: 800; color: #0f172a; margin-bottom: 6px; }
@@ -842,7 +809,14 @@ const validateBulkData = async (rows) => {
         .preview-table th, .preview-table td { padding: 10px; text-align: right; border-bottom: 1px solid #e2e8f0; }
         .passages-list { display: flex; flex-direction: column; gap: 10px; }
         .passage-item { display: flex; justify-content: space-between; align-items: center; padding: 12px; background: #f8fafc; border-radius: 12px; }
-        @media (max-width: 768px) { .dashboard-header { padding: 10px 16px; } .logo-text-dash { display: none; } .page-header { flex-direction: column; gap: 16px; } .header-actions { width: 100%; } .header-actions button { flex: 1; } .form-grid { grid-template-columns: 1fr; } .card-header-actions { flex-direction: column; align-items: flex-end; } .search-input-small { width: 100%; } }
+        @media (max-width: 768px) {
+          .page-header { flex-direction: column; gap: 16px; }
+          .header-actions { width: 100%; }
+          .header-actions button { flex: 1; }
+          .form-grid { grid-template-columns: 1fr; }
+          .card-header-actions { flex-direction: column; align-items: flex-end; }
+          .search-input-small { width: 100%; }
+        }
       `}</style>
     </div>
   );
