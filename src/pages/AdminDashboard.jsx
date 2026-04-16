@@ -12,6 +12,7 @@ export default function AdminDashboard() {
   const [processingId, setProcessingId] = useState(null);
   const [adminProfile, setAdminProfile] = useState(null);
   const [stats, setStats] = useState({ totalStudents: 0, activeAttempts: 0 });
+  const [activeAttemptsMap, setActiveAttemptsMap] = useState({}); // لتخزين حالة المحاولة لكل طالب
   const navigate = useNavigate();
 
   const fetchStats = useCallback(async () => {
@@ -51,6 +52,22 @@ export default function AdminDashboard() {
     }
   }, []);
 
+  // جلب المحاولات النشطة لكل الطلاب
+  const fetchActiveAttempts = useCallback(async () => {
+    const { data, error } = await supabase
+      .from('attempts')
+      .select('student_id, status')
+      .eq('status', 'active');
+
+    if (!error && data) {
+      const map = {};
+      data.forEach(attempt => {
+        map[attempt.student_id] = true;
+      });
+      setActiveAttemptsMap(map);
+    }
+  }, []);
+
   const fetchUsers = useCallback(async () => {
     setLoading(true);
     const { data, error } = await supabase
@@ -63,21 +80,30 @@ export default function AdminDashboard() {
     setLoading(false);
   }, []);
 
+  const refreshAllData = useCallback(() => {
+    fetchUsers();
+    fetchStats();
+    fetchActiveAttempts();
+  }, [fetchUsers, fetchStats, fetchActiveAttempts]);
+
   useEffect(() => {
     fetchUsers();
     fetchAdminProfile();
     fetchStats();
-  }, [fetchUsers, fetchAdminProfile, fetchStats]);
+    fetchActiveAttempts();
+  }, [fetchUsers, fetchAdminProfile, fetchStats, fetchActiveAttempts]);
 
   const handleActivateAttempt = async (studentId) => {
     setProcessingId(studentId);
     try {
+      // إنهاء أي محاولة نشطة حالية
       await supabase
         .from('attempts')
         .update({ status: 'completed' })
         .eq('student_id', studentId)
         .eq('status', 'active');
 
+      // إنشاء محاولة جديدة
       const { data: newAttempt, error: attemptError } = await supabase
         .from('attempts')
         .insert([{ student_id: studentId, status: 'active' }])
@@ -124,7 +150,11 @@ export default function AdminDashboard() {
       if (insertError) throw insertError;
 
       alert('تم تفعيل محاولة جديدة بنجاح!');
+      
+      // تحديث البيانات
       await fetchStats();
+      await fetchActiveAttempts(); // تحديث حالة المحاولات النشطة
+      
     } catch (e) {
       alert('خطأ: ' + e.message);
     } finally {
@@ -204,7 +234,7 @@ export default function AdminDashboard() {
             </h2>
             <div className="card-header-actions">
                 <span className="badge-count">{filteredUsers.length} طالب</span>
-                <button className="refresh-btn-table" onClick={() => { fetchUsers(); fetchStats(); }}>
+                <button className="refresh-btn-table" onClick={refreshAllData}>
                     <RefreshCw size={16} /> <span>تحديث</span>
                 </button>
             </div>
@@ -226,36 +256,49 @@ export default function AdminDashboard() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredUsers.map((user) => (
-                    <tr key={user.id}>
-                      <td>
-                        <div className="user-cell">
-                          <div className="user-avatar-small">
-                            {user.name?.charAt(0) || 'ط'}
+                  {filteredUsers.map((user) => {
+                    const hasActiveAttempt = activeAttemptsMap[user.id];
+                    return (
+                      <tr key={user.id}>
+                        <td>
+                          <div className="user-cell">
+                            <div className="user-avatar-small">
+                              {user.name?.charAt(0) || 'ط'}
+                            </div>
+                            <span className="user-name-cell">{user.name || 'غير محدد'}</span>
                           </div>
-                          <span className="user-name-cell">{user.name || 'غير محدد'}</span>
-                        </div>
-                      </td>
-                      <td>{user.username || '—'}</td>
-                      <td>{new Date(user.created_at).toLocaleDateString('ar-EG')}</td>
-                      <td className="text-center">
-                        <button
-                          className="activate-btn-table"
-                          onClick={() => handleActivateAttempt(user.id)}
-                          disabled={processingId === user.id}
-                        >
-                          {processingId === user.id ? (
-                            <>
-                              <span className="spinner-small"></span>
-                              جاري...
-                            </>
+                        </td>
+                        <td>{user.username || '—'}</td>
+                        <td>{new Date(user.created_at).toLocaleDateString('ar-EG')}</td>
+                        <td className="text-center">
+                          {hasActiveAttempt ? (
+                            <button
+                              className="activate-btn-table active-attempt"
+                              disabled
+                              style={{ background: '#10b981', cursor: 'default' }}
+                            >
+                              ✓ محاولة مفعلة
+                            </button>
                           ) : (
-                            'تفعيل محاولة'
+                            <button
+                              className="activate-btn-table"
+                              onClick={() => handleActivateAttempt(user.id)}
+                              disabled={processingId === user.id}
+                            >
+                              {processingId === user.id ? (
+                                <>
+                                  <span className="spinner-small"></span>
+                                  جاري...
+                                </>
+                              ) : (
+                                'تفعيل محاولة'
+                              )}
+                            </button>
                           )}
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             ) : (
@@ -531,6 +574,11 @@ export default function AdminDashboard() {
           background: #cbd5e1;
           cursor: not-allowed;
         }
+        .activate-btn-table.active-attempt {
+          background: #10b981 !important;
+          color: white;
+          cursor: default;
+        }
         .spinner-small {
           width: 14px;
           height: 14px;
@@ -563,16 +611,16 @@ export default function AdminDashboard() {
             padding: 0 16px 24px;
           }
           .page-header {
-    flex-direction: column;
-    align-items: center;     /* توسيط العنوان أفقياً */
-    padding-right: 0;
-    margin-bottom: 20px;
-  }
-  .page-title {
-    font-size: 1.6rem;
-    text-align: center;     /* توسيط النص */
-    width: 100%;
-  }
+            flex-direction: column;
+            align-items: center;     /* توسيط العنوان أفقياً */
+            padding-right: 0;
+            margin-bottom: 20px;
+          }
+          .page-title {
+            font-size: 1.6rem;
+            text-align: center;     /* توسيط النص */
+            width: 100%;
+          }
           
           .stats-grid {
             grid-template-columns: 1fr;
