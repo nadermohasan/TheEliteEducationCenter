@@ -130,7 +130,10 @@ export default function Auth() {
           <div className="logo-image-wrapper">
             <img src="https://i.imgur.com/p1hg12H.png" alt="شعار مركز النخبة" className="logo-image" />
           </div>
-          <span className="logo-text">مركز النخبة التعليمي</span>
+          <div className="logo-text-group">
+            <span className="logo-text">مركز النخبة التعليمي</span>
+            <span className="logo-slogan">The Elite Education Center</span>
+          </div>
         </div>
       </div>
 
@@ -263,10 +266,26 @@ export default function Auth() {
           color: #1a4f8b;
         }
 
+        .logo-text-group {
+          display: flex;
+          flex-direction: column;
+          align-items: flex-start;
+        }
+
         .logo-text {
           font-size: 24px;
           font-weight: 700;
           color: #1a4f8b; /* لون ثابت */
+          line-height: 1.3;
+        }
+
+        .logo-slogan {
+          font-size: 15px;
+          font-weight: 500;
+          color: #3a6ea5;
+          letter-spacing: 0.5px;
+          margin-top: 2px;
+          margin-right: 9%;
         }
 
         .logo-image-wrapper {
@@ -291,7 +310,7 @@ export default function Auth() {
           background: white;
           width: 100%;
           max-width: 400px;
-          margin-top: 103px;
+          margin-top: 130px; /* زيادة قليلاً لاستيعاب الشعار مع الشعار الفرعي */
           padding: 30px;
           border-radius: 20px;
           box-shadow: 0 15px 35px rgba(0,0,0,0.05);
@@ -410,8 +429,10 @@ export default function Auth() {
 
         @media (max-width: 480px) {
           .auth-card { padding: 25px 20px; }
-          .logo-text { font-size: 18px; }
+          .logo-text { font-size: 20px; }
+          .logo-slogan { font-size: 12px; }
           .logo-image-wrapper { width: 60px; height: 60px; }
+          .top-logo-content { gap: 10px; }
         }
       `}</style>
     </div>
