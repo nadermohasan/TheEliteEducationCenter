@@ -277,7 +277,7 @@ export default function AdminDashboard() {
                               disabled
                               style={{ background: '#10b981', cursor: 'default' }}
                             >
-                              ✓ محاولة مفعلة
+                              ✔ محاولة مفعلة
                             </button>
                           ) : (
                             <button
@@ -291,7 +291,7 @@ export default function AdminDashboard() {
                                   جاري...
                                 </>
                               ) : (
-                                'تفعيل محاولة'
+                                '✚ تفعيل محاولـة'
                               )}
                             </button>
                           )}
