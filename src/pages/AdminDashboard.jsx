@@ -13,7 +13,6 @@ export default function AdminDashboard() {
   const [processingId, setProcessingId] = useState(null);
   const [adminProfile, setAdminProfile] = useState(null);
   const [stats, setStats] = useState({ totalStudents: 0, activeAttempts: 0 });
-  const [activeAttemptsMap, setActiveAttemptsMap] = useState({}); // لتخزين حالة المحاولة لكل طالب
   const [activeAttemptsMap, setActiveAttemptsMap] = useState({});
   const navigate = useNavigate();
 
@@ -31,7 +30,10 @@ export default function AdminDashboard() {
         .eq('status', 'active');
       if (attemptsError) throw attemptsError;
 
-      setStats({ totalStudents: totalStudents || 0, activeAttempts: activeAttempts || 0 });
+      setStats({
+        totalStudents: totalStudents || 0,
+        activeAttempts: activeAttempts || 0
+      });
     } catch (error) {
       console.error('Error fetching stats:', error);
     }
@@ -49,9 +51,6 @@ export default function AdminDashboard() {
     }
   }, []);
 
-  // جلب المحاولات النشطة لكل الطلاب
-=======
->>>>>>> bd51822 (update project)
   const fetchActiveAttempts = useCallback(async () => {
     const { data, error } = await supabase
       .from('attempts')
@@ -63,10 +62,6 @@ export default function AdminDashboard() {
       data.forEach(attempt => {
         map[attempt.student_id] = true;
       });
-
-    if (!error && data) {
-      const map = {};
-      data.forEach(attempt => { map[attempt.student_id] = true; });
       setActiveAttemptsMap(map);
     }
   }, []);
@@ -78,6 +73,7 @@ export default function AdminDashboard() {
       .select('*')
       .eq('role', 'student')
       .order('created_at', { ascending: false });
+
     if (!error) setUsers(data);
     setLoading(false);
   }, []);
@@ -231,13 +227,7 @@ export default function AdminDashboard() {
       const { error: insertError } = await supabase.from('attempt_questions').insert(allInsertData);
       if (insertError) throw insertError;
 
-      alert('تم تفعيل محاولة جديدة بنجاح!');
-      
-      // تحديث البيانات
-      await fetchStats();
-      await fetchActiveAttempts(); // تحديث حالة المحاولات النشطة
-      
-      toast.success('! تم تفعيل محاولة جديدة بنجاح');
+      toast.success('تم تفعيل محاولة جديدة بنجاح!');
       await fetchStats();
       await fetchActiveAttempts();
 
@@ -290,12 +280,10 @@ export default function AdminDashboard() {
           <div className="card-header">
             <h2 className="card-title"><Users size={20} className="icon-blue" /> قائمة الطلاب</h2>
             <div className="card-header-actions">
-                <span className="badge-count">{filteredUsers.length} طالب</span>
-                <button className="refresh-btn-table" onClick={refreshAllData}>
-                    <RefreshCw size={16} /> <span>تحديث</span>
-                </button>
               <span className="badge-count">{filteredUsers.length} طالب</span>
-              <button className="refresh-btn-table" onClick={refreshAllData}><RefreshCw size={16} /> <span>تحديث</span></button>
+              <button className="refresh-btn-table" onClick={refreshAllData}>
+                <RefreshCw size={16} /> <span>تحديث</span>
+              </button>
             </div>
           </div>
           <div className="table-responsive">
@@ -304,7 +292,12 @@ export default function AdminDashboard() {
             ) : filteredUsers.length > 0 ? (
               <table className="modern-table">
                 <thead>
-                  <tr><th>الاسم</th><th>اسم المستخدم</th><th>تاريخ التسجيل</th><th className="text-center">الإجراءات</th></tr>
+                  <tr>
+                    <th>الاسم</th>
+                    <th>اسم المستخدم</th>
+                    <th>تاريخ التسجيل</th>
+                    <th className="text-center">الإجراءات</th>
+                  </tr>
                 </thead>
                 <tbody>
                   {filteredUsers.map((user) => {
@@ -313,22 +306,15 @@ export default function AdminDashboard() {
                       <tr key={user.id}>
                         <td>
                           <div className="user-cell">
-                            <div className="user-avatar-small">
-                              {user.name?.charAt(0) || 'ط'}
-                            </div>
+                            <div className="user-avatar-small">{user.name?.charAt(0) || 'ط'}</div>
                             <span className="user-name-cell">{user.name || 'غير محدد'}</span>
                           </div>
                         </td>
-                        <td><div className="user-cell"><div className="user-avatar-small">{user.name?.charAt(0) || 'ط'}</div><span className="user-name-cell">{user.name || 'غير محدد'}</span></div></td>
                         <td>{user.username || '—'}</td>
                         <td>{new Date(user.created_at).toLocaleDateString('ar-EG')}</td>
                         <td className="text-center">
                           {hasActiveAttempt ? (
-                            <button
-                              className="activate-btn-table active-attempt"
-                              disabled
-                              style={{ background: '#10b981', cursor: 'default' }}
-                            >
+                            <button className="activate-btn-table active-attempt" disabled style={{ background: '#10b981', cursor: 'default' }}>
                               ✔ محاولة مفعلة
                             </button>
                           ) : (
@@ -345,10 +331,6 @@ export default function AdminDashboard() {
                               ) : (
                                 '✚ تفعيل محاولـة'
                               )}
-                            <button className="activate-btn-table active-attempt" disabled style={{ background: '#10b981', cursor: 'default' }}>✔ محاولة مفعلة</button>
-                          ) : (
-                            <button className="activate-btn-table" onClick={() => handleActivateAttempt(user.id)} disabled={processingId === user.id}>
-                              {processingId === user.id ? (<><span className="spinner-small"></span> جاري...</>) : '✚ تفعيل محاولـة'}
                             </button>
                           )}
                         </td>
@@ -358,7 +340,11 @@ export default function AdminDashboard() {
                 </tbody>
               </table>
             ) : (
-              <div className="empty-state"><div className="empty-icon">📭</div><h3>لا يوجد طلاب</h3><p>لم يتم العثور على أي طالب مطابق لبحثك</p></div>
+              <div className="empty-state">
+                <div className="empty-icon">📭</div>
+                <h3>لا يوجد طلاب</h3>
+                <p>لم يتم العثور على أي طالب مطابق لبحثك</p>
+              </div>
             )}
           </div>
         </div>
@@ -401,66 +387,6 @@ export default function AdminDashboard() {
         .modern-table td { padding: 16px 20px; border-bottom: 1px solid #f1f5f9; color: #334155; vertical-align: middle; }
         .modern-table tbody tr:hover { background: #fbfcfd; }
         .text-center { text-align: center !important; }
-
-        .user-cell {
-          display: flex;
-          align-items: center;
-          gap: 12px;
-        }
-        .user-avatar-small {
-          width: 36px;
-          height: 36px;
-          background: #eff6ff;
-          color: #3b82f6;
-          border-radius: 50%;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-weight: 800;
-          font-size: 1rem;
-        }
-        .user-name-cell {
-          font-weight: 600;
-          color: #1e293b;
-        }
-
-        .activate-btn-table {
-          background: #3b82f6;
-          color: white;
-          border: none;
-          padding: 8px 20px;
-          border-radius: 30px;
-          font-family: 'Cairo';
-          font-weight: 600;
-          font-size: 0.85rem;
-          cursor: pointer;
-          transition: all 0.2s;
-          display: inline-flex;
-          align-items: center;
-          gap: 6px;
-        }
-        .activate-btn-table:hover:not(:disabled) {
-          background: #2563eb;
-          transform: scale(1.02);
-        }
-        .activate-btn-table:disabled {
-          background: #cbd5e1;
-          cursor: not-allowed;
-        }
-        .activate-btn-table.active-attempt {
-          background: #10b981 !important;
-          color: white;
-          cursor: default;
-        }
-        .spinner-small {
-          width: 14px;
-          height: 14px;
-          border: 2px solid rgba(255,255,255,0.3);
-          border-top-color: white;
-          border-radius: 50%;
-          animation: spin 0.6s linear infinite;
-          display: inline-block;
-        }
         .user-cell { display: flex; align-items: center; gap: 12px; }
         .user-avatar-small { width: 36px; height: 36px; background: #eff6ff; color: #3b82f6; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 1rem; }
         .user-name-cell { font-weight: 600; color: #1e293b; }
@@ -473,47 +399,6 @@ export default function AdminDashboard() {
         .empty-state { padding: 60px 20px; text-align: center; color: #64748b; }
         .loading-spinner { width: 40px; height: 40px; border: 4px solid #e2e8f0; border-top-color: #3b82f6; border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 20px; }
         @media (max-width: 768px) {
-          .dashboard-main {
-            padding: 0 16px 24px;
-          }
-          .page-header {
-            flex-direction: column;
-            align-items: center;     /* توسيط العنوان أفقياً */
-            padding-right: 0;
-            margin-bottom: 20px;
-          }
-          .page-title {
-            font-size: 1.6rem;
-            text-align: center;     /* توسيط النص */
-            width: 100%;
-          }
-          
-          .stats-grid {
-            grid-template-columns: 1fr;
-          }
-          .stat-card {
-            justify-content: flex-start;
-          }
-          .stat-content {
-            align-items: flex-start;
-            text-align: right;
-          }
-          
-          .card-header {
-            padding: 15px;
-          }
-          .card-header-actions {
-            gap: 8px;
-          }
-          .refresh-btn-table span {
-            display: none;  /* إخفاء نص "تحديث" في الموبايل */
-          }
-          
-          .modern-table th,
-          .modern-table td {
-            padding: 12px;
-          }
-
           .dashboard-main { padding: 0 16px 24px; }
           .page-header { flex-direction: column; align-items: center; padding-right: 0; margin-bottom: 20px; }
           .page-title { font-size: 1.6rem; text-align: center; width: 100%; }
