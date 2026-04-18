@@ -1,9 +1,12 @@
+// QuizPage.jsx
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
+import { toast } from 'react-hot-toast';
 import Footer from './Footer';
+import ConfirmDialog from './ConfirmDialog';
 
-// --- مكون شاشة التحميل الجديد ---
+// --- مكون شاشة التحميل ---
 const LoadingScreen = () => (
   <div className="loading-overlay">
     <div className="loading-content">
@@ -117,10 +120,20 @@ export default function QuizPage() {
   const [selectedAnswers, setSelectedAnswers] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [timeLeft, setTimeLeft] = useState(3600);
+  const [timeLeft, setTimeLeft] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [isEnglishSubject, setIsEnglishSubject] = useState(false);
-  
+  const [studentId, setStudentId] = useState(null);
+  const [attemptId, setAttemptId] = useState(null);
+  const [confirmState, setConfirmState] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    confirmText: '',
+    cancelText: '',
+    resolve: null
+  });
+
   const hasAutoSubmitted = useRef(false);
   const timerRef = useRef(null);
   const blocksRef = useRef([]);
@@ -134,69 +147,98 @@ export default function QuizPage() {
 
   const numericSubjectId = parseInt(subjectId, 10);
 
+  // --- دوال المؤقت مع localStorage (مرتبطة بـ attempt_id) ---
+  const getTimerStorageKey = useCallback(() => {
+    if (!studentId || !attemptId) return null;
+    return `quiz_timer_${studentId}_${numericSubjectId}_${attemptId}`;
+  }, [studentId, numericSubjectId, attemptId]);
+
+  const saveTimerState = useCallback((currentTimeLeft) => {
+    const key = getTimerStorageKey();
+    if (!key) return;
+    const data = { timeLeft: currentTimeLeft, timestamp: Date.now() };
+    localStorage.setItem(key, JSON.stringify(data));
+  }, [getTimerStorageKey]);
+
+  const clearTimerState = useCallback(() => {
+    const key = getTimerStorageKey();
+    if (key) localStorage.removeItem(key);
+  }, [getTimerStorageKey]);
+
+  // --- مودال التأكيد ---
+  const showConfirm = (options) => {
+    return new Promise((resolve) => {
+      setConfirmState({
+        isOpen: true,
+        title: options.title || 'تأكيد العملية',
+        message: options.message,
+        confirmText: options.confirmText || 'تأكيد',
+        cancelText: options.cancelText || 'إلغاء',
+        resolve
+      });
+    });
+  };
+
+  const handleConfirm = () => {
+    if (confirmState.resolve) confirmState.resolve(true);
+    setConfirmState(prev => ({ ...prev, isOpen: false }));
+  };
+
+  const handleCancel = () => {
+    if (confirmState.resolve) confirmState.resolve(false);
+    setConfirmState(prev => ({ ...prev, isOpen: false }));
+  };
+
+  // --- تسليم الاختبار ---
   const performSubmit = useCallback(async (isAuto = false) => {
     if (hasAutoSubmitted.current || submitting) return false;
-    
+
     hasAutoSubmitted.current = true;
     setSubmitting(true);
-    
+    clearTimerState();
+
     if (timerRef.current) {
       clearInterval(timerRef.current);
       timerRef.current = null;
     }
-    
+
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        navigate('/login');
-        return false;
-      }
-      
+      if (!user) { navigate('/login'); return false; }
+
       let studentName = 'طالب';
       try {
-        const { data: profile, error: profileError } = await supabase
+        const { data: profile } = await supabase
           .from('profiles')
           .select('name')
           .eq('id', user.id)
           .maybeSingle();
-          
-        if (!profileError && profile?.name) {
-          studentName = profile.name;
-        }
-      } catch (err) {
-        console.warn('تعذر جلب اسم الطالب:', err);
-      }
-      
+        if (profile?.name) studentName = profile.name;
+      } catch (err) { console.warn('تعذر جلب اسم الطالب:', err); }
+
       const currentBlocks = blocksRef.current;
       const currentAnswers = selectedAnswersRef.current;
-      
+
       let allQuestions = [];
       currentBlocks.forEach(block => {
-        if (block.type === 'passage') {
-          allQuestions.push(...block.questions);
-        } else {
-          allQuestions.push(block.question);
-        }
+        if (block.type === 'passage') allQuestions.push(...block.questions);
+        else allQuestions.push(block.question);
       });
-      
+
       let finalScore = 0;
       allQuestions.forEach((q) => {
         const userAns = currentAnswers[q.id];
-        if (userAns !== undefined && parseInt(userAns) === parseInt(q.correct_option)) {
-          finalScore++;
-        }
+        if (userAns !== undefined && parseInt(userAns) === parseInt(q.correct_option)) finalScore++;
       });
 
-      const { data: activeAttempt, error: attemptError } = await supabase
+      const { data: activeAttempt } = await supabase
         .from('attempts')
         .select('id')
         .eq('student_id', user.id)
         .eq('status', 'active')
         .maybeSingle();
 
-      if (attemptError || !activeAttempt) {
-        throw new Error('لا توجد محاولة نشطة لهذا الطالب. يرجى التواصل مع الإدارة.');
-      }
+      if (!activeAttempt) throw new Error('لا توجد محاولة نشطة لهذا الطالب');
 
       const { error: resultError } = await supabase.from('results').insert([{
         student_id: user.id,
@@ -205,49 +247,42 @@ export default function QuizPage() {
         student_answers: currentAnswers,
         attempt_id: activeAttempt.id
       }]);
-
       if (resultError) throw resultError;
-       /*
-      const { error: updateError } = await supabase
-        .from('attempts')
-        .update({ status: 'completed' })
-        .eq('id', activeAttempt.id);
 
-      if (updateError) console.error('فشل تحديث حالة المحاولة:', updateError);
-      */
       navigate('/result', {
-        state: { 
-          score: finalScore, 
-          total_questions: allQuestions.length, 
-          questions: allQuestions, 
+        state: {
+          score: finalScore,
+          total_questions: allQuestions.length,
+          questions: allQuestions,
           selectedAnswers: currentAnswers,
-          studentName: studentName 
+          studentName
         },
         replace: true
       });
       return true;
     } catch (err) {
       console.error('Submit error:', err);
-      alert('حدث خطأ أثناء تسليم الاختبار: ' + err.message);
+      toast.error('حدث خطأ أثناء تسليم الاختبار ' + err.message);
       hasAutoSubmitted.current = false;
       setSubmitting(false);
       return false;
     }
-  }, [navigate, submitting]);
+  }, [navigate, submitting, clearTimerState]);
 
   const handleAutoSubmit = useCallback(() => {
     if (hasAutoSubmitted.current || submitting) return;
+    clearTimerState();
     performSubmit(true);
-  }, [performSubmit, submitting]);
+  }, [performSubmit, submitting, clearTimerState]);
 
+  // --- بدء المؤقت عند تجهيز البيانات ---
   useEffect(() => {
-    if (!loading && blocks.length > 0 && !hasAutoSubmitted.current) {
+    if (!loading && blocks.length > 0 && timeLeft !== null && !hasAutoSubmitted.current) {
       if (timerRef.current) clearInterval(timerRef.current);
-      
       timerRef.current = setInterval(() => {
         setTimeLeft((prev) => {
           if (prev <= 1) {
-            if (timerRef.current) clearInterval(timerRef.current);
+            clearInterval(timerRef.current);
             if (!hasAutoSubmitted.current && !submitting) handleAutoSubmit();
             return 0;
           }
@@ -256,39 +291,44 @@ export default function QuizPage() {
       }, 1000);
     }
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
-  }, [loading, blocks, handleAutoSubmit, submitting]);
+  }, [loading, blocks, timeLeft, handleAutoSubmit, submitting]);
 
+  // --- حفظ المؤقت في localStorage عند تغيره ---
+  useEffect(() => {
+    if (timeLeft !== null && !loading && studentId && attemptId) {
+      saveTimerState(timeLeft);
+    }
+  }, [timeLeft, loading, studentId, attemptId, saveTimerState]);
+
+  // --- جلب بيانات الاختبار ---
   const fetchQuizData = useCallback(async () => {
     setLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { navigate('/login'); return; }
 
-      const { data: attempts, error: attemptsError } = await supabase
+      const currentStudentId = user.id;
+      setStudentId(currentStudentId);
+
+      const { data: attempts } = await supabase
         .from('attempts')
         .select('id')
-        .eq('student_id', user.id)
+        .eq('student_id', currentStudentId)
         .eq('status', 'active')
         .maybeSingle();
 
-      if (attemptsError || !attempts) {
-        setError('no_active_attempt');
-        setLoading(false);
-        return;
-      }
+      if (!attempts) { setError('no_active_attempt'); setLoading(false); return; }
 
-      const attemptId = attempts.id;
+      const currentAttemptId = attempts.id;
+      setAttemptId(currentAttemptId);
+
       const { data: aqData } = await supabase
         .from('attempt_questions')
         .select('question_id')
-        .eq('attempt_id', attemptId)
+        .eq('attempt_id', currentAttemptId)
         .eq('subject_id', numericSubjectId);
 
-      if (!aqData || aqData.length === 0) {
-        setError('no_questions');
-        setLoading(false);
-        return;
-      }
+      if (!aqData || aqData.length === 0) { setError('no_questions'); setLoading(false); return; }
 
       const questionIds = aqData.map(aq => aq.question_id);
       let { data: qData } = await supabase
@@ -297,23 +337,36 @@ export default function QuizPage() {
         .in('id', questionIds)
         .order('created_at', { ascending: true });
 
-      if (!qData || qData.length === 0) {
-        setError('no_questions');
-        setLoading(false);
-        return;
-      }
+      if (!qData || qData.length === 0) { setError('no_questions'); setLoading(false); return; }
 
       const { data: subjectInfo } = await supabase
         .from('subjects')
-        .select('name')
+        .select('name, duration_minutes')
         .eq('id', numericSubjectId)
         .single();
 
       const isEnglish = subjectInfo?.name?.includes('إنجليزية') || false;
       setIsEnglishSubject(isEnglish);
 
+      const durationMinutes = subjectInfo?.duration_minutes || 60;
+      const defaultTime = durationMinutes * 60;
+
+      // استرجاع الوقت المخزن باستخدام attempt_id
+      const storageKey = `quiz_timer_${currentStudentId}_${numericSubjectId}_${currentAttemptId}`;
+      const saved = localStorage.getItem(storageKey);
+      let savedTime = null;
+      if (saved) {
+        try {
+          const { timeLeft: savedTimeLeft, timestamp } = JSON.parse(saved);
+          const elapsed = Math.floor((Date.now() - timestamp) / 1000);
+          savedTime = Math.max(0, savedTimeLeft - elapsed);
+        } catch (e) {}
+      }
+
+      const initialTime = (savedTime !== null && savedTime < defaultTime) ? savedTime : defaultTime;
+      setTimeLeft(initialTime);
+
       let finalBlocks = [];
-      
       if (isEnglish) {
         const passageIds = [...new Set(qData.map(q => q.passage_id).filter(id => id))];
         let passages = [];
@@ -321,47 +374,32 @@ export default function QuizPage() {
           const { data: pData } = await supabase.from('passages').select('*').in('id', passageIds);
           passages = pData || [];
         }
-
         const passageQuestionsMap = new Map();
         const standalone = [];
         qData.forEach(q => {
           if (q.passage_id) {
             if (!passageQuestionsMap.has(q.passage_id)) passageQuestionsMap.set(q.passage_id, []);
             passageQuestionsMap.get(q.passage_id).push(q);
-          } else {
-            standalone.push(q);
-          }
+          } else standalone.push(q);
         });
-
         const sortedPassages = passages.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
         for (const passage of sortedPassages) {
           const questionsOfPassage = passageQuestionsMap.get(passage.id) || [];
           questionsOfPassage.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
-          finalBlocks.push({
-            type: 'passage',
-            passage: passage,
-            questions: questionsOfPassage
-          });
+          finalBlocks.push({ type: 'passage', passage, questions: questionsOfPassage });
         }
-        standalone.forEach(q => {
-          finalBlocks.push({
-            type: 'single',
-            question: q
-          });
-        });
+        standalone.forEach(q => finalBlocks.push({ type: 'single', question: q }));
       } else {
         finalBlocks = qData.map(q => ({ type: 'single', question: q }));
       }
-      
+
       setBlocks(finalBlocks);
       setCurrentBlockIndex(0);
       hasAutoSubmitted.current = false;
-      
     } catch (err) {
       console.error(err);
       setError('error');
     } finally {
-      // نترك تأخيراً بسيطاً لضمان سلاسة الانتقال البصري
       setTimeout(() => setLoading(false), 800);
     }
   }, [navigate, numericSubjectId]);
@@ -374,50 +412,45 @@ export default function QuizPage() {
 
   const handleSubmitQuiz = async () => {
     if (hasAutoSubmitted.current || submitting) return;
-    let totalQuestions = 0;
-    blocks.forEach(block => {
-      if (block.type === 'passage') totalQuestions += block.questions.length;
-      else totalQuestions += 1;
-    });
+    const totalQuestions = blocks.reduce((acc, block) => acc + (block.type === 'passage' ? block.questions.length : 1), 0);
     const answeredCount = Object.keys(selectedAnswers).length;
-    const unansweredCount = totalQuestions - answeredCount;
-    let confirmMsg = 'هل أنت متأكد من إنهاء وتسليم الاختبار؟';
-    if (unansweredCount > 0) confirmMsg = `⚠️ لديك ${unansweredCount} سؤال بدون إجابة.\n\n${confirmMsg}`;
-    if (!window.confirm(confirmMsg)) return;
+    const unanswered = totalQuestions - answeredCount;
+    let msg = 'هل أنت متأكد من إنهاء وتسليم الاختبار؟';
+    if (unanswered > 0) msg = `لديك ${unanswered} سؤال بدون إجابة.\n\n${msg}`;
+
+    const confirmed = await showConfirm({
+      title: 'تسليم الاختبار',
+      message: msg,
+      confirmText: 'تسليم',
+      cancelText: 'مراجعة'
+    });
+    if (!confirmed) return;
     performSubmit(false);
   };
 
-  const formatTime = (s) => {
-    const m = Math.floor(s / 60);
-    const sec = s % 60;
-    return `${m}:${sec.toString().padStart(2, '0')}`;
-  };
+  const formatTime = (s) => (s === null ? '--:--' : `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, '0')}`);
+  const handleAnswerSelect = (qId, idx) => setSelectedAnswers(prev => ({ ...prev, [qId]: idx }));
 
-  const handleAnswerSelect = (questionId, answerIndex) => {
-    setSelectedAnswers(prev => ({ ...prev, [questionId]: answerIndex }));
-  };
-
-  // --- التحكم في المخرجات بناءً على الحالة ---
-
-  // 1. حالة التحميل
   if (loading) return <LoadingScreen />;
-  
-  // 2. حالة الخطأ (بعد انتهاء التحميل)
+
   if (error) {
     return (
       <div className="quiz-page-wrapper" style={{ direction: isEnglishSubject ? 'ltr' : 'rtl' }}>
         <header className="quiz-header">
           <div className="timer-pill"><span>⏱️</span><span>00:00</span></div>
-          <div className="center-brand"><img src="https://i.imgur.com/p1hg12H.png" alt="Logo" className="quiz-logo" /><span className="quiz-brand-name">مركز النخبة التعليمي</span></div>
+          <div className="center-brand">
+            <img src="https://i.imgur.com/p1hg12H.png" alt="Logo" className="quiz-logo" />
+            <span className="quiz-brand-name">مركز النخبة التعليمي</span>
+          </div>
           <button className="submit-quiz-btn" style={{ opacity: 0.5, cursor: 'default' }}>إنهاء الاختبار</button>
         </header>
         <div className="progress-container"><div className="progress-bar" style={{ width: '0%' }}></div></div>
         <main className="quiz-main-content">
           <div className="empty-state-card">
-            <div className="empty-state-icon">{error === 'no_questions' ? '📚' : '⚠️'}</div>
+            <div className="empty-state-icon">{error === 'no_questions' ? '' : ''}</div>
             <h2 className="empty-state-title">{error === 'no_questions' ? 'لا توجد أسئلة' : 'لا توجد محاولة نشطة'}</h2>
             <p className="empty-state-description">
-              {error === 'no_questions' ? 'عذراً، لم يتم العثور على أسئلة لهذه المادة حالياً.' : 'لا توجد محاولة نشطة حالياً. يرجى مراجعة الإدارة لتفعيل محاولة جديدة.'}
+              {error === 'no_questions' ? 'عذراً، لم يتم العثور على أسئلة لهذه المادة حالياً.' : ' يرجى مراجعة الإدارة لتفعيل محاولة جديدة'}
             </p>
             <button onClick={() => navigate('/dashboard')} className="back-to-dashboard-btn">العودة إلى المواد الدراسية</button>
           </div>
@@ -437,7 +470,6 @@ export default function QuizPage() {
           .progress-container { height: 6px; background: #e2e8f0; width: 100%; }
           .progress-bar { height: 100%; background: linear-gradient(90deg, #3b82f6, #60a5fa); transition: width 0.5s cubic-bezier(0.4,0,0.2,1); }
           .quiz-main-content { flex: 1; padding: 50px 20px; max-width: 900px; margin: 0 auto; width: 100%; display: flex; align-items: center; justify-content: center; }
-          .empty-state-card { background: white; border-radius: 28px; padding: 60px 40px; text-align: center; box-shadow: 0 12px 40px rgba(0,0,0,0.04); width: 100%; animation: fadeIn 0.5s ease-out; border: 1px solid #f1f5f9; }
           @keyframes fadeIn { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
           .empty-state-icon { font-size: 70px; margin-bottom: 20px; display: inline-block; }
           .empty-state-title { font-size: 26px; font-weight: 800; color: #1e293b; margin-bottom: 12px; }
@@ -453,35 +485,20 @@ export default function QuizPage() {
   const currentBlock = blocks[currentBlockIndex];
   if (!currentBlock) return null;
 
-  // حساب المتغيرات الجديدة لعرض الترقيم بشكل صحيح
   const totalBlocks = blocks.length;
-  
-  // عدد القطع الفعلي (فقط الكتل من نوع passage)
-  const passagesCount = blocks.filter(block => block.type === 'passage').length;
-  
-  // إجمالي عدد الأسئلة الكلي
-  const totalQuestionsCount = blocks.reduce((acc, block) => {
-    return acc + (block.type === 'passage' ? block.questions.length : 1);
-  }, 0);
-  
-  // رقم السؤال الحالي (بالنسبة لإجمالي الأسئلة)
+  const passagesCount = blocks.filter(b => b.type === 'passage').length;
+  const totalQuestionsCount = blocks.reduce((acc, b) => acc + (b.type === 'passage' ? b.questions.length : 1), 0);
   let currentQuestionNumber = 0;
   for (let i = 0; i < currentBlockIndex; i++) {
-    const block = blocks[i];
-    if (block.type === 'passage') {
-      currentQuestionNumber += block.questions.length;
-    } else {
-      currentQuestionNumber += 1;
-    }
+    const b = blocks[i];
+    currentQuestionNumber += (b.type === 'passage' ? b.questions.length : 1);
   }
-  // السؤال الأول في الكتلة الحالية
-  currentQuestionNumber = currentQuestionNumber + 1;
+  currentQuestionNumber++;
 
   const answeredCount = Object.keys(selectedAnswers).length;
   const progress = totalQuestionsCount > 0 ? (answeredCount / totalQuestionsCount) * 100 : 0;
   const optionLabels = isEnglishSubject ? ['A', 'B', 'C', 'D'] : ['أ', 'ب', 'ج', 'د'];
 
-  // 3. حالة الصفحة الرئيسية للاختبار
   return (
     <div className="quiz-page-wrapper" style={{ direction: isEnglishSubject ? 'ltr' : 'rtl' }}>
       <header className="quiz-header">
@@ -618,6 +635,16 @@ export default function QuizPage() {
 
       <Footer />
 
+      <ConfirmDialog
+        isOpen={confirmState.isOpen}
+        title={confirmState.title}
+        message={confirmState.message}
+        confirmText={confirmState.confirmText}
+        cancelText={confirmState.cancelText}
+        onConfirm={handleConfirm}
+        onCancel={handleCancel}
+      />
+
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap');
         * { box-sizing: border-box; margin: 0; }
@@ -714,6 +741,16 @@ export default function QuizPage() {
         }
         .selected .option-value { color: #1e3a8a; }
         
+        /* محاذاة خاصة للغة الإنجليزية */
+        .english-options .option-value {
+          text-align: left;
+        }
+
+        /* إصلاح ترتيب الشعار والاسم في اللغة الإنجليزية */
+        .quiz-page-wrapper[style*="direction: ltr"] .center-brand {
+          flex-direction: row-reverse;
+        }
+
         .option-image-wrapper { max-width: 130px; flex-shrink: 0; }
         .option-image { max-width: 100%; max-height: 100px; border-radius: 14px; object-fit: contain; background: white; border: 1px solid #e2e8f0; padding: 4px; }
         
@@ -735,10 +772,6 @@ export default function QuizPage() {
           top: 50%;
           left: 50%;
           transform: translate(-50%, -50%);
-        }
-
-        .english-options .option-value {
-          text-align: left;
         }
 
         .quiz-nav-controls { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-top: 40px; padding-top: 20px; border-top: 1px solid #eef2f6; }
