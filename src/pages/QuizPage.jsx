@@ -690,7 +690,10 @@ export default function QuizPage() {
           border-radius: 4px; 
         }
         .passage-box h3 { margin: 0 0 16px 0; color: #0f172a; font-size: 1.35rem; font-weight: 800; }
-        .passage-box p { line-height: 1.8; color: #334155; font-size: 1.05rem; }
+        .passage-box p {     line-height: 22px;
+    color: #334155;
+    font-size: 15px;
+    text-align: justify; }
         
         .questions-container { display: flex; flex-direction: column; gap: 45px; }
         .single-question-wrapper { border-top: 1px dashed #e2e8f0; padding-top: 35px; }
