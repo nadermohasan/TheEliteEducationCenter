@@ -13,11 +13,8 @@ export default function AdminDashboard() {
   const [processingId, setProcessingId] = useState(null);
   const [adminProfile, setAdminProfile] = useState(null);
   const [stats, setStats] = useState({ totalStudents: 0, activeAttempts: 0 });
-<<<<<<< HEAD
   const [activeAttemptsMap, setActiveAttemptsMap] = useState({}); // لتخزين حالة المحاولة لكل طالب
-=======
   const [activeAttemptsMap, setActiveAttemptsMap] = useState({});
->>>>>>> bd51822 (update project)
   const navigate = useNavigate();
 
   const fetchStats = useCallback(async () => {
@@ -52,7 +49,6 @@ export default function AdminDashboard() {
     }
   }, []);
 
-<<<<<<< HEAD
   // جلب المحاولات النشطة لكل الطلاب
 =======
 >>>>>>> bd51822 (update project)
@@ -61,18 +57,16 @@ export default function AdminDashboard() {
       .from('attempts')
       .select('student_id, status')
       .eq('status', 'active');
-<<<<<<< HEAD
 
     if (!error && data) {
       const map = {};
       data.forEach(attempt => {
         map[attempt.student_id] = true;
       });
-=======
+
     if (!error && data) {
       const map = {};
       data.forEach(attempt => { map[attempt.student_id] = true; });
->>>>>>> bd51822 (update project)
       setActiveAttemptsMap(map);
     }
   }, []);
@@ -237,19 +231,16 @@ export default function AdminDashboard() {
       const { error: insertError } = await supabase.from('attempt_questions').insert(allInsertData);
       if (insertError) throw insertError;
 
-<<<<<<< HEAD
       alert('تم تفعيل محاولة جديدة بنجاح!');
       
       // تحديث البيانات
       await fetchStats();
       await fetchActiveAttempts(); // تحديث حالة المحاولات النشطة
       
-=======
       toast.success('! تم تفعيل محاولة جديدة بنجاح');
       await fetchStats();
       await fetchActiveAttempts();
 
->>>>>>> bd51822 (update project)
     } catch (e) {
       toast.error('خطأ: ' + e.message);
     } finally {
@@ -299,15 +290,12 @@ export default function AdminDashboard() {
           <div className="card-header">
             <h2 className="card-title"><Users size={20} className="icon-blue" /> قائمة الطلاب</h2>
             <div className="card-header-actions">
-<<<<<<< HEAD
                 <span className="badge-count">{filteredUsers.length} طالب</span>
                 <button className="refresh-btn-table" onClick={refreshAllData}>
                     <RefreshCw size={16} /> <span>تحديث</span>
                 </button>
-=======
               <span className="badge-count">{filteredUsers.length} طالب</span>
               <button className="refresh-btn-table" onClick={refreshAllData}><RefreshCw size={16} /> <span>تحديث</span></button>
->>>>>>> bd51822 (update project)
             </div>
           </div>
           <div className="table-responsive">
@@ -323,7 +311,6 @@ export default function AdminDashboard() {
                     const hasActiveAttempt = activeAttemptsMap[user.id];
                     return (
                       <tr key={user.id}>
-<<<<<<< HEAD
                         <td>
                           <div className="user-cell">
                             <div className="user-avatar-small">
@@ -332,14 +319,11 @@ export default function AdminDashboard() {
                             <span className="user-name-cell">{user.name || 'غير محدد'}</span>
                           </div>
                         </td>
-=======
                         <td><div className="user-cell"><div className="user-avatar-small">{user.name?.charAt(0) || 'ط'}</div><span className="user-name-cell">{user.name || 'غير محدد'}</span></div></td>
->>>>>>> bd51822 (update project)
                         <td>{user.username || '—'}</td>
                         <td>{new Date(user.created_at).toLocaleDateString('ar-EG')}</td>
                         <td className="text-center">
                           {hasActiveAttempt ? (
-<<<<<<< HEAD
                             <button
                               className="activate-btn-table active-attempt"
                               disabled
@@ -361,12 +345,10 @@ export default function AdminDashboard() {
                               ) : (
                                 '✚ تفعيل محاولـة'
                               )}
-=======
                             <button className="activate-btn-table active-attempt" disabled style={{ background: '#10b981', cursor: 'default' }}>✔ محاولة مفعلة</button>
                           ) : (
                             <button className="activate-btn-table" onClick={() => handleActivateAttempt(user.id)} disabled={processingId === user.id}>
                               {processingId === user.id ? (<><span className="spinner-small"></span> جاري...</>) : '✚ تفعيل محاولـة'}
->>>>>>> bd51822 (update project)
                             </button>
                           )}
                         </td>
@@ -419,7 +401,6 @@ export default function AdminDashboard() {
         .modern-table td { padding: 16px 20px; border-bottom: 1px solid #f1f5f9; color: #334155; vertical-align: middle; }
         .modern-table tbody tr:hover { background: #fbfcfd; }
         .text-center { text-align: center !important; }
-<<<<<<< HEAD
 
         .user-cell {
           display: flex;
@@ -480,7 +461,6 @@ export default function AdminDashboard() {
           animation: spin 0.6s linear infinite;
           display: inline-block;
         }
-=======
         .user-cell { display: flex; align-items: center; gap: 12px; }
         .user-avatar-small { width: 36px; height: 36px; background: #eff6ff; color: #3b82f6; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 1rem; }
         .user-name-cell { font-weight: 600; color: #1e293b; }
@@ -489,12 +469,10 @@ export default function AdminDashboard() {
         .activate-btn-table:disabled { background: #cbd5e1; cursor: not-allowed; }
         .activate-btn-table.active-attempt { background: #10b981 !important; color: white; cursor: default; }
         .spinner-small { width: 14px; height: 14px; border: 2px solid rgba(255,255,255,0.3); border-top-color: white; border-radius: 50%; animation: spin 0.6s linear infinite; display: inline-block; }
->>>>>>> bd51822 (update project)
         @keyframes spin { to { transform: rotate(360deg); } }
         .empty-state { padding: 60px 20px; text-align: center; color: #64748b; }
         .loading-spinner { width: 40px; height: 40px; border: 4px solid #e2e8f0; border-top-color: #3b82f6; border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 20px; }
         @media (max-width: 768px) {
-<<<<<<< HEAD
           .dashboard-main {
             padding: 0 16px 24px;
           }
@@ -535,7 +513,7 @@ export default function AdminDashboard() {
           .modern-table td {
             padding: 12px;
           }
-=======
+
           .dashboard-main { padding: 0 16px 24px; }
           .page-header { flex-direction: column; align-items: center; padding-right: 0; margin-bottom: 20px; }
           .page-title { font-size: 1.6rem; text-align: center; width: 100%; }
@@ -545,7 +523,6 @@ export default function AdminDashboard() {
           .card-header { padding: 15px; }
           .refresh-btn-table span { display: none; }
           .modern-table th, .modern-table td { padding: 12px; }
->>>>>>> bd51822 (update project)
         }
       `}</style>
     </div>

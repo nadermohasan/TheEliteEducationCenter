@@ -229,7 +229,6 @@ export default function Auth() {
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700&display=swap');
         
-<<<<<<< HEAD
         /* إجبار التصميم على استخدام الألوان الفاتحة وتجاهل Dark Mode */
         :root {
           color-scheme: light only;
@@ -440,7 +439,6 @@ export default function Auth() {
           .logo-image-wrapper { width: 60px; height: 60px; }
           .top-logo-content { gap: 10px; }
         }
-=======
         :root { color-scheme: light only; }
         body, html { margin: 0; padding: 0; font-family: 'Cairo', sans-serif; background: #eef5ff; color: #1e293b; }
         .auth-page-container { min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; direction: rtl; background: linear-gradient(135deg, #eef5ff 0%, #d8e8fc 100%); position: relative; padding: 20px; box-sizing: border-box; }
@@ -467,7 +465,6 @@ export default function Auth() {
         .toggle-view span { color: #4a8ada; cursor: pointer; font-weight: 700; margin-right: 5px; }
         .toggle-view span:hover { text-decoration: underline; }
         @media (max-width: 480px) { .auth-card { padding: 25px 20px; } .logo-text { font-size: 20px; } .logo-slogan { font-size: 12px; } .logo-image-wrapper { width: 60px; height: 60px; } .top-logo-content { gap: 10px; } }
->>>>>>> bd51822 (update project)
       `}</style>
     </div>
   );
