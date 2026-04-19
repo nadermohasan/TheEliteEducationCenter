@@ -90,6 +90,7 @@ export default function AdminDashboard() {
     fetchStats();
     fetchActiveAttempts();
   }, [fetchUsers, fetchAdminProfile, fetchStats, fetchActiveAttempts]);
+  useEffect(() => { document.title = " مسؤول النظام"; }, []);
 
   const handleActivateAttempt = async (studentId) => {
     setProcessingId(studentId);

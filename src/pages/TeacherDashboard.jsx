@@ -135,6 +135,9 @@ export default function TeacherDashboard() {
       totalPassages: passages.length
     });
   }, [questions, passages]);
+useEffect(() => {
+  document.title = "إدارة بنك الاسئلة - مركز النخبة التعليمي";
+}, []);
 
   const loadUploadBatches = () => {
     const saved = localStorage.getItem('teacher_upload_batches');
@@ -1172,13 +1175,31 @@ export default function TeacherDashboard() {
         .passage-item { display: flex; justify-content: space-between; align-items: center; padding: 12px; background: #f8fafc; border-radius: 12px; color: #1e293b; }
         
         @media (max-width: 768px) {
-          .page-header { flex-direction: column; gap: 16px; }
-          .header-actions { width: 100%; }
-          .header-actions button { flex: 1; }
-          .form-grid { grid-template-columns: 1fr; }
-          .card-header-actions { flex-direction: column; align-items: flex-end; }
-          .search-input-small { width: 100%; }
-        }
+ .page-header {
+      flex-direction: column;
+      gap: 16px;
+    }
+    .header-actions {
+      width: 100%;
+      flex-direction: column; /* تغيير الاتجاه إلى عمودي */
+      gap: 10px;
+    }
+    .header-actions button {
+      width: 100%; /* عرض كامل لكل زر */
+      flex: none;
+      padding: 12px 16px; /* تحسين المساحة */
+      font-size: 0.95rem;
+    }
+    .form-grid {
+      grid-template-columns: 1fr;
+    }
+    .card-header-actions {
+      flex-direction: column;
+      align-items: flex-end;
+    }
+    .search-input-small {
+      width: 100%;
+    }
       `}</style>
     </div>
   );

@@ -140,42 +140,42 @@ export default function Dashboard() {
 
     const name = subjectName.toLowerCase();
 
-    if (name.includes("اللغة الإنجليزية") || name.includes("إنجليز"))
+    if (name.includes("اللغة الإنجليزية") || name.includes("English"))
       return {
         icon: <Languages />,
         bg: 'linear-gradient(135deg, #dbeafe, #a5b4fc)',
         color: '#1e3a8a'
       };
 
-    if (name.includes("عربية") || name.includes("لغتي"))
+    if (name.includes("عربية") || name.includes("اللغة العربية"))
       return {
         icon: <BookOpen />,
         bg: 'linear-gradient(135deg, #fef08a, #facc15)',
         color: '#713f12'
       };
 
-    if (name.includes("رياضيات") || name.includes("حساب"))
+    if (name.includes("الرياضيات"))
       return {
         icon: <Calculator />,
         bg: 'linear-gradient(135deg, #fca5a5, #ef4444)',
         color: '#ffffff'
       };
 
-    if (name.includes("تاريخ"))
+    if (name.includes("التاريخ"))
       return {
         icon: <Landmark />,
         bg: 'linear-gradient(135deg, #bbf7d0, #4ade80)',
         color: '#14532d'
       };
 
-    if (name.includes("جغرافيا"))
+    if (name.includes("الجغرافيا"))
       return {
         icon: <Globe />,
         bg: 'linear-gradient(135deg, #a5f3fc, #22d3ee)',
         color: '#164e63'
       };
 
-    if (name.includes("حاسب") || name.includes("تكنولوجيا"))
+    if (name.includes("تكنولوجيا المعلومات"))
       return {
         icon: <Laptop />,
         bg: 'linear-gradient(135deg, #3b82f6, #1e40af)',
@@ -218,7 +218,8 @@ export default function Dashboard() {
 
         const { data: subjectsData } = await supabase
           .from('subjects')
-          .select('*');
+  .select('*')
+  .order('id', { ascending: true });
 
         if (subjectsData) {
           setSubjects(subjectsData);
@@ -232,6 +233,7 @@ export default function Dashboard() {
 
     fetchData();
   }, [navigate]);
+  useEffect(() => { document.title = "الصفحة الرئيسية"; }, []);
 
   if (loading) {
     return <LoadingScreen />;

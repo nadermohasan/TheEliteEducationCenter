@@ -114,6 +114,7 @@ const LoadingScreen = () => (
 export default function QuizPage() {
   const { subjectId } = useParams();
   const navigate = useNavigate();
+  const [subjectName, setSubjectName] = useState('');
 
   const [blocks, setBlocks] = useState([]);
   const [currentBlockIndex, setCurrentBlockIndex] = useState(0);
@@ -144,6 +145,14 @@ export default function QuizPage() {
     blocksRef.current = blocks;
     selectedAnswersRef.current = selectedAnswers;
   }, [blocks, selectedAnswers]);
+useEffect(() => {
+    if (subjectName) {
+      document.title = `${subjectName} - مركز النخبة التعليمي`;
+    } else {
+      document.title = 'اختبار - مركز النخبة التعليمي';
+    }
+  }, [subjectName]);
+
 
   const numericSubjectId = parseInt(subjectId, 10);
 
@@ -302,6 +311,15 @@ export default function QuizPage() {
 
   // --- جلب بيانات الاختبار ---
   const fetchQuizData = useCallback(async () => {
+const { data: subjectInfo } = await supabase
+      .from('subjects')
+      .select('name, duration_minutes')
+      .eq('id', numericSubjectId)
+      .single();
+
+    const isEnglish = subjectInfo?.name?.includes('إنجليزية') || false;
+    setIsEnglishSubject(isEnglish);
+    setSubjectName(subjectInfo?.name || 'اختبار');
     setLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -409,6 +427,7 @@ export default function QuizPage() {
     numericSubjectIdRef.current = numericSubjectId;
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
   }, [subjectId, fetchQuizData, numericSubjectId]);
+  useEffect(() => { document.title = "محاولة اختبار"; }, []);
 
   const handleSubmitQuiz = async () => {
     if (hasAutoSubmitted.current || submitting) return;

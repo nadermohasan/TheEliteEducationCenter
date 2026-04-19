@@ -16,6 +16,7 @@ export default function QuizResult() {
       navigate('/dashboard', { replace: true });
     }
   }, [state, navigate]);
+   useEffect(() => { document.title = "مراجعة الإجابات"; }, []);
 
   if (!result) return null;
 

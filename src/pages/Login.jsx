@@ -6,7 +6,8 @@ import Footer from './Footer';
 
 export default function Auth() {
   const [isLoginView, setIsLoginView] = useState(true);
-  const [username, setUsername] = useState('');
+  const [loginUsername, setLoginUsername] = useState('');
+  const [signupUsername, setSignupUsername] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
   const [loading, setLoading] = useState(false);
@@ -25,7 +26,7 @@ export default function Auth() {
       .maybeSingle();
 
     if (profileError || !profile) {
-      toast.error('تعذر جلب بيانات الصلاحيات، راجع الإدارة.');
+      toast.error('تعذر جلب بيانات الصلاحيات، راجع الإدارة');
       setLoading(false);
       return false;
     }
@@ -67,13 +68,15 @@ export default function Auth() {
     e.preventDefault();
     setError(null);
 
-    if (!username.trim()) {
+    const currentUsername = isLoginView ? loginUsername : signupUsername;
+
+    if (!currentUsername.trim()) {
       toast.error('اسم المستخدم مطلوب');
       return;
     }
 
     setLoading(true);
-    const email = `${username.toLowerCase().replace(/\s/g, '')}@nokhba.local`;
+    const email = `${currentUsername.toLowerCase().replace(/\s/g, '')}@nokhba.local`;
 
     if (isLoginView) {
       const { data: authData, error: signInError } = await supabase.auth.signInWithPassword({
@@ -89,7 +92,7 @@ export default function Auth() {
       
       if (authData.user) {
         try {
-          await ensureProfile(authData.user.id, username, fullName || username);
+          await ensureProfile(authData.user.id, currentUsername, fullName || currentUsername);
           await checkRoleAndRedirect(authData.user.id);
         } catch (err) {
           toast.error('حدث خطأ في تجهيز حسابك. يرجى المحاولة مرة أخرى');
@@ -116,7 +119,7 @@ export default function Auth() {
       
       if (authData.user) {
         try {
-          await ensureProfile(authData.user.id, username, fullName);
+          await ensureProfile(authData.user.id, currentUsername, fullName);
           await checkRoleAndRedirect(authData.user.id);
         } catch (profileError) {
           console.error('فشل إنشاء البروفايل:', profileError);
@@ -163,7 +166,7 @@ export default function Auth() {
                   type="text"
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
-                  placeholder="ادخل اسمك الرباعي"
+                  placeholder="الإسم الرباعي"
                   required={!isLoginView}
                   className="auth-input"
                 />
@@ -180,14 +183,25 @@ export default function Auth() {
               </svg>
             </label>
             <div className="input-wrapper">
-              <input
-                type="text"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                placeholder="مثال: nader"
-                required
-                className="auth-input"
-              />
+              {isLoginView ? (
+                <input
+                  type="text"
+                  value={loginUsername}
+                  onChange={(e) => setLoginUsername(e.target.value)}
+                  placeholder="مثال: nader"
+                  required
+                  className="auth-input"
+                />
+              ) : (
+                <input
+                  type="text"
+                  value={signupUsername}
+                  onChange={(e) => setSignupUsername(e.target.value)}
+                  placeholder="اسم المستخدم"
+                  required
+                  className="auth-input"
+                />
+              )}
             </div>
           </div>
 
@@ -229,7 +243,6 @@ export default function Auth() {
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700&display=swap');
         
-        /* إجبار التصميم على استخدام الألوان الفاتحة وتجاهل Dark Mode */
         :root {
           color-scheme: light only;
         }
@@ -238,8 +251,8 @@ export default function Auth() {
           margin: 0;
           padding: 0;
           font-family: 'Cairo', sans-serif;
-          background: #eef5ff; /* خلفية فاتحة ثابتة */
-          color: #1e293b; /* لون نص أساسي */
+          background: #eef5ff;
+          color: #1e293b;
         }
 
         .auth-page-container {
@@ -280,7 +293,7 @@ export default function Auth() {
         .logo-text {
           font-size: 24px;
           font-weight: 700;
-          color: #1a4f8b; /* لون ثابت */
+          color: #1a4f8b;
           line-height: 1.3;
         }
 
@@ -315,12 +328,12 @@ export default function Auth() {
           background: white;
           width: 100%;
           max-width: 400px;
-          margin-top: 130px; /* زيادة قليلاً لاستيعاب الشعار مع الشعار الفرعي */
+          margin-top: 130px;
           padding: 30px;
           border-radius: 20px;
           box-shadow: 0 15px 35px rgba(0,0,0,0.05);
           z-index: 10;
-          color: #2c3e50; /* لون النص داخل البطاقة */
+          color: #2c3e50;
         }
 
         .auth-title {
@@ -353,7 +366,7 @@ export default function Auth() {
           gap: 8px;
           font-size: 14px;
           font-weight: 600;
-          color: #4a5568; /* لون ثابت */
+          color: #4a5568;
           margin-bottom: 6px;
         }
 
@@ -373,14 +386,13 @@ export default function Auth() {
           box-sizing: border-box;
           transition: 0.3s;
           background: #f8fafc;
-          color: #1e293b; /* لون النص داخل الحقل - مهم جداً */
-          -webkit-text-fill-color: #1e293b; /* يجبر اللون في متصفحات WebKit */
+          color: #1e293b;
+          -webkit-text-fill-color: #1e293b;
         }
 
-        /* مكان العنصر النائب (placeholder) */
         .input-wrapper input::placeholder {
           color: #94a3b8;
-          opacity: 1; /* مهم في بعض المتصفحات */
+          opacity: 1;
         }
 
         .input-wrapper input:focus {
@@ -439,32 +451,6 @@ export default function Auth() {
           .logo-image-wrapper { width: 60px; height: 60px; }
           .top-logo-content { gap: 10px; }
         }
-        :root { color-scheme: light only; }
-        body, html { margin: 0; padding: 0; font-family: 'Cairo', sans-serif; background: #eef5ff; color: #1e293b; }
-        .auth-page-container { min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; direction: rtl; background: linear-gradient(135deg, #eef5ff 0%, #d8e8fc 100%); position: relative; padding: 20px; box-sizing: border-box; }
-        .top-logo-container { position: absolute; top: 30px; display: flex; justify-content: center; width: 100%; z-index: 5; }
-        .top-logo-content { display: flex; align-items: center; gap: 15px; color: #1a4f8b; }
-        .logo-text-group { display: flex; flex-direction: column; align-items: flex-start; }
-        .logo-text { font-size: 24px; font-weight: 700; color: #1a4f8b; line-height: 1.3; }
-        .logo-slogan { font-size: 15px; font-weight: 500; color: #3a6ea5; letter-spacing: 0.5px; margin-top: 2px; margin-right: 9%; }
-        .logo-image-wrapper { background: white; width: 70px; height: 70px; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(0,0,0,0.1); overflow: hidden; }
-        .logo-image { max-width: 90%; max-height: 90%; object-fit: contain; }
-        .auth-card { background: white; width: 100%; max-width: 400px; margin-top: 130px; padding: 30px; border-radius: 20px; box-shadow: 0 15px 35px rgba(0,0,0,0.05); z-index: 10; color: #2c3e50; }
-        .auth-title { text-align: center; color: #2c3e50; margin-bottom: 25px; font-size: 22px; }
-        .error-alert { background: #fff5f5; color: #e74c3c; padding: 10px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #fed7d7; font-size: 13px; text-align: center; }
-        .auth-form { display: flex; flex-direction: column; gap: 18px; }
-        .input-group label { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; color: #4a5568; margin-bottom: 6px; }
-        .label-icon { width: 16px; height: 16px; color: #4a8ada; }
-        .input-wrapper input { width: 100%; padding: 12px 15px; border: 1.5px solid #e2e8f0; border-radius: 10px; font-family: 'Cairo', sans-serif; font-size: 14px; box-sizing: border-box; transition: 0.3s; background: #f8fafc; color: #1e293b; -webkit-text-fill-color: #1e293b; }
-        .input-wrapper input::placeholder { color: #94a3b8; opacity: 1; }
-        .input-wrapper input:focus { outline: none; border-color: #4a8ada; background: white; box-shadow: 0 0 0 3px rgba(74, 138, 218, 0.1); }
-        .submit-btn { width: 100%; padding: 12px; background: #4a8ada; color: white; border: none; border-radius: 10px; font-size: 16px; font-weight: 700; cursor: pointer; transition: 0.3s; margin-top: 10px; }
-        .submit-btn:hover { background: #3b76c4; transform: translateY(-1px); }
-        .submit-btn:disabled { background: #cbd5e0; cursor: not-allowed; }
-        .toggle-view { text-align: center; margin-top: 20px; font-size: 14px; color: #4a5568; }
-        .toggle-view span { color: #4a8ada; cursor: pointer; font-weight: 700; margin-right: 5px; }
-        .toggle-view span:hover { text-decoration: underline; }
-        @media (max-width: 480px) { .auth-card { padding: 25px 20px; } .logo-text { font-size: 20px; } .logo-slogan { font-size: 12px; } .logo-image-wrapper { width: 60px; height: 60px; } .top-logo-content { gap: 10px; } }
       `}</style>
     </div>
   );
