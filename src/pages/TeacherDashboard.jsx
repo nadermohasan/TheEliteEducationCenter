@@ -1,38 +1,47 @@
 // TeacherDashboard.jsx
-import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { supabase } from '../supabaseClient';
-import { toast } from 'react-hot-toast';
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { supabase } from "../supabaseClient";
+import { toast } from "react-hot-toast";
 import {
   PlusCircle, Trash2, BookOpen, Edit2, X, UploadCloud, CheckCircle2, FileText,
   Upload, Download, FileSpreadsheet, FileJson, AlertCircle, Search, Image as ImageIcon,
   Save, Power, PowerOff, Settings
 } from "lucide-react";
-import * as XLSX from 'xlsx';
-import Footer from './Footer';
-import Navbar from './Navbar';
-import ConfirmDialog from './ConfirmDialog';
+import * as XLSX from "xlsx";
+import Footer from "./Footer";
+import Navbar from "./Navbar";
+import ConfirmDialog from "./ConfirmDialog";
 
 // دوال تحويل الإجابة الصحيحة للرفع الجماعي
 const mapCorrectOption = (value, isEnglish = false) => {
-  if (value === undefined || value === '') return null;
+  if (value === undefined || value === "") return null;
   if (!isNaN(value) && [0, 1, 2, 3].includes(Number(value))) return Number(value);
   const str = String(value).trim().toLowerCase();
-  const englishMap = { 'a': 0, 'b': 1, 'c': 2, 'd': 3 };
-  const arabicMap = { 'أ': 0, 'ا': 0, 'ب': 1, 'ج': 2, 'د': 3 };
+  const englishMap = { a: 0, b: 1, c: 2, d: 3 };
+  const arabicMap = { أ: 0, ا: 0, ب: 1, ج: 2, د: 3 };
   if (englishMap[str] !== undefined) return englishMap[str];
   if (arabicMap[str] !== undefined) return arabicMap[str];
   return null;
 };
 
 const getCorrectOptionLetter = (correctNumber, isEnglish) => {
-  const englishLetters = ['A', 'B', 'C', 'D'];
-  const arabicLetters = ['أ', 'ب', 'ج', 'د'];
+  const englishLetters = ["A", "B", "C", "D"];
+  const arabicLetters = ["أ", "ب", "ج", "د"];
   const letters = isEnglish ? englishLetters : arabicLetters;
-  return letters[correctNumber] || '?';
+  return letters[correctNumber] || "?";
 };
 
-const ALLOW_IMAGE_OPTIONS_KEYWORDS = ['رياضيات', 'جغرافيا', 'تكنولوجيا المعلومات', 'تقنية معلومات'];
+const ALLOW_IMAGE_OPTIONS_KEYWORDS = [
+  "رياضيات", "جغرافيا", "تكنولوجيا المعلومات", "تقنية معلومات"
+];
+
+// المواد المشتركة بين الفرعين
+const SHARED_SUBJECTS = ["الرياضيات", "اللغة الإنجليزية", "تكنولوجيا المعلومات", "اللغة العربية"];
+// مواد علمي فقط
+const SCIENTIFIC_ONLY = ["كيمياء", "أحياء", "فيزياء"];
+// مواد أدبي فقط
+const LITERARY_ONLY = ["جغرافيا", "تاريخ", "الثقافة العلمية"];
 
 export default function TeacherDashboard() {
   const navigate = useNavigate();
@@ -45,7 +54,7 @@ export default function TeacherDashboard() {
   const [editingId, setEditingId] = useState(null);
   const [fetchError, setFetchError] = useState(null);
   const [teacherProfile, setTeacherProfile] = useState(null);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = useState("");
   const [stats, setStats] = useState({ totalQuestions: 0, totalPassages: 0 });
 
   const [showBulkModal, setShowBulkModal] = useState(false);
@@ -53,13 +62,15 @@ export default function TeacherDashboard() {
   const [bulkPreview, setBulkPreview] = useState([]);
   const [bulkUploading, setBulkUploading] = useState(false);
   const [bulkErrors, setBulkErrors] = useState([]);
-  const [bulkFileName, setBulkFileName] = useState('');
-  const [selectedBulkSubject, setSelectedBulkSubject] = useState('');
+  const [bulkFileName, setBulkFileName] = useState("");
+  const [selectedBulkSubject, setSelectedBulkSubject] = useState("");
   const [isEnglishBulk, setIsEnglishBulk] = useState(false);
 
   const [showPassageModal, setShowPassageModal] = useState(false);
   const [editingPassage, setEditingPassage] = useState(null);
-  const [passageForm, setPassageForm] = useState({ title: '', passage_text: '', subject_id: '' });
+  const [passageForm, setPassageForm] = useState({
+    title: "", passage_text: "", subject_id: ""
+  });
 
   const [uploadBatches, setUploadBatches] = useState([]);
   const [editingDurations, setEditingDurations] = useState({});
@@ -68,56 +79,66 @@ export default function TeacherDashboard() {
   const [showSettingsModal, setShowSettingsModal] = useState(false);
 
   const [confirmState, setConfirmState] = useState({
-    isOpen: false,
-    title: '',
-    message: '',
-    confirmText: '',
-    cancelText: '',
-    resolve: null
+    isOpen: false, title: "", message: "", confirmText: "", cancelText: "", resolve: null
   });
 
   const [formData, setFormData] = useState({
-    subject_id: '',
-    question_text: '',
-    optionA: '',
-    optionB: '',
-    optionC: '',
-    optionD: '',
+    subject_id: "",
+    question_text: "",
+    optionA: "",
+    optionB: "",
+    optionC: "",
+    optionD: "",
     correct_option: 0,
-    image_url: '',
-    passage_id: '',
-    imageA: '',
-    imageB: '',
-    imageC: '',
-    imageD: '',
-    unit_number: ''
+    image_url: "",
+    passage_id: "",
+    imageA: "",
+    imageB: "",
+    imageC: "",
+    imageD: "",
+    unit_number: "",
+    branch: ""
   });
+
+  // دوال مساعدة لتحديد نوع المادة
+  const getSelectedSubject = () => subjects.find(s => s.id == formData.subject_id);
+  const isSharedSubject = () => {
+    const subject = getSelectedSubject();
+    if (!subject) return false;
+    return SHARED_SUBJECTS.some(keyword => subject.name.includes(keyword));
+  };
+  const isScientificOnly = () => {
+    const subject = getSelectedSubject();
+    if (!subject) return false;
+    return SCIENTIFIC_ONLY.some(keyword => subject.name.includes(keyword));
+  };
+  const isLiteraryOnly = () => {
+    const subject = getSelectedSubject();
+    if (!subject) return false;
+    return LITERARY_ONLY.some(keyword => subject.name.includes(keyword));
+  };
 
   // دالة عرض مودال التأكيد
   const showConfirm = (options) => {
     return new Promise((resolve) => {
       setConfirmState({
         isOpen: true,
-        title: options.title || 'تأكيد العملية',
+        title: options.title || "تأكيد العملية",
         message: options.message,
-        confirmText: options.confirmText || 'تأكيد',
-        cancelText: options.cancelText || 'إلغاء',
+        confirmText: options.confirmText || "تأكيد",
+        cancelText: options.cancelText || "إلغاء",
         resolve
       });
     });
   };
 
   const handleConfirm = () => {
-    if (confirmState.resolve) {
-      confirmState.resolve(true);
-    }
+    if (confirmState.resolve) confirmState.resolve(true);
     setConfirmState(prev => ({ ...prev, isOpen: false }));
   };
 
   const handleCancel = () => {
-    if (confirmState.resolve) {
-      confirmState.resolve(false);
-    }
+    if (confirmState.resolve) confirmState.resolve(false);
     setConfirmState(prev => ({ ...prev, isOpen: false }));
   };
 
@@ -130,29 +151,27 @@ export default function TeacherDashboard() {
   }, []);
 
   useEffect(() => {
-    setStats({
-      totalQuestions: questions.length,
-      totalPassages: passages.length
-    });
+    setStats({ totalQuestions: questions.length, totalPassages: passages.length });
   }, [questions, passages]);
-useEffect(() => {
-  document.title = "إدارة بنك الاسئلة - مركز النخبة التعليمي";
-}, []);
+
+  useEffect(() => {
+    document.title = "إدارة بنك الاسئلة - مركز النخبة التعليمي";
+  }, []);
 
   const loadUploadBatches = () => {
-    const saved = localStorage.getItem('teacher_upload_batches');
+    const saved = localStorage.getItem("teacher_upload_batches");
     if (saved) setUploadBatches(JSON.parse(saved));
   };
 
   const saveUploadBatches = (batches) => {
-    localStorage.setItem('teacher_upload_batches', JSON.stringify(batches));
+    localStorage.setItem("teacher_upload_batches", JSON.stringify(batches));
     setUploadBatches(batches);
   };
 
   const fetchTeacherProfile = async () => {
     const { data: { user: currentUser } } = await supabase.auth.getUser();
     if (currentUser) {
-      const { data: profile } = await supabase.from('profiles').select('name').eq('id', currentUser.id).single();
+      const { data: profile } = await supabase.from("profiles").select("name").eq("id", currentUser.id).single();
       setTeacherProfile(profile);
     }
   };
@@ -160,10 +179,9 @@ useEffect(() => {
   const fetchSubjects = async () => {
     try {
       const { data, error } = await supabase
-        .from('subjects')
-        .select('id, name, duration_minutes, questions_count')
-        .order('id');
-
+        .from("subjects")
+        .select('id, name, duration_minutes, questions_count, branch')
+        .order("id");
       if (!error) {
         setSubjects(data || []);
         const durations = {};
@@ -183,13 +201,13 @@ useEffect(() => {
       setLoading(true);
       setFetchError(null);
       const { data: { user }, error: userError } = await supabase.auth.getUser();
-      if (userError || !user) { navigate('/login'); return; }
+      if (userError || !user) { navigate("/login"); return; }
 
       const { data: questionsData, error: questionsError } = await supabase
-        .from('questions')
-        .select('*')
-        .eq('teacher_id', user.id)
-        .order('created_at', { ascending: false });
+        .from("questions")
+        .select("*")
+        .eq("teacher_id", user.id)
+        .order("created_at", { ascending: false });
 
       if (questionsError) throw questionsError;
       if (!questionsData || questionsData.length === 0) { setQuestions([]); return; }
@@ -197,32 +215,32 @@ useEffect(() => {
       const subjectIds = [...new Set(questionsData.map(q => q.subject_id).filter(id => id))];
       let subjectsMap = new Map();
       if (subjectIds.length > 0) {
-        const { data: subjectsData } = await supabase.from('subjects').select('id, name').in('id', subjectIds);
+        const { data: subjectsData } = await supabase.from("subjects").select("id, name").in("id", subjectIds);
         if (subjectsData) subjectsData.forEach(subject => subjectsMap.set(subject.id, subject));
       }
 
       const formattedQuestions = questionsData.map(question => ({
         ...question,
-        subjects: subjectsMap.get(question.subject_id) || { name: 'غير محدد' }
+        subjects: subjectsMap.get(question.subject_id) || { name: "غير محدد" }
       }));
       setQuestions(formattedQuestions);
     } catch (err) {
-      setFetchError('حدث خطأ في جلب الأسئلة');
+      setFetchError("حدث خطأ في جلب الأسئلة");
       setQuestions([]);
     } finally { setLoading(false); }
   };
 
   const fetchPassages = async () => {
-    const { data, error } = await supabase.from('passages').select('*').order('created_at', { ascending: true });
+    const { data, error } = await supabase.from("passages").select("*").order("created_at", { ascending: true });
     if (!error) setPassages(data || []);
   };
 
   const uploadImage = async (file) => {
-    const fileExt = file.name.split('.').pop();
+    const fileExt = file.name.split(".").pop();
     const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 8)}.${fileExt}`;
-    const { error } = await supabase.storage.from('question-images').upload(fileName, file);
+    const { error } = await supabase.storage.from("question-images").upload(fileName, file);
     if (error) throw error;
-    const { data: { publicUrl } } = supabase.storage.from('question-images').getPublicUrl(fileName);
+    const { data: { publicUrl } } = supabase.storage.from("question-images").getPublicUrl(fileName);
     return publicUrl;
   };
 
@@ -231,7 +249,11 @@ useEffect(() => {
     setLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { navigate('/login'); return; }
+      if (!user) { navigate("/login"); return; }
+
+      let finalBranch = formData.branch;
+      if (isScientificOnly()) finalBranch = "علمي";
+      else if (isLiteraryOnly()) finalBranch = "أدبي";
 
       const newQuestion = {
         teacher_id: user.id,
@@ -247,12 +269,13 @@ useEffect(() => {
         image_option_c: formData.imageC || null,
         image_option_d: formData.imageD || null,
         unit_number: formData.unit_number ? parseInt(formData.unit_number) : null,
+        branch: finalBranch || null,
         is_active: true
       };
 
-      const { error } = await supabase.from('questions').insert([newQuestion]);
+      const { error } = await supabase.from("questions").insert([newQuestion]);
       if (error) throw error;
-      toast.success('تم إضافة السؤال بنجاح!');
+      toast.success("تم إضافة السؤال بنجاح!");
 
       const currentSubject = formData.subject_id;
       resetForm();
@@ -260,7 +283,7 @@ useEffect(() => {
 
       await fetchQuestions();
     } catch (error) {
-      toast.error('خطأ في الإضافة: ' + error.message);
+      toast.error("خطأ في الإضافة: " + error.message);
     } finally { setLoading(false); }
   };
 
@@ -268,6 +291,10 @@ useEffect(() => {
     e.preventDefault();
     setLoading(true);
     try {
+      let finalBranch = formData.branch;
+      if (isScientificOnly()) finalBranch = "علمي";
+      else if (isLiteraryOnly()) finalBranch = "أدبي";
+
       const updatedQuestion = {
         subject_id: formData.subject_id,
         question_text: formData.question_text,
@@ -279,65 +306,67 @@ useEffect(() => {
         image_option_b: formData.imageB || null,
         image_option_c: formData.imageC || null,
         image_option_d: formData.imageD || null,
-        unit_number: formData.unit_number ? parseInt(formData.unit_number) : null
+        unit_number: formData.unit_number ? parseInt(formData.unit_number) : null,
+        branch: finalBranch || null
       };
-      const { error } = await supabase.from('questions').update(updatedQuestion).eq('id', editingId);
+      const { error } = await supabase.from("questions").update(updatedQuestion).eq("id", editingId);
       if (error) throw error;
-      toast.success('تم تعديل السؤال بنجاح!');
+      toast.success("تم تعديل السؤال بنجاح!");
       resetForm();
       await fetchQuestions();
     } catch (error) {
-      toast.error('خطأ في التعديل: ' + error.message);
+      toast.error("خطأ في التعديل: " + error.message);
     } finally { setLoading(false); }
   };
 
   const deleteQuestion = async (id) => {
     const confirmed = await showConfirm({
-      title: 'حذف السؤال',
-      message: 'هل أنت متأكد من حذف هذا السؤال؟ لا يمكن التراجع عن هذا الإجراء.',
-      confirmText: 'حذف',
-      cancelText: 'إلغاء'
+      title: "حذف السؤال",
+      message: "هل أنت متأكد من حذف هذا السؤال؟ لا يمكن التراجع عن هذا الإجراء.",
+      confirmText: "حذف",
+      cancelText: "إلغاء"
     });
     if (!confirmed) return;
 
     try {
-      const { error } = await supabase.from('questions').delete().eq('id', id);
+      const { error } = await supabase.from("questions").delete().eq("id", id);
       if (error) throw error;
       if (editingId === id) resetForm();
       await fetchQuestions();
-      toast.success('تم حذف السؤال بنجاح');
+      toast.success("تم حذف السؤال بنجاح");
     } catch (error) {
-      toast.error('خطأ أثناء الحذف: ' + error.message);
+      toast.error("خطأ أثناء الحذف: " + error.message);
     }
   };
 
   const loadQuestionForEdit = (question) => {
-    const options = question.options || ['', '', '', ''];
+    const options = question.options || ["", "", "", ""];
     setFormData({
-      subject_id: question.subject_id || '',
-      question_text: question.question_text || '',
-      optionA: options[0] || '',
-      optionB: options[1] || '',
-      optionC: options[2] || '',
-      optionD: options[3] || '',
+      subject_id: question.subject_id || "",
+      question_text: question.question_text || "",
+      optionA: options[0] || "",
+      optionB: options[1] || "",
+      optionC: options[2] || "",
+      optionD: options[3] || "",
       correct_option: question.correct_option || 0,
-      image_url: question.image_url || '',
-      passage_id: question.passage_id || '',
-      imageA: question.image_option_a || '',
-      imageB: question.image_option_b || '',
-      imageC: question.image_option_c || '',
-      imageD: question.image_option_d || '',
-      unit_number: question.unit_number || ''
+      image_url: question.image_url || "",
+      passage_id: question.passage_id || "",
+      imageA: question.image_option_a || "",
+      imageB: question.image_option_b || "",
+      imageC: question.image_option_c || "",
+      imageD: question.image_option_d || "",
+      unit_number: question.unit_number || "",
+      branch: question.branch || ""
     });
     setIsEditing(true);
     setEditingId(question.id);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const resetForm = () => {
     setFormData({
-      subject_id: '', question_text: '', optionA: '', optionB: '', optionC: '', optionD: '', correct_option: 0,
-      image_url: '', passage_id: '', imageA: '', imageB: '', imageC: '', imageD: '', unit_number: ''
+      subject_id: "", question_text: "", optionA: "", optionB: "", optionC: "", optionD: "", correct_option: 0,
+      image_url: "", passage_id: "", imageA: "", imageB: "", imageC: "", imageD: "", unit_number: "", branch: ""
     });
     setIsEditing(false);
     setEditingId(null);
@@ -349,29 +378,28 @@ useEffect(() => {
     if (!user) return;
     const newPassage = { ...passageForm, subject_id: parseInt(passageForm.subject_id) };
     if (editingPassage) {
-      await supabase.from('passages').update(newPassage).eq('id', editingPassage.id);
+      await supabase.from("passages").update(newPassage).eq("id", editingPassage.id);
     } else {
-      await supabase.from('passages').insert([newPassage]);
+      await supabase.from("passages").insert([newPassage]);
     }
     fetchPassages();
     setShowPassageModal(false);
     setEditingPassage(null);
-    setPassageForm({ title: '', passage_text: '', subject_id: '' });
-    toast.success(editingPassage ? 'تم تحديث النص بنجاح' : 'تم إضافة النص بنجاح');
+    setPassageForm({ title: "", passage_text: "", subject_id: "" });
+    toast.success(editingPassage ? "تم تحديث النص بنجاح" : "تم إضافة النص بنجاح");
   };
 
   const deletePassage = async (id) => {
     const confirmed = await showConfirm({
-      title: 'حذف النص',
-      message: 'حذف النص سيؤدي إلى فصل الأسئلة المرتبطة به. هل أنت متأكد؟',
-      confirmText: 'حذف',
-      cancelText: 'إلغاء'
+      title: "حذف النص",
+      message: "حذف النص سيؤدي إلى فصل الأسئلة المرتبطة به. هل أنت متأكد؟",
+      confirmText: "حذف",
+      cancelText: "إلغاء"
     });
     if (!confirmed) return;
-
-    await supabase.from('passages').delete().eq('id', id);
+    await supabase.from("passages").delete().eq("id", id);
     fetchPassages();
-    toast.success('تم حذف النص بنجاح');
+    toast.success("تم حذف النص بنجاح");
   };
 
   const handleSubjectDurationChange = (subjectId, value) => {
@@ -390,21 +418,17 @@ useEffect(() => {
         duration_minutes: editingDurations[subject.id],
         questions_count: editingQuestionsCount[subject.id]
       }));
-
       for (const update of updates) {
         const { error } = await supabase
-          .from('subjects')
-          .update({
-            duration_minutes: update.duration_minutes,
-            questions_count: update.questions_count
-          })
-          .eq('id', update.id);
+          .from("subjects")
+          .update({ duration_minutes: update.duration_minutes, questions_count: update.questions_count })
+          .eq("id", update.id);
         if (error) throw error;
       }
-      toast.success('تم حفظ جميع الإعدادات بنجاح');
+      toast.success("تم حفظ جميع الإعدادات بنجاح");
       setShowSettingsModal(false);
     } catch (error) {
-      toast.error('خطأ في الحفظ: ' + error.message);
+      toast.error("خطأ في الحفظ: " + error.message);
     } finally {
       setSavingSettings(false);
     }
@@ -412,34 +436,29 @@ useEffect(() => {
 
   // Bulk Upload Logic
   const handleBulkFileUpload = (file) => {
-    if (!selectedBulkSubject) {
-      toast.error('الرجاء اختيار المادة أولاً');
-      return;
-    }
+    if (!selectedBulkSubject) { toast.error("الرجاء اختيار المادة أولاً"); return; }
     setBulkFileName(file.name);
     const reader = new FileReader();
     reader.onload = async (e) => {
       const data = new Uint8Array(e.target.result);
-      const workbook = XLSX.read(data, { type: 'array' });
+      const workbook = XLSX.read(data, { type: "array" });
       const sheet = workbook.Sheets[workbook.SheetNames[0]];
       const rows = XLSX.utils.sheet_to_json(sheet);
-
-      const questionCol = isEnglishBulk ? 'Question' : 'السؤال';
-      const optACol = isEnglishBulk ? 'Option A' : 'الخيار أ';
-      const optBCol = isEnglishBulk ? 'Option B' : 'الخيار ب';
-      const optCCol = isEnglishBulk ? 'Option C' : 'الخيار ج';
-      const optDCol = isEnglishBulk ? 'Option D' : 'الخيار د';
-      const correctCol = isEnglishBulk ? 'Correct Answer' : 'الإجابة الصحيحة';
-      const unitCol = isEnglishBulk ? 'Unit' : 'رقم الوحدة';
-
+      const questionCol = isEnglishBulk ? "Question" : "السؤال";
+      const optACol = isEnglishBulk ? "Option A" : "الخيار أ";
+      const optBCol = isEnglishBulk ? "Option B" : "الخيار ب";
+      const optCCol = isEnglishBulk ? "Option C" : "الخيار ج";
+      const optDCol = isEnglishBulk ? "Option D" : "الخيار د";
+      const correctCol = isEnglishBulk ? "Correct Answer" : "الإجابة الصحيحة";
+      const unitCol = isEnglishBulk ? "Unit" : "رقم الوحدة";
       const mappedRows = rows.map(row => ({
-        question_text: row[questionCol] || row['Question'] || row['question_text'] || '',
-        optionA: row[optACol] || row['Option A'] || row['optionA'] || '',
-        optionB: row[optBCol] || row['Option B'] || row['optionB'] || '',
-        optionC: row[optCCol] || row['Option C'] || row['optionC'] || '',
-        optionD: row[optDCol] || row['Option D'] || row['optionD'] || '',
-        correct_option: row[correctCol] || row['Correct Answer'] || row['correct_option'] || '',
-        unit_number: row[unitCol] || row['Unit'] || row['unit_number'] || ''
+        question_text: row[questionCol] || row["Question"] || row["question_text"] || "",
+        optionA: row[optACol] || row["Option A"] || row["optionA"] || "",
+        optionB: row[optBCol] || row["Option B"] || row["optionB"] || "",
+        optionC: row[optCCol] || row["Option C"] || row["optionC"] || "",
+        optionD: row[optDCol] || row["Option D"] || row["optionD"] || "",
+        correct_option: row[correctCol] || row["Correct Answer"] || row["correct_option"] || "",
+        unit_number: row[unitCol] || row["Unit"] || row["unit_number"] || ""
       }));
       setBulkData(mappedRows);
       await validateBulkData(mappedRows);
@@ -448,10 +467,7 @@ useEffect(() => {
   };
 
   const handleBulkJsonUpload = (file) => {
-    if (!selectedBulkSubject) {
-      toast.error('الرجاء اختيار المادة أولاً');
-      return;
-    }
+    if (!selectedBulkSubject) { toast.error("الرجاء اختيار المادة أولاً"); return; }
     setBulkFileName(file.name);
     const reader = new FileReader();
     reader.onload = (e) => {
@@ -459,7 +475,7 @@ useEffect(() => {
         const rows = JSON.parse(e.target.result);
         setBulkData(rows);
         validateBulkData(rows);
-      } catch (err) { setBulkErrors(['الملف JSON غير صالح']); }
+      } catch (err) { setBulkErrors(["الملف JSON غير صالح"]); }
     };
     reader.readAsText(file);
   };
@@ -467,21 +483,17 @@ useEffect(() => {
   const validateBulkData = async (rows) => {
     const errors = [];
     const validRows = [];
-
     const subjectId = parseInt(selectedBulkSubject);
     const subject = subjects.find(s => s.id === subjectId);
-    const subjectName = subject?.name || '';
-    const isEnglish = subjectName.includes('إنجليزية');
-
+    const subjectName = subject?.name || "";
+    const isEnglish = subjectName.includes("إنجليزية");
     for (const [idx, row] of rows.entries()) {
       const rowErrors = [];
-
       if (!row.question_text?.trim()) rowErrors.push(`السؤال ${idx + 1}: نص السؤال مطلوب`);
       if (!row.optionA?.trim()) rowErrors.push(`السؤال ${idx + 1}: الخيار أ مطلوب`);
       if (!row.optionB?.trim()) rowErrors.push(`السؤال ${idx + 1}: الخيار ب مطلوب`);
       if (!row.optionC?.trim()) rowErrors.push(`السؤال ${idx + 1}: الخيار ج مطلوب`);
       if (!row.optionD?.trim()) rowErrors.push(`السؤال ${idx + 1}: الخيار د مطلوب`);
-
       let correctNumber = null;
       const correctValue = row.correct_option?.toString().trim();
       if (!correctValue) {
@@ -493,27 +505,19 @@ useEffect(() => {
         } else {
           const options = [row.optionA, row.optionB, row.optionC, row.optionD];
           const matchedIndex = options.findIndex(opt => opt?.trim().toLowerCase() === correctValue.toLowerCase());
-          if (matchedIndex !== -1) {
-            correctNumber = matchedIndex;
-          } else {
-            rowErrors.push(`السؤال ${idx + 1}: قيمة الإجابة الصحيحة غير صالحة ("${correctValue}")`);
-          }
+          if (matchedIndex !== -1) correctNumber = matchedIndex;
+          else rowErrors.push(`السؤال ${idx + 1}: قيمة الإجابة الصحيحة غير صالحة ("${correctValue}")`);
         }
       }
-
       let unitNumber = row.unit_number ? parseInt(row.unit_number) : null;
       if (row.unit_number && isNaN(unitNumber)) {
         rowErrors.push(`السؤال ${idx + 1}: رقم الوحدة يجب أن يكون رقماً`);
         unitNumber = null;
       }
-
       if (rowErrors.length === 0) {
         validRows.push({
           question_text: row.question_text,
-          optionA: row.optionA,
-          optionB: row.optionB,
-          optionC: row.optionC,
-          optionD: row.optionD,
+          optionA: row.optionA, optionB: row.optionB, optionC: row.optionC, optionD: row.optionD,
           correct_option: correctNumber,
           correct_option_letter: getCorrectOptionLetter(correctNumber, isEnglish),
           unit_number: unitNumber,
@@ -524,17 +528,16 @@ useEffect(() => {
         errors.push(...rowErrors);
       }
     }
-
     setBulkErrors(errors);
     setBulkPreview(validRows);
   };
 
   const handleBulkSubmit = async () => {
-    if (bulkPreview.length === 0) { toast.error('لا توجد بيانات صالحة للرفع'); return; }
+    if (bulkPreview.length === 0) { toast.error("لا توجد بيانات صالحة للرفع"); return; }
     setBulkUploading(true);
     let success = 0, fail = 0;
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) { navigate('/login'); return; }
+    if (!user) { navigate("/login"); return; }
     const batchId = Date.now().toString();
     for (const q of bulkPreview) {
       try {
@@ -544,18 +547,13 @@ useEffect(() => {
           question_text: q.question_text,
           options: [q.optionA, q.optionB, q.optionC, q.optionD],
           correct_option: q.correct_option,
-          image_url: null,
-          passage_id: null,
-          created_at: new Date(),
+          image_url: null, passage_id: null, created_at: new Date(),
           bulk_batch_id: batchId,
-          image_option_a: null,
-          image_option_b: null,
-          image_option_c: null,
-          image_option_d: null,
+          image_option_a: null, image_option_b: null, image_option_c: null, image_option_d: null,
           unit_number: q.unit_number,
           is_active: true
         };
-        const { error } = await supabase.from('questions').insert([newQuestion]);
+        const { error } = await supabase.from("questions").insert([newQuestion]);
         if (error) throw error;
         success++;
       } catch (err) { fail++; console.error(err); }
@@ -564,7 +562,7 @@ useEffect(() => {
       toast.error(`تم رفع ${success} سؤال، فشل رفع ${fail} سؤالاً`);
       setBulkErrors([`تم رفع ${success} سؤال، فشل رفع ${fail} سؤالاً`]);
     } else {
-      const newBatch = { batchId, date: new Date().toLocaleString(), count: success, fileName: bulkFileName || 'رفع يدوي', subjectId: selectedBulkSubject };
+      const newBatch = { batchId, date: new Date().toLocaleString(), count: success, fileName: bulkFileName || "رفع يدوي", subjectId: selectedBulkSubject };
       saveUploadBatches([newBatch, ...uploadBatches]);
       setShowBulkModal(false);
       resetBulkState();
@@ -575,121 +573,98 @@ useEffect(() => {
   };
 
   const resetBulkState = () => {
-    setBulkData([]); setBulkPreview([]); setBulkErrors([]); setBulkFileName('');
-    setSelectedBulkSubject(''); setIsEnglishBulk(false);
+    setBulkData([]); setBulkPreview([]); setBulkErrors([]); setBulkFileName("");
+    setSelectedBulkSubject(""); setIsEnglishBulk(false);
   };
 
-  const handleCancelBulk = () => {
-    setShowBulkModal(false);
-    resetBulkState();
-  };
+  const handleCancelBulk = () => { setShowBulkModal(false); resetBulkState(); };
 
   const toggleBatchActive = async (batchId, currentlyActive) => {
     const newActiveState = !currentlyActive;
     try {
-      const { error } = await supabase
-        .from('questions')
-        .update({ is_active: newActiveState })
-        .eq('bulk_batch_id', batchId);
+      const { error } = await supabase.from("questions").update({ is_active: newActiveState }).eq("bulk_batch_id", batchId);
       if (error) throw error;
-      const updatedBatches = uploadBatches.map(b =>
-        b.batchId === batchId ? { ...b, isActive: newActiveState } : b
-      );
+      const updatedBatches = uploadBatches.map(b => b.batchId === batchId ? { ...b, isActive: newActiveState } : b);
       saveUploadBatches(updatedBatches);
       await fetchQuestions();
-      toast.success(newActiveState ? 'تم تفعيل المجموعة' : 'تم تعطيل المجموعة');
+      toast.success(newActiveState ? "تم تفعيل المجموعة" : "تم تعطيل المجموعة");
     } catch (error) {
-      toast.error('خطأ في تحديث حالة التفعيل: ' + error.message);
+      toast.error("خطأ في تحديث حالة التفعيل: " + error.message);
     }
   };
 
   const deleteBatchQuestions = async (batchId, batchIndex) => {
     const confirmed = await showConfirm({
-      title: 'حذف مجموعة الأسئلة',
+      title: "حذف مجموعة الأسئلة",
       message: `هل أنت متأكد من حذف جميع أسئلة المجموعة التي تم رفعها في ${uploadBatches[batchIndex].date}؟`,
-      confirmText: 'حذف المجموعة',
-      cancelText: 'إلغاء'
+      confirmText: "حذف المجموعة",
+      cancelText: "إلغاء"
     });
     if (!confirmed) return;
-
     setLoading(true);
     try {
-      const { error } = await supabase.from('questions').delete().eq('bulk_batch_id', batchId);
+      const { error } = await supabase.from("questions").delete().eq("bulk_batch_id", batchId);
       if (error) throw error;
       const newBatches = uploadBatches.filter((_, idx) => idx !== batchIndex);
       saveUploadBatches(newBatches);
-      toast.success('تم حذف جميع أسئلة المجموعة بنجاح');
+      toast.success("تم حذف جميع أسئلة المجموعة بنجاح");
       await fetchQuestions();
     } catch (error) {
-      toast.error('خطأ أثناء الحذف: ' + error.message);
+      toast.error("خطأ أثناء الحذف: " + error.message);
     } finally { setLoading(false); }
   };
 
   const downloadTemplate = () => {
-    if (!selectedBulkSubject) {
-      toast.error('الرجاء اختيار المادة أولاً');
-      return;
-    }
+    if (!selectedBulkSubject) { toast.error("الرجاء اختيار المادة أولاً"); return; }
     const isEnglish = isEnglishBulk;
     const template = [{
-      [isEnglish ? 'Question' : 'السؤال']: isEnglish ? 'Example: What is the capital of Egypt?' : 'مثال: ما هي عاصمة مصر؟',
-      [isEnglish ? 'Option A' : 'الخيار أ']: isEnglish ? 'Cairo' : 'القاهرة',
-      [isEnglish ? 'Option B' : 'الخيار ب']: isEnglish ? 'Alexandria' : 'الإسكندرية',
-      [isEnglish ? 'Option C' : 'الخيار ج']: isEnglish ? 'Giza' : 'الجيزة',
-      [isEnglish ? 'Option D' : 'الخيار د']: isEnglish ? 'Sharm El Sheikh' : 'شرم الشيخ',
-      [isEnglish ? 'Correct Answer' : 'الإجابة الصحيحة']: 'A',
-      [isEnglish ? 'Unit' : 'رقم الوحدة']: 1
+      [isEnglish ? "Question" : "السؤال"]: isEnglish ? "Example: What is the capital of Egypt?" : "مثال: ما هي عاصمة مصر؟",
+      [isEnglish ? "Option A" : "الخيار أ"]: isEnglish ? "Cairo" : "القاهرة",
+      [isEnglish ? "Option B" : "الخيار ب"]: isEnglish ? "Alexandria" : "الإسكندرية",
+      [isEnglish ? "Option C" : "الخيار ج"]: isEnglish ? "Giza" : "الجيزة",
+      [isEnglish ? "Option D" : "الخيار د"]: isEnglish ? "Sharm El Sheikh" : "شرم الشيخ",
+      [isEnglish ? "Correct Answer" : "الإجابة الصحيحة"]: "A",
+      [isEnglish ? "Unit" : "رقم الوحدة"]: 1
     }];
     const ws = XLSX.utils.json_to_sheet(template);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Questions');
-    XLSX.writeFile(wb, isEnglish ? 'questions_template.xlsx' : 'نموذج_رفع_الأسئلة.xlsx');
+    XLSX.utils.book_append_sheet(wb, ws, "Questions");
+    XLSX.writeFile(wb, isEnglish ? "questions_template.xlsx" : "نموذج_رفع_الأسئلة.xlsx");
   };
 
-  const openBulkModal = () => {
-    setSelectedBulkSubject('');
-    setIsEnglishBulk(false);
-    setShowBulkModal(true);
-  };
-
+  const openBulkModal = () => { setSelectedBulkSubject(""); setIsEnglishBulk(false); setShowBulkModal(true); };
   const handleSubjectSelectForBulk = (subjectId) => {
     setSelectedBulkSubject(subjectId);
     const subject = subjects.find(s => s.id == subjectId);
-    setIsEnglishBulk(subject?.name?.includes('إنجليزية') || false);
+    setIsEnglishBulk(subject?.name?.includes("إنجليزية") || false);
   };
 
   const filteredQuestions = questions.filter(q => q.question_text?.includes(searchTerm) || q.subjects?.name?.includes(searchTerm));
-
   const isEnglishSubject = () => {
     if (!formData.subject_id) return false;
     const subject = subjects.find(s => s.id == formData.subject_id);
-    return subject?.name?.includes('إنجليزية') || false;
+    return subject?.name?.includes("إنجليزية") || false;
   };
-
   const allowImageOptions = () => {
     if (!formData.subject_id) return false;
     const subject = subjects.find(s => s.id == formData.subject_id);
     if (!subject) return false;
-    const subjectName = subject.name;
-    return ALLOW_IMAGE_OPTIONS_KEYWORDS.some(keyword => subjectName.includes(keyword));
+    return ALLOW_IMAGE_OPTIONS_KEYWORDS.some(keyword => subject.name.includes(keyword));
   };
-
-  const getOptionLabels = () => isEnglishSubject() ? ['A', 'B', 'C', 'D'] : ['أ', 'ب', 'ج', 'د'];
+  const getOptionLabels = () => isEnglishSubject() ? ["A", "B", "C", "D"] : ["أ", "ب", "ج", "د"];
   const getQuestionOptionLabels = (question) => {
     const subject = subjects.find(s => s.id === question.subject_id);
-    const isEnglish = subject?.name?.includes('إنجليزية') || false;
-    return isEnglish ? ['A', 'B', 'C', 'D'] : ['أ', 'ب', 'ج', 'د'];
+    const isEnglish = subject?.name?.includes("إنجليزية") || false;
+    return isEnglish ? ["A", "B", "C", "D"] : ["أ", "ب", "ج", "د"];
   };
   const optionLabels = getOptionLabels();
 
   const ImageUploadField = ({ label, imageUrl, onImageChange, onRemove, inputId }) => (
-    <div className="form-group" style={{ marginTop: '8px' }}>
-      <label style={{ fontSize: '0.85rem', color: '#64748b' }}>{label} (اختياري)</label>
+    <div className="form-group" style={{ marginTop: "8px" }}>
+      <label style={{ fontSize: "0.85rem", color: "#64748b" }}>{label} (اختياري)</label>
       <div className="upload-box">
-        <input type="file" accept="image/*" id={inputId} style={{ display: 'none' }} onChange={onImageChange} />
-        <label htmlFor={inputId} className="upload-label-small">
-          <UploadCloud size={18} /> رفع صورة
-        </label>
+        <input type="file" accept="image/*" id={inputId} style={{ display: "none" }} onChange={onImageChange} />
+        <label htmlFor={inputId} className="upload-label-small"><UploadCloud size={18} /> رفع صورة</label>
         {imageUrl && (
           <div className="image-preview">
             <img src={imageUrl} alt="preview" />
@@ -702,24 +677,17 @@ useEffect(() => {
 
   return (
     <div className="teacher-container">
-      <Navbar userName={teacherProfile?.name || 'معلم'} />
-
+      <Navbar userName={teacherProfile?.name || "معلم"} />
       <main className="teacher-main">
         <div className="page-header">
           <div>
-            <h1 className="page-title">{isEditing ? 'تعديل السؤال' : 'إدارة بنك الأسئلة'}</h1>
+            <h1 className="page-title">{isEditing ? "تعديل السؤال" : "إدارة بنك الأسئلة"}</h1>
             <p className="page-subtitle">أضف، عدل، وقم بإدارة أسئلة الاختبارات بكل سهولة.</p>
           </div>
           <div className="header-actions">
-            <button className="btn-secondary" onClick={() => setShowPassageModal(true)}>
-              <FileText size={18} /> إدارة النصوص
-            </button>
-            <button className="btn-secondary" onClick={() => setShowSettingsModal(true)}>
-              <Settings size={18} /> إعدادات المواد
-            </button>
-            <button className="btn-primary" onClick={openBulkModal}>
-              <Upload size={18} /> رفع مجموعة أسئلة
-            </button>
+            <button className="btn-secondary" onClick={() => setShowPassageModal(true)}><FileText size={18} /> إدارة النصوص</button>
+            <button className="btn-secondary" onClick={() => setShowSettingsModal(true)}><Settings size={18} /> إعدادات المواد</button>
+            <button className="btn-primary" onClick={openBulkModal}><Upload size={18} /> رفع مجموعة أسئلة</button>
           </div>
         </div>
 
@@ -733,53 +701,72 @@ useEffect(() => {
 
         <section className="form-card">
           <div className="card-header">
-            <h2 className="card-title">{isEditing ? <Edit2 size={20} className="icon-blue" /> : <PlusCircle size={20} className="icon-blue" />}{isEditing ? 'تحديث بيانات السؤال' : 'إضافة سؤال جديد'}</h2>
+            <h2 className="card-title">{isEditing ? <Edit2 size={20} className="icon-blue" /> : <PlusCircle size={20} className="icon-blue" />}{isEditing ? "تحديث بيانات السؤال" : "إضافة سؤال جديد"}</h2>
             {isEditing && <button className="btn-text" onClick={resetForm}><X size={16} /> إلغاء</button>}
           </div>
 
           <form onSubmit={isEditing ? handleUpdateQuestion : handleAddQuestion} className="question-form">
             <div className="form-grid">
               <div className="form-group full-width"><label>نص السؤال <span className="required">*</span></label><textarea required className="modern-input textarea-input" value={formData.question_text} onChange={(e) => setFormData({ ...formData, question_text: e.target.value })} placeholder="اكتب السؤال بصيغة واضحة ومباشرة هنا..." /></div>
-              <div className="form-group full-width"><label>صورة توضيحية للسؤال (اختياري)</label><div className="upload-box"><input type="file" id="q-image" className="hidden-input" accept="image/*" onChange={async (e) => { const file = e.target.files[0]; if (file) { try { const url = await uploadImage(file); setFormData({ ...formData, image_url: url }); } catch { toast.error('فشل رفع الصورة'); } } }} /><label htmlFor="q-image" className="upload-label"><UploadCloud size={32} className="upload-icon" /><span className="upload-text">اضغط هنا لرفع صورة</span><span className="upload-hint">PNG, JPG حتى 5MB</span></label>{formData.image_url && (<div className="image-preview"><img src={formData.image_url} alt="preview" /><button type="button" onClick={() => setFormData({ ...formData, image_url: '' })}><X size={16} /></button></div>)}</div></div>
+              <div className="form-group full-width"><label>صورة توضيحية للسؤال (اختياري)</label><div className="upload-box"><input type="file" id="q-image" className="hidden-input" accept="image/*" onChange={async (e) => { const file = e.target.files[0]; if (file) { try { const url = await uploadImage(file); setFormData({ ...formData, image_url: url }); } catch { toast.error("فشل رفع الصورة"); } } }} /><label htmlFor="q-image" className="upload-label"><UploadCloud size={32} className="upload-icon" /><p className="upload-text">اضغط هنا لرفع صورة</p><span className="upload-hint">PNG, JPG حتى 5MB</span></label>{formData.image_url && (<div className="image-preview"><img src={formData.image_url} alt="preview" /><button type="button" onClick={() => setFormData({ ...formData, image_url: "" })}><X size={16} /></button></div>)}</div></div>
 
               <div className="form-group"><label>المادة الدراسية <span className="required">*</span></label><select required className="modern-input" value={formData.subject_id} onChange={(e) => setFormData({ ...formData, subject_id: e.target.value })}><option value="" disabled>اختر المادة من القائمة</option>{subjects.map(s => (<option key={s.id} value={s.id}>{s.name}</option>))}</select></div>
 
               <div className="form-group"><label>رقم الوحدة</label><input type="number" className="modern-input" value={formData.unit_number} onChange={(e) => setFormData({ ...formData, unit_number: e.target.value })} placeholder="مثال: 1" min="1" /></div>
 
-              {isEnglishSubject() && (<div className="form-group full-width"><label>القطعة المرتبطة</label><select className="modern-input" value={formData.passage_id} onChange={(e) => setFormData({ ...formData, passage_id: e.target.value })}><option value="">بدون نص</option>{passages.filter(p => p.subject_id == formData.subject_id).map(p => (<option key={p.id} value={p.id}>{p.title}</option>))}</select></div>)}
+              {isSharedSubject() && (
+                <div className="form-group">
+                  <label>الفرع الدراسي</label>
+                  <select className="modern-input" value={formData.branch} onChange={(e) => setFormData({ ...formData, branch: e.target.value })}>
+                    <option value="" disabled>اختر الفرع الدراسي</option>
+                    <option value="العلمي">العلمي</option>
+                    <option value="الأدبي">الأدبي</option>
+                  </select>
+                </div>
+              )}
+
+              {isEnglishSubject() && (
+                <div className="form-group">
+                  <label>القطعة المرتبطة</label>
+                  <select className="modern-input" value={formData.passage_id} onChange={(e) => setFormData({ ...formData, passage_id: e.target.value })}>
+                    <option value="">بدون نص</option>
+                    {passages.filter(p => p.subject_id == formData.subject_id).map(p => (<option key={p.id} value={p.id}>{p.title}</option>))}
+                  </select>
+                </div>
+              )}
 
               {[0, 1, 2, 3].map(idx => {
-                const optKey = ['A', 'B', 'C', 'D'][idx];
-                const valueKey = ['optionA', 'optionB', 'optionC', 'optionD'][idx];
-                const imageKey = ['imageA', 'imageB', 'imageC', 'imageD'][idx];
+                const optKey = ["A", "B", "C", "D"][idx];
+                const valueKey = ["optionA", "optionB", "optionC", "optionD"][idx];
+                const imageKey = ["imageA", "imageB", "imageC", "imageD"][idx];
                 return (
                   <div className="form-group" key={idx}>
                     <label>الخيار ({optionLabels[idx]}) <span className="required">*</span></label>
                     <input required className="modern-input" type="text" value={formData[valueKey]} onChange={(e) => setFormData({ ...formData, [valueKey]: e.target.value })} placeholder={`محتوى الخيار ${optionLabels[idx]}`} />
                     {allowImageOptions() && (
-                      <ImageUploadField
-                        label={`صورة الخيار ${optionLabels[idx]}`}
-                        imageUrl={formData[imageKey]}
-                        inputId={`option${optKey}-upload`}
-                        onImageChange={async (e) => { const file = e.target.files[0]; if (file) { try { const url = await uploadImage(file); setFormData({ ...formData, [imageKey]: url }); } catch { toast.error('فشل رفع الصورة'); } } }}
-                        onRemove={() => setFormData({ ...formData, [imageKey]: '' })}
-                      />
+                      <ImageUploadField label={`صورة الخيار ${optionLabels[idx]}`} imageUrl={formData[imageKey]} inputId={`option${optKey}-upload`}
+                        onImageChange={async (e) => { const file = e.target.files[0]; if (file) { try { const url = await uploadImage(file); setFormData({ ...formData, [imageKey]: url }); } catch { toast.error("فشل رفع الصورة"); } } }}
+                        onRemove={() => setFormData({ ...formData, [imageKey]: "" })} />
                     )}
                   </div>
                 );
               })}
 
-              <div className="form-group full-width">
-                <label>الإجابة الصحيحة <span className="required">*</span></label>
-                <select className="modern-input" value={formData.correct_option} onChange={(e) => setFormData({ ...formData, correct_option: e.target.value })}>
-                  <option value="0">{optionLabels[0]}</option>
-                  <option value="1">{optionLabels[1]}</option>
-                  <option value="2">{optionLabels[2]}</option>
-                  <option value="3">{optionLabels[3]}</option>
-                </select>
-              </div>
+              <div className={`form-group ${!isSharedSubject() || isEnglishSubject() ? 'full-width' : ''}`}>
+  <label>الإجابة الصحيحة <span className="required">*</span></label>
+  <select
+    className="modern-input"
+    value={formData.correct_option}
+    onChange={(e) => setFormData({ ...formData, correct_option: e.target.value })}
+  >
+    <option value="0">{optionLabels[0]}</option>
+    <option value="1">{optionLabels[1]}</option>
+    <option value="2">{optionLabels[2]}</option>
+    <option value="3">{optionLabels[3]}</option>
+  </select>
+</div>
             </div>
-            <div className="form-actions"><button type="submit" className="btn-primary" disabled={loading}>{isEditing ? <Edit2 size={18} /> : <CheckCircle2 size={18} />}{loading ? 'جاري المعالجة...' : (isEditing ? 'حفظ التعديلات' : 'نشر السؤال في البنك')}</button></div>
+            <div className="form-actions"><button type="submit" className="btn-primary" disabled={loading}>{isEditing ? <Edit2 size={18} /> : <CheckCircle2 size={18} />}{loading ? "جاري المعالجة..." : (isEditing ? "حفظ التعديلات" : "نشر السؤال في البنك")}</button></div>
           </form>
         </section>
 
@@ -790,11 +777,7 @@ useEffect(() => {
               <div className="empty-state"><div className="loading-spinner"></div><p>جاري تحميل الأسئلة...</p></div>
             ) : filteredQuestions.length > 0 ? (
               <table className="modern-table">
-                <thead>
-                  <tr>
-                    <th>المادة</th><th>الوحدة</th><th>نص السؤال</th><th>الوسائط</th><th className="text-center">الإجابة</th><th className="text-center">الإجراءات</th>
-                  </tr>
-                </thead>
+                <thead><tr><th>المادة</th><th>الوحدة</th><th>نص السؤال</th><th>الوسائط</th><th className="text-center">الإجابة</th><th className="text-center">الإجراءات</th></tr></thead>
                 <tbody>
                   {filteredQuestions.map((q) => {
                     const labels = getQuestionOptionLabels(q);
@@ -802,16 +785,10 @@ useEffect(() => {
                     const imagesCount = [q.image_option_a, q.image_option_b, q.image_option_c, q.image_option_d].filter(Boolean).length;
                     return (
                       <tr key={q.id} style={{ opacity: q.is_active ? 1 : 0.6 }}>
-                        <td><span className="subject-badge">{q.subjects?.name || 'غير محدد'}</span></td>
-                        <td className="text-center">{q.unit_number || '-'}</td>
+                        <td><span className="subject-badge">{q.subjects?.name || "غير محدد"}</span></td>
+                        <td className="text-center">{q.unit_number || "-"}</td>
                         <td className="q-text-cell" title={q.question_text}>{q.question_text}</td>
-                        <td className="text-center">
-                          <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
-                            {hasImage && <CheckCircle2 size={16} color="#3b82f6" title="يحتوي على صورة للسؤال" />}
-                            {imagesCount > 0 && <span title={`${imagesCount} صور للخيارات`}><ImageIcon size={16} color="#8b5cf6" /></span>}
-                            {!hasImage && imagesCount === 0 && '-'}
-                          </div>
-                        </td>
+                        <td className="text-center"><div style={{ display: "flex", gap: "6px", justifyContent: "center" }}>{hasImage && <CheckCircle2 size={16} color="#3b82f6" title="يحتوي على صورة للسؤال" />}{imagesCount > 0 && <span title={`${imagesCount} صور للخيارات`}><ImageIcon size={16} color="#8b5cf6" /></span>}{!hasImage && imagesCount === 0 && "-"}</div></td>
                         <td className="text-center"><span className="correct-badge">{labels[q.correct_option]}</span></td>
                         <td><div className="action-buttons"><button className="icon-btn edit" onClick={() => loadQuestionForEdit(q)}><Edit2 size={16} /></button><button className="icon-btn delete" onClick={() => deleteQuestion(q.id)}><Trash2 size={16} /></button></div></td>
                       </tr>
@@ -820,13 +797,13 @@ useEffect(() => {
                 </tbody>
               </table>
             ) : (
-              <div className="empty-state"><div className="empty-icon"><BookOpen size={48} /></div><h3>لا توجد أسئلة</h3><p>{searchTerm ? 'لا توجد نتائج مطابقة لبحثك' : 'ابدأ بإضافة أول سؤال لبنك الأسئلة الخاص بك.'}</p></div>
+              <div className="empty-state"><div className="empty-icon"><BookOpen size={48} /></div><h3>لا توجد أسئلة</h3><p>{searchTerm ? "لا توجد نتائج مطابقة لبحثك" : "ابدأ بإضافة أول سؤال لبنك الأسئلة الخاص بك."}</p></div>
             )}
           </div>
         </section>
 
         {uploadBatches.length > 0 && (
-          <section className="table-card" style={{ marginTop: '30px' }}>
+          <section className="table-card" style={{ marginTop: "30px" }}>
             <div className="card-header"><h2 className="card-title"><Upload size={20} className="icon-blue" /> أسئلة الاختبار المرفوعة</h2><span className="badge-count">{uploadBatches.length} مجموعة</span></div>
             <div className="table-responsive">
               <table className="modern-table">
@@ -837,28 +814,12 @@ useEffect(() => {
                     const isActive = batch.isActive !== false;
                     return (
                       <tr key={batch.batchId}>
-                        <td>{batch.date}</td>
-                        <td>{batch.fileName}</td>
-                        <td>{subject?.name || 'غير معروف'}</td>
-                        <td className="text-center">{batch.count}</td>
-                        <td className="text-center">
-                          <span style={{ color: isActive ? '#10b981' : '#ef4444' }}>
-                            {isActive ? 'مفعل' : 'معطل'}
-                          </span>
-                        </td>
-                        <td className="text-center">
-                          <div className="action-buttons" style={{ justifyContent: 'center' }}>
-                            <button
-                              className="icon-btn"
-                              style={{ background: isActive ? '#fef3c7' : '#dcfce7', color: isActive ? '#d97706' : '#16a34a' }}
-                              onClick={() => toggleBatchActive(batch.batchId, isActive)}
-                              title={isActive ? 'تعطيل المجموعة' : 'تفعيل المجموعة'}
-                            >
-                              {isActive ? <PowerOff size={16} /> : <Power size={16} />}
-                            </button>
-                            <button className="icon-btn delete" onClick={() => deleteBatchQuestions(batch.batchId, idx)}><Trash2 size={16} /></button>
-                          </div>
-                        </td>
+                        <td>{batch.date}</td><td>{batch.fileName}</td><td>{subject?.name || "غير معروف"}</td><td className="text-center">{batch.count}</td>
+                        <td className="text-center"><span style={{ color: isActive ? "#10b981" : "#ef4444" }}>{isActive ? "مفعل" : "معطل"}</span></td>
+                        <td className="text-center"><div className="action-buttons" style={{ justifyContent: "center" }}>
+                          <button className="icon-btn" style={{ background: isActive ? "#fef3c7" : "#dcfce7", color: isActive ? "#d97706" : "#16a34a" }} onClick={() => toggleBatchActive(batch.batchId, isActive)} title={isActive ? "تعطيل المجموعة" : "تفعيل المجموعة"}>{isActive ? <PowerOff size={16} /> : <Power size={16} />}</button>
+                          <button className="icon-btn delete" onClick={() => deleteBatchQuestions(batch.batchId, idx)}><Trash2 size={16} /></button>
+                        </div></td>
                       </tr>
                     );
                   })}
@@ -878,13 +839,13 @@ useEffect(() => {
             <div className="modal-header"><h3><FileText size={20} /> إدارة النصوص القرائية</h3><button className="close-modal" onClick={() => setShowPassageModal(false)}><X size={20} /></button></div>
             <div className="modal-body">
               <form onSubmit={handleAddPassage}>
-                <div className="form-group"><label>المادة</label><select required className="modern-input" value={passageForm.subject_id} onChange={(e) => setPassageForm({ ...passageForm, subject_id: e.target.value })}><option value="">اختر المادة</option>{subjects.filter(s => s.name?.includes('إنجليزية')).map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select></div>
+                <div className="form-group"><label>المادة</label><select required className="modern-input" value={passageForm.subject_id} onChange={(e) => setPassageForm({ ...passageForm, subject_id: e.target.value })}><option value="">اختر المادة</option>{subjects.filter(s => s.name?.includes("إنجليزية")).map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select></div>
                 <div className="form-group"><label>عنوان النص</label><input required className="modern-input" value={passageForm.title} onChange={(e) => setPassageForm({ ...passageForm, title: e.target.value })} placeholder="مثال: أهمية القراءة" /></div>
                 <div className="form-group"><label>نص القراءة</label><textarea required className="modern-input textarea-input" rows="6" value={passageForm.passage_text} onChange={(e) => setPassageForm({ ...passageForm, passage_text: e.target.value })} placeholder="اكتب النص الكامل هنا..." /></div>
-                <div className="form-actions"><button type="submit" className="btn-primary">{editingPassage ? 'تحديث' : 'إضافة'}</button><button type="button" className="btn-secondary" onClick={() => { setShowPassageModal(false); setEditingPassage(null); setPassageForm({ title: '', passage_text: '', subject_id: '' }); }}>إلغاء</button></div>
+                <div className="form-actions"><button type="submit" className="btn-primary">{editingPassage ? "تحديث" : "إضافة"}</button><button type="button" className="btn-secondary" onClick={() => { setShowPassageModal(false); setEditingPassage(null); setPassageForm({ title: "", passage_text: "", subject_id: "" }); }}>إلغاء</button></div>
               </form>
               <hr /><h4>النصوص الموجودة</h4>
-              {passages.length === 0 ? <p style={{ color: '#64748b' }}>لا توجد نصوص</p> : (
+              {passages.length === 0 ? <p style={{ color: "#64748b" }}>لا توجد نصوص</p> : (
                 <div className="passages-list">
                   {passages.map(p => (
                     <div key={p.id} className="passage-item">
@@ -905,55 +866,30 @@ useEffect(() => {
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header"><h3><Upload size={20} /> رفع مجموعة أسئلة</h3><button className="close-modal" onClick={handleCancelBulk}><X size={20} /></button></div>
             <div className="modal-body">
-              <div className="form-group">
-                <label>اختر المادة المستهدفة <span className="required">*</span></label>
-                <select className="modern-input" value={selectedBulkSubject} onChange={(e) => handleSubjectSelectForBulk(e.target.value)}>
-                  <option value="">-- اختر المادة --</option>
-                  {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                </select>
-              </div>
-
+              <div className="form-group"><label>اختر المادة المستهدفة <span className="required">*</span></label><select className="modern-input" value={selectedBulkSubject} onChange={(e) => handleSubjectSelectForBulk(e.target.value)}><option value="">-- اختر المادة --</option>{subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select></div>
               {selectedBulkSubject && (
                 <>
                   <div className="upload-options">
                     <label className="upload-option"><FileSpreadsheet size={24} /><span>رفع ملف Excel</span><input type="file" accept=".xlsx, .xls" onChange={(e) => handleBulkFileUpload(e.target.files[0])} disabled={!selectedBulkSubject} /></label>
                     <label className="upload-option"><FileJson size={24} /><span>رفع ملف JSON</span><input type="file" accept=".json" onChange={(e) => handleBulkJsonUpload(e.target.files[0])} disabled={!selectedBulkSubject} /></label>
-                    <button className="download-template" onClick={downloadTemplate}><Download size={18} /> تحميل النموذج ({isEnglishBulk ? 'English' : 'عربي'})</button>
+                    <button className="download-template" onClick={downloadTemplate}><Download size={18} /> تحميل النموذج ({isEnglishBulk ? "English" : "عربي"})</button>
                   </div>
-                  <p style={{ fontSize: '0.85rem', color: '#64748b', marginTop: '5px' }}>
-                    {isEnglishBulk ? 'Headers must be: Question, Option A, Option B, Option C, Option D, Correct Answer, Unit' : 'العناوين المطلوبة: السؤال، الخيار أ، الخيار ب، الخيار ج، الخيار د، الإجابة الصحيحة، رقم الوحدة'}
-                  </p>
+                  <p style={{ fontSize: "0.85rem", color: "#64748b", marginTop: "5px" }}>{isEnglishBulk ? "Headers must be: Question, Option A, Option B, Option C, Option D, Correct Answer, Unit" : "العناوين المطلوبة: السؤال، الخيار أ، الخيار ب، الخيار ج، الخيار د، الإجابة الصحيحة، رقم الوحدة"}</p>
                 </>
               )}
-
               {bulkErrors.length > 0 && (<div className="bulk-errors"><AlertCircle size={18} /><ul>{bulkErrors.map((err, i) => <li key={i}>{err}</li>)}</ul></div>)}
-
               {bulkPreview.length > 0 && (
                 <div className="bulk-preview">
                   <h4>معاينة البيانات الصالحة ({bulkPreview.length} سؤالاً)</h4>
                   <div className="preview-table-wrapper">
                     <table className="preview-table">
-                      <thead>
-                        <tr>
-                          <th>{isEnglishBulk ? 'Question' : 'السؤال'}</th>
-                          <th>{isEnglishBulk ? 'Option A' : 'الخيار أ'}</th>
-                          <th>{isEnglishBulk ? 'Option B' : 'الخيار ب'}</th>
-                          <th>{isEnglishBulk ? 'Option C' : 'الخيار ج'}</th>
-                          <th>{isEnglishBulk ? 'Option D' : 'الخيار د'}</th>
-                          <th>{isEnglishBulk ? 'Answer' : 'الإجابة'}</th>
-                          <th>{isEnglishBulk ? 'Unit' : 'الوحدة'}</th>
-                        </tr>
-                      </thead>
+                      <thead><tr><th>{isEnglishBulk ? "Question" : "السؤال"}</th><th>{isEnglishBulk ? "Option A" : "الخيار أ"}</th><th>{isEnglishBulk ? "Option B" : "الخيار ب"}</th><th>{isEnglishBulk ? "Option C" : "الخيار ج"}</th><th>{isEnglishBulk ? "Option D" : "الخيار د"}</th><th>{isEnglishBulk ? "Answer" : "الإجابة"}</th><th>{isEnglishBulk ? "Unit" : "الوحدة"}</th></tr></thead>
                       <tbody>
                         {bulkPreview.slice(0, 5).map((q, i) => (
                           <tr key={i}>
-                            <td>{q.question_text?.substring(0, 50)}</td>
-                            <td>{q.optionA}</td>
-                            <td>{q.optionB}</td>
-                            <td>{q.optionC}</td>
-                            <td>{q.optionD}</td>
-                            <td className="correct-badge" style={{ background: '#dcfce7', color: '#16a34a', fontWeight: 'bold', textAlign: 'center' }}>{q.correct_option_letter}</td>
-                            <td className="text-center">{q.unit_number || '-'}</td>
+                            <td>{q.question_text?.substring(0, 50)}</td><td>{q.optionA}</td><td>{q.optionB}</td><td>{q.optionC}</td><td>{q.optionD}</td>
+                            <td className="correct-badge" style={{ background: "#dcfce7", color: "#16a34a", fontWeight: "bold", textAlign: "center" }}>{q.correct_option_letter}</td>
+                            <td className="text-center">{q.unit_number || "-"}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -963,10 +899,7 @@ useEffect(() => {
                 </div>
               )}
             </div>
-            <div className="modal-footer">
-              <button className="btn-secondary" onClick={handleCancelBulk}>إلغاء</button>
-              <button className="btn-primary" onClick={handleBulkSubmit} disabled={bulkUploading || bulkPreview.length === 0}>{bulkUploading ? 'جاري الرفع...' : `رفع ${bulkPreview.length} سؤال`}</button>
-            </div>
+            <div className="modal-footer"><button className="btn-secondary" onClick={handleCancelBulk}>إلغاء</button><button className="btn-primary" onClick={handleBulkSubmit} disabled={bulkUploading || bulkPreview.length === 0}>{bulkUploading ? "جاري الرفع..." : `رفع ${bulkPreview.length} سؤال`}</button></div>
           </div>
         </div>
       )}
@@ -975,83 +908,33 @@ useEffect(() => {
       {showSettingsModal && (
         <div className="modal-overlay" onClick={() => setShowSettingsModal(false)}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3><Settings size={20} /> إعدادات المواد (المدة وعدد الأسئلة)</h3>
-              <button className="close-modal" onClick={() => setShowSettingsModal(false)}>
-                <X size={20} />
-              </button>
-            </div>
+            <div className="modal-header"><h3><Settings size={20} /> إعدادات المواد (المدة وعدد الأسئلة)</h3><button className="close-modal" onClick={() => setShowSettingsModal(false)}><X size={20} /></button></div>
             <div className="modal-body">
               <div className="table-responsive">
                 <table className="modern-table">
-                  <thead>
-                    <tr>
-                      <th>المادة</th>
-                      <th>المدة (دقيقة)</th>
-                      <th>عدد الأسئلة</th>
-                    </tr>
-                  </thead>
+                  <thead><tr><th>المادة</th><th>المدة (دقيقة)</th><th>عدد الأسئلة</th></tr></thead>
                   <tbody>
                     {subjects.map(subject => (
                       <tr key={subject.id}>
                         <td><span className="subject-badge">{subject.name}</span></td>
-                        <td>
-                          <input
-                            type="number"
-                            min="1"
-                            max="180"
-                            className="duration-table-input"
-                            value={editingDurations[subject.id] || 60}
-                            onChange={(e) => handleSubjectDurationChange(subject.id, e.target.value)}
-                          />
-                        </td>
-                        <td>
-                          <input
-                            type="number"
-                            min="1"
-                            max="100"
-                            className="duration-table-input"
-                            value={editingQuestionsCount[subject.id] || 40}
-                            onChange={(e) => handleSubjectQuestionsCountChange(subject.id, e.target.value)}
-                          />
-                        </td>
+                        <td><input type="number" min="1" max="180" className="duration-table-input" value={editingDurations[subject.id] || 60} onChange={(e) => handleSubjectDurationChange(subject.id, e.target.value)} /></td>
+                        <td><input type="number" min="1" max="100" className="duration-table-input" value={editingQuestionsCount[subject.id] || 40} onChange={(e) => handleSubjectQuestionsCountChange(subject.id, e.target.value)} /></td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
             </div>
-            <div className="modal-footer">
-              <button className="btn-secondary" onClick={() => setShowSettingsModal(false)}>
-                إلغاء
-              </button>
-              <button
-                className="btn-primary"
-                onClick={handleSaveAllSettings}
-                disabled={savingSettings}
-              >
-                <Save size={18} />
-                {savingSettings ? 'جاري الحفظ...' : 'حفظ جميع الإعدادات'}
-              </button>
-            </div>
+            <div className="modal-footer"><button className="btn-secondary" onClick={() => setShowSettingsModal(false)}>إلغاء</button><button className="btn-primary" onClick={handleSaveAllSettings} disabled={savingSettings}><Save size={18} />{savingSettings ? "جاري الحفظ..." : "حفظ جميع الإعدادات"}</button></div>
           </div>
         </div>
       )}
 
       {/* مودال التأكيد */}
-      <ConfirmDialog
-        isOpen={confirmState.isOpen}
-        title={confirmState.title}
-        message={confirmState.message}
-        confirmText={confirmState.confirmText}
-        cancelText={confirmState.cancelText}
-        onConfirm={handleConfirm}
-        onCancel={handleCancel}
-      />
+      <ConfirmDialog isOpen={confirmState.isOpen} title={confirmState.title} message={confirmState.message} confirmText={confirmState.confirmText} cancelText={confirmState.cancelText} onConfirm={handleConfirm} onCancel={handleCancel} />
 
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap');
-        
         :root { color-scheme: light only; }
         * { box-sizing: border-box; margin: 0; }
         body { margin: 0; background-color: #f4f7fe; font-family: 'Cairo', sans-serif; color: #1e293b; }
@@ -1106,37 +989,21 @@ useEffect(() => {
         .btn-primary:disabled { background: #94a3b8; cursor: not-allowed; box-shadow: none; }
         .btn-secondary { background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0; }
         .btn-secondary:hover { background: #e2e8f0; color: #1e293b; }
-        
-        .duration-table-input {
-          width: 100px;
-          padding: 8px 12px;
-          border: 1px solid #cbd5e1;
-          border-radius: 10px;
-          font-family: 'Cairo';
-          text-align: center;
-          background: white;
-          color: #1e293b;
-          transition: all 0.2s ease;
-        }
-        .duration-table-input:focus {
-          outline: none;
-          border-color: #3b82f6;
-          box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-        }
-        
+        .duration-table-input { width: 100px; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 10px; font-family: 'Cairo'; text-align: center; background: white; color: #1e293b; transition: all 0.2s ease; }
+        .duration-table-input:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1); }
         .card-header-actions { display: flex; align-items: center; gap: 16px; }
         .badge-count { background: #eff6ff; color: #3b82f6; padding: 6px 14px; border-radius: 20px; font-size: 0.9rem; font-weight: 700; }
         .search-wrapper-small { position: relative; }
         .search-icon-small { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); color: #94a3b8; }
         .search-input-small { padding: 8px 36px 8px 12px; border: 1px solid #e2e8f0; border-radius: 30px; font-family: 'Cairo'; font-size: 0.9rem; background: white; width: 220px; }
         .table-responsive { width: 100%; overflow-x: auto; }
-        .modern-table { width: 100%; border-collapse: collapse; min-width: 700px; text-align: right; }
+        .modern-table { width: 100%; border-collapse: collapse; min-width: 700px; text-align: center; }
         .modern-table th { background: #f8fafc; padding: 16px 20px; color: #475569; font-weight: 700; font-size: 0.95rem; border-bottom: 2px solid #e2e8f0; }
         .modern-table td { padding: 16px 20px; border-bottom: 1px solid #f1f5f9; color: #334155; vertical-align: middle; }
         .modern-table tbody tr:hover { background: #fbfcfd; }
         .q-text-cell { max-width: 350px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 600; }
         .text-center { text-align: center !important; }
-        .subject-badge { background: #f1f5f9; color: #475569; padding: 6px 12px; border-radius: 8px; font-size: 0.85rem; font-weight: 700; }
+        .subject-badge { color: #475569; padding: 6px 12px; border-radius: 8px; font-size: 0.85rem; font-weight: 700; }
         .correct-badge { display: inline-block; background: #dcfce7; color: #16a34a; width: 30px; height: 30px; line-height: 30px; text-align: center; border-radius: 8px; font-weight: 800; }
         .action-buttons { display: flex; gap: 10px; justify-content: center; }
         .icon-btn { width: 36px; height: 36px; border-radius: 10px; border: none; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s ease; }
@@ -1149,7 +1016,6 @@ useEffect(() => {
         .empty-state h3 { color: #1e293b; margin: 0 0 8px 0; }
         .loading-spinner { width: 40px; height: 40px; border: 4px solid #e2e8f0; border-top-color: #3b82f6; border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 20px; }
         @keyframes spin { to { transform: rotate(360deg); } }
-        
         .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 2000; }
         .modal-content { background: white; border-radius: 24px; width: 90%; max-width: 800px; max-height: 90vh; overflow-y: auto; direction: rtl; color: #1e293b; }
         .modal-header { display: flex; justify-content: space-between; align-items: center; padding: 20px 25px; border-bottom: 1px solid #f1f5f9; }
@@ -1173,33 +1039,14 @@ useEffect(() => {
         .preview-table th { background: #f1f5f9; color: #475569; }
         .passages-list { display: flex; flex-direction: column; gap: 10px; }
         .passage-item { display: flex; justify-content: space-between; align-items: center; padding: 12px; background: #f8fafc; border-radius: 12px; color: #1e293b; }
-        
         @media (max-width: 768px) {
- .page-header {
-      flex-direction: column;
-      gap: 16px;
-    }
-    .header-actions {
-      width: 100%;
-      flex-direction: column; /* تغيير الاتجاه إلى عمودي */
-      gap: 10px;
-    }
-    .header-actions button {
-      width: 100%; /* عرض كامل لكل زر */
-      flex: none;
-      padding: 12px 16px; /* تحسين المساحة */
-      font-size: 0.95rem;
-    }
-    .form-grid {
-      grid-template-columns: 1fr;
-    }
-    .card-header-actions {
-      flex-direction: column;
-      align-items: flex-end;
-    }
-    .search-input-small {
-      width: 100%;
-    }
+          .page-header { flex-direction: column; gap: 16px; }
+          .header-actions { width: 100%; flex-direction: column; gap: 10px; }
+          .header-actions button { width: 100%; flex: none; padding: 12px 16px; font-size: 0.95rem; }
+          .form-grid { grid-template-columns: 1fr; }
+          .card-header-actions { flex-direction: column; align-items: flex-end; }
+          .search-input-small { width: 100%; }
+        }
       `}</style>
     </div>
   );

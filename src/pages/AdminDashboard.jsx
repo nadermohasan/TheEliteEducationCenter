@@ -1,15 +1,21 @@
-import { useEffect, useState, useCallback } from 'react';
-import { supabase } from '../supabaseClient';
-import { useNavigate } from 'react-router-dom';
-import { toast } from 'react-hot-toast';
-import Footer from './Footer';
-import Navbar from './Navbar';
-import { Users, CheckCircle, Search, TrendingUp, RefreshCw } from 'lucide-react';
+import { useEffect, useState, useCallback } from "react";
+import { supabase } from "../supabaseClient";
+import { useNavigate } from "react-router-dom";
+import { toast } from "react-hot-toast";
+import Footer from "./Footer";
+import Navbar from "./Navbar";
+import {
+  Users,
+  CheckCircle,
+  Search,
+  TrendingUp,
+  RefreshCw,
+} from "lucide-react";
 
 export default function AdminDashboard() {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = useState("");
   const [processingId, setProcessingId] = useState(null);
   const [adminProfile, setAdminProfile] = useState(null);
   const [stats, setStats] = useState({ totalStudents: 0, activeAttempts: 0 });
@@ -19,33 +25,35 @@ export default function AdminDashboard() {
   const fetchStats = useCallback(async () => {
     try {
       const { count: totalStudents, error: studentsError } = await supabase
-        .from('profiles')
-        .select('*', { count: 'exact', head: true })
-        .eq('role', 'student');
+        .from("profiles")
+        .select("*", { count: "exact", head: true })
+        .eq("role", "student");
       if (studentsError) throw studentsError;
 
       const { count: activeAttempts, error: attemptsError } = await supabase
-        .from('attempts')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'active');
+        .from("attempts")
+        .select("*", { count: "exact", head: true })
+        .eq("status", "active");
       if (attemptsError) throw attemptsError;
 
       setStats({
         totalStudents: totalStudents || 0,
-        activeAttempts: activeAttempts || 0
+        activeAttempts: activeAttempts || 0,
       });
     } catch (error) {
-      console.error('Error fetching stats:', error);
+      console.error("Error fetching stats:", error);
     }
   }, []);
 
   const fetchAdminProfile = useCallback(async () => {
-    const { data: { user: currentUser } } = await supabase.auth.getUser();
+    const {
+      data: { user: currentUser },
+    } = await supabase.auth.getUser();
     if (currentUser) {
       const { data: profile } = await supabase
-        .from('profiles')
-        .select('name')
-        .eq('id', currentUser.id)
+        .from("profiles")
+        .select("name")
+        .eq("id", currentUser.id)
         .single();
       setAdminProfile(profile);
     }
@@ -53,13 +61,13 @@ export default function AdminDashboard() {
 
   const fetchActiveAttempts = useCallback(async () => {
     const { data, error } = await supabase
-      .from('attempts')
-      .select('student_id, status')
-      .eq('status', 'active');
+      .from("attempts")
+      .select("student_id, status")
+      .eq("status", "active");
 
     if (!error && data) {
       const map = {};
-      data.forEach(attempt => {
+      data.forEach((attempt) => {
         map[attempt.student_id] = true;
       });
       setActiveAttemptsMap(map);
@@ -69,10 +77,10 @@ export default function AdminDashboard() {
   const fetchUsers = useCallback(async () => {
     setLoading(true);
     const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('role', 'student')
-      .order('created_at', { ascending: false });
+      .from("profiles")
+      .select("*")
+      .eq("role", "student")
+      .order("created_at", { ascending: false });
 
     if (!error) setUsers(data);
     setLoading(false);
@@ -90,61 +98,87 @@ export default function AdminDashboard() {
     fetchStats();
     fetchActiveAttempts();
   }, [fetchUsers, fetchAdminProfile, fetchStats, fetchActiveAttempts]);
-  useEffect(() => { document.title = " مسؤول النظام"; }, []);
+
+  useEffect(() => {
+    document.title = " مسؤول النظام";
+  }, []);
 
   const handleActivateAttempt = async (studentId) => {
     setProcessingId(studentId);
     try {
       // إنهاء أي محاولة نشطة حالية
       await supabase
-        .from('attempts')
-        .update({ status: 'completed' })
-        .eq('student_id', studentId)
-        .eq('status', 'active');
+        .from("attempts")
+        .update({ status: "completed" })
+        .eq("student_id", studentId)
+        .eq("status", "active");
 
       // إنشاء محاولة جديدة
       const { data: newAttempt, error: attemptError } = await supabase
-        .from('attempts')
-        .insert([{ student_id: studentId, status: 'active' }])
+        .from("attempts")
+        .insert([{ student_id: studentId, status: "active" }])
         .select()
         .single();
       if (attemptError) throw attemptError;
 
-      const { data: subjects } = await supabase.from('subjects').select('id, name, questions_count');
-      if (!subjects || subjects.length === 0) throw new Error('لا توجد مواد مسجلة في النظام');
+      // ✅ جلب فرع الطالب
+      const { data: studentProfile } = await supabase
+        .from("profiles")
+        .select("branch")
+        .eq("id", studentId)
+        .single();
+      const studentBranch = studentProfile?.branch?.trim() || null;
+      console.log("👤 فرع الطالب:", studentBranch);
+
+      const { data: subjects } = await supabase
+        .from("subjects")
+        .select("id, name, questions_count");
+      if (!subjects || subjects.length === 0)
+        throw new Error("لا توجد مواد مسجلة في النظام");
 
       let allInsertData = [];
 
       for (const subject of subjects) {
         const targetCount = subject.questions_count || 40;
 
-        const { data: questions, error: qError } = await supabase
-          .from('questions')
-          .select('id, passage_id, unit_number')
-          .eq('subject_id', subject.id)
-          .eq('is_active', true);
+        // ✅ بناء استعلام الأسئلة مع فلترة الفرع
+        let query = supabase
+          .from("questions")
+          .select("id, passage_id, unit_number")
+          .eq("subject_id", subject.id)
+          .eq("is_active", true);
+
+        if (studentBranch) {
+          // الأسئلة العامة (branch = null) أو المطابقة لفرع الطالب
+          query = query.or(`branch.is.null,branch.eq.${studentBranch}`);
+        }
+
+        const { data: questions, error: qError } = await query;
         if (qError) throw qError;
         if (!questions || questions.length === 0) continue;
 
-        const isEnglish = subject.name.includes('إنجليزية');
+        const isEnglish = subject.name.includes("إنجليزية");
 
         if (isEnglish) {
           const passageMap = new Map();
           const standaloneQuestions = [];
-          questions.forEach(q => {
+          questions.forEach((q) => {
             if (q.passage_id) {
-              if (!passageMap.has(q.passage_id)) passageMap.set(q.passage_id, []);
+              if (!passageMap.has(q.passage_id))
+                passageMap.set(q.passage_id, []);
               passageMap.get(q.passage_id).push(q);
             } else {
               standaloneQuestions.push(q);
             }
           });
 
-          const passages = Array.from(passageMap.entries()).map(([passageId, qs]) => ({
-            passageId,
-            questions: qs,
-            count: qs.length
-          }));
+          const passages = Array.from(passageMap.entries()).map(
+            ([passageId, qs]) => ({
+              passageId,
+              questions: qs,
+              count: qs.length,
+            }),
+          );
           passages.sort((a, b) => b.count - a.count);
 
           let selectedQuestions = [];
@@ -156,7 +190,9 @@ export default function AdminDashboard() {
               selectedQuestions.push(...passage.questions);
               remaining -= passage.count;
             } else {
-              const shuffled = [...passage.questions].sort(() => 0.5 - Math.random());
+              const shuffled = [...passage.questions].sort(
+                () => 0.5 - Math.random(),
+              );
               selectedQuestions.push(...shuffled.slice(0, remaining));
               remaining = 0;
               break;
@@ -164,29 +200,32 @@ export default function AdminDashboard() {
           }
 
           if (remaining > 0 && standaloneQuestions.length > 0) {
-            const shuffledStandalone = [...standaloneQuestions].sort(() => 0.5 - Math.random());
+            const shuffledStandalone = [...standaloneQuestions].sort(
+              () => 0.5 - Math.random(),
+            );
             const take = Math.min(remaining, shuffledStandalone.length);
             selectedQuestions.push(...shuffledStandalone.slice(0, take));
             remaining -= take;
           }
 
           if (remaining > 0) {
-            const selectedIds = new Set(selectedQuestions.map(q => q.id));
-            const allRemaining = questions.filter(q => !selectedIds.has(q.id));
+            const selectedIds = new Set(selectedQuestions.map((q) => q.id));
+            const allRemaining = questions.filter(
+              (q) => !selectedIds.has(q.id),
+            );
             const shuffled = [...allRemaining].sort(() => 0.5 - Math.random());
             selectedQuestions.push(...shuffled.slice(0, remaining));
           }
 
-          const insertData = selectedQuestions.map(q => ({
+          const insertData = selectedQuestions.map((q) => ({
             attempt_id: newAttempt.id,
             subject_id: subject.id,
-            question_id: q.id
+            question_id: q.id,
           }));
           allInsertData.push(...insertData);
-
         } else {
           const unitMap = new Map();
-          questions.forEach(q => {
+          questions.forEach((q) => {
             const unit = q.unit_number || 0;
             if (!unitMap.has(unit)) unitMap.set(unit, []);
             unitMap.get(unit).push(q);
@@ -201,46 +240,56 @@ export default function AdminDashboard() {
 
           for (const unit of units) {
             const unitQuestions = unitMap.get(unit);
-            const take = Math.min(targetPerUnit, unitQuestions.length, remaining);
+            const take = Math.min(
+              targetPerUnit,
+              unitQuestions.length,
+              remaining,
+            );
             const shuffled = [...unitQuestions].sort(() => 0.5 - Math.random());
             selectedQuestions.push(...shuffled.slice(0, take));
             remaining -= take;
           }
 
           if (remaining > 0) {
-            const selectedIds = new Set(selectedQuestions.map(q => q.id));
-            const allRemaining = questions.filter(q => !selectedIds.has(q.id));
+            const selectedIds = new Set(selectedQuestions.map((q) => q.id));
+            const allRemaining = questions.filter(
+              (q) => !selectedIds.has(q.id),
+            );
             const shuffled = [...allRemaining].sort(() => 0.5 - Math.random());
             selectedQuestions.push(...shuffled.slice(0, remaining));
           }
 
-          const insertData = selectedQuestions.map(q => ({
+          const insertData = selectedQuestions.map((q) => ({
             attempt_id: newAttempt.id,
             subject_id: subject.id,
-            question_id: q.id
+            question_id: q.id,
           }));
           allInsertData.push(...insertData);
         }
       }
 
-      if (allInsertData.length === 0) throw new Error('لا توجد أسئلة نشطة في أي مادة. يرجى إضافة أسئلة أولاً');
+      if (allInsertData.length === 0)
+        throw new Error("لا توجد أسئلة نشطة مناسبة لهذا الطالب");
 
-      const { error: insertError } = await supabase.from('attempt_questions').insert(allInsertData);
+      const { error: insertError } = await supabase
+        .from("attempt_questions")
+        .insert(allInsertData);
       if (insertError) throw insertError;
 
-      toast.success('تم تفعيل محاولة جديدة بنجاح!');
+      toast.success("تم تفعيل محاولة جديدة بنجاح!");
       await fetchStats();
       await fetchActiveAttempts();
-
     } catch (e) {
-      toast.error('خطأ: ' + e.message);
+      toast.error("خطأ: " + e.message);
     } finally {
       setProcessingId(null);
     }
   };
 
-  const filteredUsers = users.filter(u => u.name?.includes(searchTerm) || u.username?.includes(searchTerm));
-  const todayNewStudents = users.filter(u => {
+  const filteredUsers = users.filter(
+    (u) => u.name?.includes(searchTerm) || u.username?.includes(searchTerm),
+  );
+  const todayNewStudents = users.filter((u) => {
     const createdDate = new Date(u.created_at);
     const today = new Date();
     return createdDate.toDateString() === today.toDateString();
@@ -248,7 +297,7 @@ export default function AdminDashboard() {
 
   return (
     <div className="dashboard-container">
-      <Navbar userName={adminProfile?.name || 'مدير النظام'} />
+      <Navbar userName={adminProfile?.name || "مدير النظام"} />
 
       <main className="dashboard-main">
         <div className="page-header">
@@ -259,27 +308,50 @@ export default function AdminDashboard() {
 
         <div className="stats-grid">
           <div className="stat-card">
-            <div className="stat-icon-wrapper blue"><Users size={24} /></div>
-            <div className="stat-content"><span className="stat-label">إجمالي الطلاب</span><span className="stat-number">{stats.totalStudents}</span></div>
+            <div className="stat-icon-wrapper blue">
+              <Users size={24} />
+            </div>
+            <div className="stat-content">
+              <span className="stat-label">إجمالي الطلاب</span>
+              <span className="stat-number">{stats.totalStudents}</span>
+            </div>
           </div>
           <div className="stat-card">
-            <div className="stat-icon-wrapper green"><CheckCircle size={24} /></div>
-            <div className="stat-content"><span className="stat-label">محاولات نشطة</span><span className="stat-number">{stats.activeAttempts}</span></div>
+            <div className="stat-icon-wrapper green">
+              <CheckCircle size={24} />
+            </div>
+            <div className="stat-content">
+              <span className="stat-label">محاولات نشطة</span>
+              <span className="stat-number">{stats.activeAttempts}</span>
+            </div>
           </div>
           <div className="stat-card">
-            <div className="stat-icon-wrapper purple"><TrendingUp size={24} /></div>
-            <div className="stat-content"><span className="stat-label">طلاب مسجلين اليوم</span><span className="stat-number">{todayNewStudents}</span></div>
+            <div className="stat-icon-wrapper purple">
+              <TrendingUp size={24} />
+            </div>
+            <div className="stat-content">
+              <span className="stat-label">طلاب مسجلين اليوم</span>
+              <span className="stat-number">{todayNewStudents}</span>
+            </div>
           </div>
         </div>
 
         <div className="search-wrapper">
           <Search className="search-icon" size={20} />
-          <input type="text" placeholder="بحث عن اسم الطالب..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="search-input" />
+          <input
+            type="text"
+            placeholder="بحث عن اسم الطالب..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="search-input"
+          />
         </div>
 
         <div className="table-card">
           <div className="card-header">
-            <h2 className="card-title"><Users size={20} className="icon-blue" /> قائمة الطلاب</h2>
+            <h2 className="card-title">
+              <Users size={20} className="icon-blue" /> قائمة الطلاب
+            </h2>
             <div className="card-header-actions">
               <span className="badge-count">{filteredUsers.length} طالب</span>
               <button className="refresh-btn-table" onClick={refreshAllData}>
@@ -289,13 +361,16 @@ export default function AdminDashboard() {
           </div>
           <div className="table-responsive">
             {loading ? (
-              <div className="empty-state"><div className="loading-spinner"></div><p>جاري تحميل الطلاب...</p></div>
+              <div className="empty-state">
+                <div className="loading-spinner"></div>
+                <p>جاري تحميل الطلاب...</p>
+              </div>
             ) : filteredUsers.length > 0 ? (
               <table className="modern-table">
                 <thead>
                   <tr>
-                    <th>الاسم</th>
-                    <th>اسم المستخدم</th>
+                    <th class = "nameColumn">الاسم</th>
+                    <th>الفرع</th>
                     <th>تاريخ التسجيل</th>
                     <th className="text-center">الإجراءات</th>
                   </tr>
@@ -307,15 +382,37 @@ export default function AdminDashboard() {
                       <tr key={user.id}>
                         <td>
                           <div className="user-cell">
-                            <div className="user-avatar-small">{user.name?.charAt(0) || 'ط'}</div>
-                            <span className="user-name-cell">{user.name || 'غير محدد'}</span>
+                            <div className="user-avatar-small">
+                              {user.name?.charAt(0) || "ط"}
+                            </div>
+                            <span className="user-name-cell">
+                              {user.name || "غير محدد"}
+                            </span>
                           </div>
                         </td>
-                        <td>{user.username || '—'}</td>
-                        <td>{new Date(user.created_at).toLocaleDateString('ar-EG')}</td>
+                        <td>
+                          <span
+                            className="subject-badge"
+                            style={{ color: "#475569" }}
+                          >
+                            {user.branch || "—"}
+                          </span>
+                        </td>
+                        <td>
+                          {new Date(user.created_at).toLocaleDateString(
+                            "ar-EG",
+                          )}
+                        </td>
                         <td className="text-center">
                           {hasActiveAttempt ? (
-                            <button className="activate-btn-table active-attempt" disabled style={{ background: '#10b981', cursor: 'default' }}>
+                            <button
+                              className="activate-btn-table active-attempt"
+                              disabled
+                              style={{
+                                background: "#10b981",
+                                cursor: "default",
+                              }}
+                            >
                               ✔ محاولة مفعلة
                             </button>
                           ) : (
@@ -330,7 +427,7 @@ export default function AdminDashboard() {
                                   جاري...
                                 </>
                               ) : (
-                                '✚ تفعيل محاولـة'
+                                "✚ تفعيل محاولـة"
                               )}
                             </button>
                           )}
@@ -384,11 +481,18 @@ export default function AdminDashboard() {
         .refresh-btn-table:hover { background: #eff6ff; color: #3b82f6; border-color: #3b82f6; }
         .table-responsive { width: 100%; overflow-x: auto; }
         .modern-table { width: 100%; border-collapse: collapse; min-width: 700px; text-align: right; }
-        .modern-table th { background: #f8fafc; padding: 16px 20px; color: #475569; font-weight: 700; font-size: 0.95rem; border-bottom: 2px solid #e2e8f0; }
-        .modern-table td { padding: 16px 20px; border-bottom: 1px solid #f1f5f9; color: #334155; vertical-align: middle; }
+        .modern-table th { background: #f8fafc; padding: 16px 20px; color: #475569; font-weight: 700; font-size: 0.95rem; border-bottom: 2px solid #e2e8f0; text-align: center; }
+        .modern-table td { padding: 16px 20px; border-bottom: 1px solid #f1f5f9; color: #334155; vertical-align: middle; text-align: center; }
         .modern-table tbody tr:hover { background: #fbfcfd; }
         .text-center { text-align: center !important; }
-        .user-cell { display: flex; align-items: center; gap: 12px; }
+          .user-cell {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    justify-content: flex-start; /* تغيير من center إلى flex-start */
+    padding-right: 24px; /* مسافة ثابتة من الحافة اليمنى */
+  }
+        .nameColumn{text-align: right;}
         .user-avatar-small { width: 36px; height: 36px; background: #eff6ff; color: #3b82f6; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 1rem; }
         .user-name-cell { font-weight: 600; color: #1e293b; }
         .activate-btn-table { background: #3b82f6; color: white; border: none; padding: 8px 20px; border-radius: 30px; font-family: 'Cairo'; font-weight: 600; font-size: 0.85rem; cursor: pointer; transition: all 0.2s; display: inline-flex; align-items: center; gap: 6px; }

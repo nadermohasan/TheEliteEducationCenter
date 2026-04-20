@@ -1,10 +1,10 @@
 // QuizPage.jsx
-import { useEffect, useState, useRef, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { supabase } from '../supabaseClient';
-import { toast } from 'react-hot-toast';
-import Footer from './Footer';
-import ConfirmDialog from './ConfirmDialog';
+import { useEffect, useState, useRef, useCallback } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import { supabase } from "../supabaseClient";
+import { toast } from "react-hot-toast";
+import Footer from "./Footer";
+import ConfirmDialog from "./ConfirmDialog";
 
 // --- مكون شاشة التحميل ---
 const LoadingScreen = () => (
@@ -114,13 +114,13 @@ const LoadingScreen = () => (
 export default function QuizPage() {
   const { subjectId } = useParams();
   const navigate = useNavigate();
-  const [subjectName, setSubjectName] = useState('');
+  const [subjectName, setSubjectName] = useState("");
 
   const [blocks, setBlocks] = useState([]);
   const [currentBlockIndex, setCurrentBlockIndex] = useState(0);
   const [selectedAnswers, setSelectedAnswers] = useState({});
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
   const [timeLeft, setTimeLeft] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [isEnglishSubject, setIsEnglishSubject] = useState(false);
@@ -128,11 +128,11 @@ export default function QuizPage() {
   const [attemptId, setAttemptId] = useState(null);
   const [confirmState, setConfirmState] = useState({
     isOpen: false,
-    title: '',
-    message: '',
-    confirmText: '',
-    cancelText: '',
-    resolve: null
+    title: "",
+    message: "",
+    confirmText: "",
+    cancelText: "",
+    resolve: null,
   });
 
   const hasAutoSubmitted = useRef(false);
@@ -145,14 +145,13 @@ export default function QuizPage() {
     blocksRef.current = blocks;
     selectedAnswersRef.current = selectedAnswers;
   }, [blocks, selectedAnswers]);
-useEffect(() => {
+  useEffect(() => {
     if (subjectName) {
       document.title = `${subjectName} - مركز النخبة التعليمي`;
     } else {
-      document.title = 'اختبار - مركز النخبة التعليمي';
+      document.title = "اختبار - مركز النخبة التعليمي";
     }
   }, [subjectName]);
-
 
   const numericSubjectId = parseInt(subjectId, 10);
 
@@ -162,12 +161,15 @@ useEffect(() => {
     return `quiz_timer_${studentId}_${numericSubjectId}_${attemptId}`;
   }, [studentId, numericSubjectId, attemptId]);
 
-  const saveTimerState = useCallback((currentTimeLeft) => {
-    const key = getTimerStorageKey();
-    if (!key) return;
-    const data = { timeLeft: currentTimeLeft, timestamp: Date.now() };
-    localStorage.setItem(key, JSON.stringify(data));
-  }, [getTimerStorageKey]);
+  const saveTimerState = useCallback(
+    (currentTimeLeft) => {
+      const key = getTimerStorageKey();
+      if (!key) return;
+      const data = { timeLeft: currentTimeLeft, timestamp: Date.now() };
+      localStorage.setItem(key, JSON.stringify(data));
+    },
+    [getTimerStorageKey],
+  );
 
   const clearTimerState = useCallback(() => {
     const key = getTimerStorageKey();
@@ -179,104 +181,120 @@ useEffect(() => {
     return new Promise((resolve) => {
       setConfirmState({
         isOpen: true,
-        title: options.title || 'تأكيد العملية',
+        title: options.title || "تأكيد العملية",
         message: options.message,
-        confirmText: options.confirmText || 'تأكيد',
-        cancelText: options.cancelText || 'إلغاء',
-        resolve
+        confirmText: options.confirmText || "تأكيد",
+        cancelText: options.cancelText || "إلغاء",
+        resolve,
       });
     });
   };
 
   const handleConfirm = () => {
     if (confirmState.resolve) confirmState.resolve(true);
-    setConfirmState(prev => ({ ...prev, isOpen: false }));
+    setConfirmState((prev) => ({ ...prev, isOpen: false }));
   };
 
   const handleCancel = () => {
     if (confirmState.resolve) confirmState.resolve(false);
-    setConfirmState(prev => ({ ...prev, isOpen: false }));
+    setConfirmState((prev) => ({ ...prev, isOpen: false }));
   };
 
   // --- تسليم الاختبار ---
-  const performSubmit = useCallback(async (isAuto = false) => {
-    if (hasAutoSubmitted.current || submitting) return false;
+  const performSubmit = useCallback(
+    async (isAuto = false) => {
+      if (hasAutoSubmitted.current || submitting) return false;
 
-    hasAutoSubmitted.current = true;
-    setSubmitting(true);
-    clearTimerState();
+      hasAutoSubmitted.current = true;
+      setSubmitting(true);
+      clearTimerState();
 
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-      timerRef.current = null;
-    }
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
 
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { navigate('/login'); return false; }
-
-      let studentName = 'طالب';
       try {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('name')
-          .eq('id', user.id)
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        if (!user) {
+          navigate("/login");
+          return false;
+        }
+
+        let studentName = "طالب";
+        try {
+          const { data: profile } = await supabase
+            .from("profiles")
+            .select("name")
+            .eq("id", user.id)
+            .maybeSingle();
+          if (profile?.name) studentName = profile.name;
+        } catch (err) {
+          console.warn("تعذر جلب اسم الطالب:", err);
+        }
+
+        const currentBlocks = blocksRef.current;
+        const currentAnswers = selectedAnswersRef.current;
+
+        let allQuestions = [];
+        currentBlocks.forEach((block) => {
+          if (block.type === "passage") allQuestions.push(...block.questions);
+          else allQuestions.push(block.question);
+        });
+
+        let finalScore = 0;
+        allQuestions.forEach((q) => {
+          const userAns = currentAnswers[q.id];
+          if (
+            userAns !== undefined &&
+            parseInt(userAns) === parseInt(q.correct_option)
+          )
+            finalScore++;
+        });
+
+        const { data: activeAttempt } = await supabase
+          .from("attempts")
+          .select("id")
+          .eq("student_id", user.id)
+          .eq("status", "active")
           .maybeSingle();
-        if (profile?.name) studentName = profile.name;
-      } catch (err) { console.warn('تعذر جلب اسم الطالب:', err); }
 
-      const currentBlocks = blocksRef.current;
-      const currentAnswers = selectedAnswersRef.current;
+        if (!activeAttempt) throw new Error("لا توجد محاولة نشطة لهذا الطالب");
 
-      let allQuestions = [];
-      currentBlocks.forEach(block => {
-        if (block.type === 'passage') allQuestions.push(...block.questions);
-        else allQuestions.push(block.question);
-      });
+        const { error: resultError } = await supabase.from("results").insert([
+          {
+            student_id: user.id,
+            subject_id: numericSubjectIdRef.current,
+            score: finalScore,
+            student_answers: currentAnswers,
+            attempt_id: activeAttempt.id,
+          },
+        ]);
+        if (resultError) throw resultError;
 
-      let finalScore = 0;
-      allQuestions.forEach((q) => {
-        const userAns = currentAnswers[q.id];
-        if (userAns !== undefined && parseInt(userAns) === parseInt(q.correct_option)) finalScore++;
-      });
-
-      const { data: activeAttempt } = await supabase
-        .from('attempts')
-        .select('id')
-        .eq('student_id', user.id)
-        .eq('status', 'active')
-        .maybeSingle();
-
-      if (!activeAttempt) throw new Error('لا توجد محاولة نشطة لهذا الطالب');
-
-      const { error: resultError } = await supabase.from('results').insert([{
-        student_id: user.id,
-        subject_id: numericSubjectIdRef.current,
-        score: finalScore,
-        student_answers: currentAnswers,
-        attempt_id: activeAttempt.id
-      }]);
-      if (resultError) throw resultError;
-
-      navigate('/result', {
-        state: {
-          score: finalScore,
-          total_questions: allQuestions.length,
-          questions: allQuestions,
-          selectedAnswers: currentAnswers,
-          studentName
-        },
-        replace: true
-      });
-      return true;
-    } catch (err) {
-      console.error('Submit error:', err);
-      toast.error('حدث خطأ أثناء تسليم الاختبار ' + err.message);
-      hasAutoSubmitted.current = false;
-      setSubmitting(false);
-      return false;
-    }
-  }, [navigate, submitting, clearTimerState]);
+        navigate("/result", {
+          state: {
+            score: finalScore,
+            total_questions: allQuestions.length,
+            questions: allQuestions,
+            selectedAnswers: currentAnswers,
+            studentName,
+          },
+          replace: true,
+        });
+        return true;
+      } catch (err) {
+        console.error("Submit error:", err);
+        toast.error("حدث خطأ أثناء تسليم الاختبار " + err.message);
+        hasAutoSubmitted.current = false;
+        setSubmitting(false);
+        return false;
+      }
+    },
+    [navigate, submitting, clearTimerState],
+  );
 
   const handleAutoSubmit = useCallback(() => {
     if (hasAutoSubmitted.current || submitting) return;
@@ -286,7 +304,12 @@ useEffect(() => {
 
   // --- بدء المؤقت عند تجهيز البيانات ---
   useEffect(() => {
-    if (!loading && blocks.length > 0 && timeLeft !== null && !hasAutoSubmitted.current) {
+    if (
+      !loading &&
+      blocks.length > 0 &&
+      timeLeft !== null &&
+      !hasAutoSubmitted.current
+    ) {
       if (timerRef.current) clearInterval(timerRef.current);
       timerRef.current = setInterval(() => {
         setTimeLeft((prev) => {
@@ -299,7 +322,9 @@ useEffect(() => {
         });
       }, 1000);
     }
-    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
   }, [loading, blocks, timeLeft, handleAutoSubmit, submitting]);
 
   // --- حفظ المؤقت في localStorage عند تغيره ---
@@ -311,59 +336,78 @@ useEffect(() => {
 
   // --- جلب بيانات الاختبار ---
   const fetchQuizData = useCallback(async () => {
-const { data: subjectInfo } = await supabase
-      .from('subjects')
-      .select('name, duration_minutes')
-      .eq('id', numericSubjectId)
+    const { data: subjectInfo } = await supabase
+      .from("subjects")
+      .select("name, duration_minutes")
+      .eq("id", numericSubjectId)
       .single();
 
-    const isEnglish = subjectInfo?.name?.includes('إنجليزية') || false;
+    const isEnglish = subjectInfo?.name?.includes("إنجليزية") || false;
     setIsEnglishSubject(isEnglish);
-    setSubjectName(subjectInfo?.name || 'اختبار');
+    setSubjectName(subjectInfo?.name || "اختبار");
     setLoading(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { navigate('/login'); return; }
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) {
+        navigate("/login");
+        return;
+      }
 
       const currentStudentId = user.id;
       setStudentId(currentStudentId);
 
       const { data: attempts } = await supabase
-        .from('attempts')
-        .select('id')
-        .eq('student_id', currentStudentId)
-        .eq('status', 'active')
+        .from("attempts")
+        .select("id")
+        .eq("student_id", currentStudentId)
+        .eq("status", "active")
         .maybeSingle();
 
-      if (!attempts) { setError('no_active_attempt'); setLoading(false); return; }
+      if (!attempts) {
+        setError("no_active_attempt");
+        setLoading(false);
+        return;
+      }
 
       const currentAttemptId = attempts.id;
       setAttemptId(currentAttemptId);
 
       const { data: aqData } = await supabase
-        .from('attempt_questions')
-        .select('question_id')
-        .eq('attempt_id', currentAttemptId)
-        .eq('subject_id', numericSubjectId);
+        .from("attempt_questions")
+        .select("question_id")
+        .eq("attempt_id", currentAttemptId)
+        .eq("subject_id", numericSubjectId);
 
-      if (!aqData || aqData.length === 0) { setError('no_questions'); setLoading(false); return; }
+      if (!aqData || aqData.length === 0) {
+        setError("no_questions");
+        setLoading(false);
+        return;
+      }
 
-      const questionIds = aqData.map(aq => aq.question_id);
+      const questionIds = aqData.map((aq) => aq.question_id);
       let { data: qData } = await supabase
-        .from('questions')
-        .select('*, image_option_a, image_option_b, image_option_c, image_option_d')
-        .in('id', questionIds)
-        .order('created_at', { ascending: true });
+        .from("questions")
+        .select(
+          "*, image_option_a, image_option_b, image_option_c, image_option_d",
+        )
+        .in("id", questionIds)
+        .order("created_at", { ascending: true });
 
-      if (!qData || qData.length === 0) { setError('no_questions'); setLoading(false); return; }
+      if (!qData || qData.length === 0) {
+        setError("no_questions");
+        setLoading(false);
+        return;
+      }
 
       const { data: subjectInfo } = await supabase
-        .from('subjects')
-        .select('name, duration_minutes')
-        .eq('id', numericSubjectId)
+        .from("subjects")
+        .select("name, duration_minutes")
+        .eq("id", numericSubjectId)
         .single();
 
-      const isEnglish = subjectInfo?.name?.includes('إنجليزية') || false;
+      const isEnglish = subjectInfo?.name?.includes("إنجليزية") || false;
       setIsEnglishSubject(isEnglish);
 
       const durationMinutes = subjectInfo?.duration_minutes || 60;
@@ -381,34 +425,51 @@ const { data: subjectInfo } = await supabase
         } catch (e) {}
       }
 
-      const initialTime = (savedTime !== null && savedTime < defaultTime) ? savedTime : defaultTime;
+      const initialTime =
+        savedTime !== null && savedTime < defaultTime ? savedTime : defaultTime;
       setTimeLeft(initialTime);
 
       let finalBlocks = [];
       if (isEnglish) {
-        const passageIds = [...new Set(qData.map(q => q.passage_id).filter(id => id))];
+        const passageIds = [
+          ...new Set(qData.map((q) => q.passage_id).filter((id) => id)),
+        ];
         let passages = [];
         if (passageIds.length) {
-          const { data: pData } = await supabase.from('passages').select('*').in('id', passageIds);
+          const { data: pData } = await supabase
+            .from("passages")
+            .select("*")
+            .in("id", passageIds);
           passages = pData || [];
         }
         const passageQuestionsMap = new Map();
         const standalone = [];
-        qData.forEach(q => {
+        qData.forEach((q) => {
           if (q.passage_id) {
-            if (!passageQuestionsMap.has(q.passage_id)) passageQuestionsMap.set(q.passage_id, []);
+            if (!passageQuestionsMap.has(q.passage_id))
+              passageQuestionsMap.set(q.passage_id, []);
             passageQuestionsMap.get(q.passage_id).push(q);
           } else standalone.push(q);
         });
-        const sortedPassages = passages.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+        const sortedPassages = passages.sort(
+          (a, b) => new Date(a.created_at) - new Date(b.created_at),
+        );
         for (const passage of sortedPassages) {
           const questionsOfPassage = passageQuestionsMap.get(passage.id) || [];
-          questionsOfPassage.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
-          finalBlocks.push({ type: 'passage', passage, questions: questionsOfPassage });
+          questionsOfPassage.sort(
+            (a, b) => new Date(a.created_at) - new Date(b.created_at),
+          );
+          finalBlocks.push({
+            type: "passage",
+            passage,
+            questions: questionsOfPassage,
+          });
         }
-        standalone.forEach(q => finalBlocks.push({ type: 'single', question: q }));
+        standalone.forEach((q) =>
+          finalBlocks.push({ type: "single", question: q }),
+        );
       } else {
-        finalBlocks = qData.map(q => ({ type: 'single', question: q }));
+        finalBlocks = qData.map((q) => ({ type: "single", question: q }));
       }
 
       setBlocks(finalBlocks);
@@ -416,7 +477,7 @@ const { data: subjectInfo } = await supabase
       hasAutoSubmitted.current = false;
     } catch (err) {
       console.error(err);
-      setError('error');
+      setError("error");
     } finally {
       setTimeout(() => setLoading(false), 800);
     }
@@ -425,53 +486,95 @@ const { data: subjectInfo } = await supabase
   useEffect(() => {
     fetchQuizData();
     numericSubjectIdRef.current = numericSubjectId;
-    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
   }, [subjectId, fetchQuizData, numericSubjectId]);
-  useEffect(() => { document.title = "محاولة اختبار"; }, []);
+  useEffect(() => {
+    document.title = "محاولة اختبار";
+  }, []);
 
   const handleSubmitQuiz = async () => {
     if (hasAutoSubmitted.current || submitting) return;
-    const totalQuestions = blocks.reduce((acc, block) => acc + (block.type === 'passage' ? block.questions.length : 1), 0);
+    const totalQuestions = blocks.reduce(
+      (acc, block) =>
+        acc + (block.type === "passage" ? block.questions.length : 1),
+      0,
+    );
     const answeredCount = Object.keys(selectedAnswers).length;
     const unanswered = totalQuestions - answeredCount;
-    let msg = 'هل أنت متأكد من إنهاء وتسليم الاختبار؟';
+    let msg = "هل أنت متأكد من إنهاء وتسليم الاختبار؟";
     if (unanswered > 0) msg = `لديك ${unanswered} سؤال بدون إجابة.\n\n${msg}`;
 
     const confirmed = await showConfirm({
-      title: 'تسليم الاختبار',
+      title: "تسليم الاختبار",
       message: msg,
-      confirmText: 'تسليم',
-      cancelText: 'مراجعة'
+      confirmText: "تسليم",
+      cancelText: "مراجعة",
     });
     if (!confirmed) return;
     performSubmit(false);
   };
 
-  const formatTime = (s) => (s === null ? '--:--' : `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, '0')}`);
-  const handleAnswerSelect = (qId, idx) => setSelectedAnswers(prev => ({ ...prev, [qId]: idx }));
+  const formatTime = (s) =>
+    s === null
+      ? "--:--"
+      : `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, "0")}`;
+  const handleAnswerSelect = (qId, idx) =>
+    setSelectedAnswers((prev) => ({ ...prev, [qId]: idx }));
 
   if (loading) return <LoadingScreen />;
 
   if (error) {
     return (
-      <div className="quiz-page-wrapper" style={{ direction: isEnglishSubject ? 'ltr' : 'rtl' }}>
+      <div
+        className="quiz-page-wrapper"
+        style={{ direction: isEnglishSubject ? "ltr" : "rtl" }}
+      >
         <header className="quiz-header">
-          <div className="timer-pill"><span>⏱️</span><span>00:00</span></div>
+          <div className="timer-pill">
+            <span>⏱️</span>
+            <span>00:00</span>
+          </div>
           <div className="center-brand">
-            <img src="https://i.imgur.com/p1hg12H.png" alt="Logo" className="quiz-logo" />
+            <img
+              src="https://i.imgur.com/p1hg12H.png"
+              alt="Logo"
+              className="quiz-logo"
+            />
             <span className="quiz-brand-name">مركز النخبة التعليمي</span>
           </div>
-          <button className="submit-quiz-btn" style={{ opacity: 0.5, cursor: 'default' }}>إنهاء الاختبار</button>
+          <button
+            className="submit-quiz-btn"
+            style={{ opacity: 0.5, cursor: "default" }}
+          >
+            إنهاء الاختبار
+          </button>
         </header>
-        <div className="progress-container"><div className="progress-bar" style={{ width: '0%' }}></div></div>
+        <div className="progress-container">
+          <div className="progress-bar" style={{ width: "0%" }}></div>
+        </div>
         <main className="quiz-main-content">
           <div className="empty-state-card">
-            <div className="empty-state-icon">{error === 'no_questions' ? '' : ''}</div>
-            <h2 className="empty-state-title">{error === 'no_questions' ? 'لا توجد أسئلة' : 'لا توجد محاولة نشطة'}</h2>
+            <div className="empty-state-icon">
+              {error === "no_questions" ? "" : ""}
+            </div>
+            <h2 className="empty-state-title">
+              {error === "no_questions"
+                ? "لا توجد أسئلة"
+                : "لا توجد محاولة نشطة"}
+            </h2>
             <p className="empty-state-description">
-              {error === 'no_questions' ? 'عذراً، لم يتم العثور على أسئلة لهذه المادة حالياً.' : ' يرجى مراجعة الإدارة لتفعيل محاولة جديدة'}
+              {error === "no_questions"
+                ? "عذراً، لم يتم العثور على أسئلة لهذه المادة حالياً."
+                : " يرجى مراجعة الإدارة لتفعيل محاولة جديدة"}
             </p>
-            <button onClick={() => navigate('/dashboard')} className="back-to-dashboard-btn">العودة إلى المواد الدراسية</button>
+            <button
+              onClick={() => navigate("/dashboard")}
+              className="back-to-dashboard-btn"
+            >
+              العودة إلى المواد الدراسية
+            </button>
           </div>
         </main>
         <Footer />
@@ -505,34 +608,59 @@ const { data: subjectInfo } = await supabase
   if (!currentBlock) return null;
 
   const totalBlocks = blocks.length;
-  const passagesCount = blocks.filter(b => b.type === 'passage').length;
-  const totalQuestionsCount = blocks.reduce((acc, b) => acc + (b.type === 'passage' ? b.questions.length : 1), 0);
+  const passagesCount = blocks.filter((b) => b.type === "passage").length;
+  const totalQuestionsCount = blocks.reduce(
+    (acc, b) => acc + (b.type === "passage" ? b.questions.length : 1),
+    0,
+  );
   let currentQuestionNumber = 0;
   for (let i = 0; i < currentBlockIndex; i++) {
     const b = blocks[i];
-    currentQuestionNumber += (b.type === 'passage' ? b.questions.length : 1);
+    currentQuestionNumber += b.type === "passage" ? b.questions.length : 1;
   }
   currentQuestionNumber++;
 
   const answeredCount = Object.keys(selectedAnswers).length;
-  const progress = totalQuestionsCount > 0 ? (answeredCount / totalQuestionsCount) * 100 : 0;
-  const optionLabels = isEnglishSubject ? ['A', 'B', 'C', 'D'] : ['أ', 'ب', 'ج', 'د'];
+  const progress =
+    totalQuestionsCount > 0 ? (answeredCount / totalQuestionsCount) * 100 : 0;
+  const optionLabels = isEnglishSubject
+    ? ["A", "B", "C", "D"]
+    : ["أ", "ب", "ج", "د"];
 
   return (
-    <div className="quiz-page-wrapper" style={{ direction: isEnglishSubject ? 'ltr' : 'rtl' }}>
+    <div
+      className="quiz-page-wrapper"
+      style={{ direction: isEnglishSubject ? "ltr" : "rtl" }}
+    >
       <header className="quiz-header">
         <div className="timer-pill">
           <span>⏱️</span>
-          <span className={timeLeft < 60 ? 'time-critical' : timeLeft < 300 ? 'time-warning' : ''}>
+          <span
+            className={
+              timeLeft < 60
+                ? "time-critical"
+                : timeLeft < 300
+                  ? "time-warning"
+                  : ""
+            }
+          >
             {formatTime(timeLeft)}
           </span>
         </div>
         <div className="center-brand">
-          <img src="https://i.imgur.com/p1hg12H.png" alt="Logo" className="quiz-logo" />
+          <img
+            src="https://i.imgur.com/p1hg12H.png"
+            alt="Logo"
+            className="quiz-logo"
+          />
           <span className="quiz-brand-name">مركز النخبة التعليمي</span>
         </div>
-        <button onClick={handleSubmitQuiz} disabled={submitting || hasAutoSubmitted.current} className="submit-quiz-btn">
-          {submitting ? 'جاري التسليم' : 'إنهاء الاختبار'}
+        <button
+          onClick={handleSubmitQuiz}
+          disabled={submitting || hasAutoSubmitted.current}
+          className="submit-quiz-btn"
+        >
+          {submitting ? "..جاري التسليم" : "إنهاء الاختبار"}
         </button>
       </header>
 
@@ -545,9 +673,10 @@ const { data: subjectInfo } = await supabase
           <div className="question-card">
             <div className="q-header">
               <span className="q-number">
-                {isEnglishSubject && currentBlock.type === 'passage' ? (
+                {isEnglishSubject && currentBlock.type === "passage" ? (
                   <>
-                    القطعة {currentBlockIndex + 1} من {passagesCount} • السؤال {currentQuestionNumber} من {totalQuestionsCount}
+                    القطعة {currentBlockIndex + 1} من {passagesCount} • السؤال{" "}
+                    {currentQuestionNumber} من {totalQuestionsCount}
                   </>
                 ) : (
                   `السؤال ${currentQuestionNumber} من ${totalQuestionsCount}`
@@ -555,7 +684,7 @@ const { data: subjectInfo } = await supabase
               </span>
             </div>
 
-            {currentBlock.type === 'passage' && currentBlock.passage && (
+            {currentBlock.type === "passage" && currentBlock.passage && (
               <div className="passage-box">
                 <div className="passage-accent"></div>
                 <h3>{currentBlock.passage.title}</h3>
@@ -564,10 +693,24 @@ const { data: subjectInfo } = await supabase
             )}
 
             <div className="questions-container">
-              {(currentBlock.type === 'passage' ? currentBlock.questions : [currentBlock.question]).map((q, qIdx) => (
-                <div key={q.id} className="single-question-wrapper" style={{ marginBottom: qIdx < (currentBlock.type === 'passage' ? currentBlock.questions.length-1 : 0) ? '50px' : '0' }}>
-                  
-                  {currentBlock.type === 'passage' && (
+              {(currentBlock.type === "passage"
+                ? currentBlock.questions
+                : [currentBlock.question]
+              ).map((q, qIdx) => (
+                <div
+                  key={q.id}
+                  className="single-question-wrapper"
+                  style={{
+                    marginBottom:
+                      qIdx <
+                      (currentBlock.type === "passage"
+                        ? currentBlock.questions.length - 1
+                        : 0)
+                        ? "50px"
+                        : "0",
+                  }}
+                >
+                  {currentBlock.type === "passage" && (
                     <div className="question-header">
                       <span className="question-number">سؤال {qIdx + 1}</span>
                     </div>
@@ -575,27 +718,39 @@ const { data: subjectInfo } = await supabase
 
                   {q.image_url ? (
                     <div className="question-image-container">
-                      <img src={q.image_url} alt="السؤال" className="question-image" />
+                      <img
+                        src={q.image_url}
+                        alt="السؤال"
+                        className="question-image"
+                      />
                     </div>
                   ) : (
                     <h2 className="question-text">{q.question_text}</h2>
                   )}
 
-                  <div className={`options-grid ${isEnglishSubject ? 'english-options' : ''}`}>
+                  <div
+                    className={`options-grid ${isEnglishSubject ? "english-options" : ""}`}
+                  >
                     {q.options?.map((opt, idx) => {
-                      const englishLetter = ['a', 'b', 'c', 'd'][idx];
+                      const englishLetter = ["a", "b", "c", "d"][idx];
                       const imageKey = `image_option_${englishLetter}`;
                       const optionImageUrl = q[imageKey];
                       return (
-                        <div 
-                          key={idx} 
-                          className={`option-item ${selectedAnswers[q.id] === idx ? 'selected' : ''}`}
+                        <div
+                          key={idx}
+                          className={`option-item ${selectedAnswers[q.id] === idx ? "selected" : ""}`}
                           onClick={() => handleAnswerSelect(q.id, idx)}
                         >
-                          <span className="option-label">{optionLabels[idx]}</span>
+                          <span className="option-label">
+                            {optionLabels[idx]}
+                          </span>
                           {optionImageUrl ? (
                             <div className="option-image-wrapper">
-                              <img src={optionImageUrl} alt={`خيار ${optionLabels[idx]}`} className="option-image" />
+                              <img
+                                src={optionImageUrl}
+                                alt={`خيار ${optionLabels[idx]}`}
+                                className="option-image"
+                              />
                             </div>
                           ) : (
                             <span className="option-value">{opt}</span>
@@ -611,29 +766,32 @@ const { data: subjectInfo } = await supabase
           </div>
 
           <div className="quiz-nav-controls">
-            <button 
-              className="nav-btn prev" 
+            <button
+              className="nav-btn prev"
               disabled={currentBlockIndex === 0}
-              onClick={() => setCurrentBlockIndex(prev => prev - 1)}
+              onClick={() => setCurrentBlockIndex((prev) => prev - 1)}
             >
               السابق
             </button>
             <div className="q-dots-nav">
               {blocks.map((block, idx) => {
-                let label = '';
+                let label = "";
                 let isCompleted = false;
-                if (block.type === 'passage') {
-                  const allAnswered = block.questions.every(q => selectedAnswers[q.id] !== undefined);
+                if (block.type === "passage") {
+                  const allAnswered = block.questions.every(
+                    (q) => selectedAnswers[q.id] !== undefined,
+                  );
                   isCompleted = allAnswered;
-                  label = `${idx+1}`;
+                  label = `${idx + 1}`;
                 } else {
-                  isCompleted = selectedAnswers[block.question.id] !== undefined;
-                  label = `${idx+1}`;
+                  isCompleted =
+                    selectedAnswers[block.question.id] !== undefined;
+                  label = `${idx + 1}`;
                 }
                 return (
-                  <div 
+                  <div
                     key={idx}
-                    className={`dot ${currentBlockIndex === idx ? 'active' : ''} ${isCompleted ? 'completed' : ''}`}
+                    className={`dot ${currentBlockIndex === idx ? "active" : ""} ${isCompleted ? "completed" : ""}`}
                     onClick={() => setCurrentBlockIndex(idx)}
                   >
                     {label}
@@ -641,10 +799,10 @@ const { data: subjectInfo } = await supabase
                 );
               })}
             </div>
-            <button 
-              className="nav-btn next" 
+            <button
+              className="nav-btn next"
               disabled={currentBlockIndex === totalBlocks - 1}
-              onClick={() => setCurrentBlockIndex(prev => prev + 1)}
+              onClick={() => setCurrentBlockIndex((prev) => prev + 1)}
             >
               التالي
             </button>

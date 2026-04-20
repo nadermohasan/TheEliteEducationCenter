@@ -1,4 +1,5 @@
 // Navbar.jsx
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 
@@ -19,6 +20,22 @@ const UserIcon = () => (
 
 export default function Navbar({ userName = 'مستخدم', role = 'student' }) {
   const navigate = useNavigate();
+  const [branch, setBranch] = useState('');
+
+  useEffect(() => {
+    const fetchBranch = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('branch')
+          .eq('id', user.id)
+          .maybeSingle();
+        setBranch(profile?.branch || '');
+      }
+    };
+    fetchBranch();
+  }, []);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -44,7 +61,6 @@ export default function Navbar({ userName = 'مستخدم', role = 'student' }) 
   return (
     <>
       <header className="dashboard-header">
-        {/* زر الخروج بتصميمه الأصلي تماماً */}
         <button onClick={handleLogout} className="logout-button">
           <span>خروج</span>
           <span className="logout-icon"><LogoutIcon /></span>
@@ -59,7 +75,10 @@ export default function Navbar({ userName = 'مستخدم', role = 'student' }) 
 
         <div className="user-section">
           <div className="user-info">
-            <span className="user-name">{displayName}</span>
+            <div className="user-text">
+              <span className="user-name">{displayName}</span>
+              {branch && <span className="user-branch">الفرع: {branch}</span>}
+            </div>
             <div className="user-avatar">
               <UserIcon />
             </div>
@@ -130,11 +149,24 @@ export default function Navbar({ userName = 'مستخدم', role = 'student' }) 
           gap: 12px;
         }
 
+        .user-text {
+          display: flex;
+          flex-direction: column;
+          align-items: flex-end;
+          line-height: 1.4;
+        }
+
         .user-name {
           font-weight: 600;
           color: #334155;
           font-size: 1rem;
           font-family: 'Cairo', sans-serif;
+        }
+
+        .user-branch {
+          font-size: 0.8rem;
+          color: #64748b;
+          font-weight: 400;
         }
 
         .user-avatar {
@@ -154,7 +186,6 @@ export default function Navbar({ userName = 'مستخدم', role = 'student' }) 
           height: 20px;
         }
 
-        /* تنسيق زر الخروج الأصلي الخاص بك */
         .logout-button {
           display: flex;
           align-items: center;
