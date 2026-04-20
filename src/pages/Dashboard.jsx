@@ -52,104 +52,115 @@ export default function Dashboard() {
   const [userBranch, setUserBranch] = useState("");
   const [subjects, setSubjects] = useState([]);
   const [loading, setLoading] = useState(true);
-
-  const getSubjectStyle = useCallback((subjectName) => {
-    if (!subjectName)
-      return {
-        icon: <BookOpen />,
-        bg: "linear-gradient(135deg, #f1f5f9, #cbd5e1)",
-        color: "#334155",
-      };
-
-    const name = subjectName.toLowerCase();
-
-    if (name.includes("اللغة الإنجليزية") || name.includes("english"))
-      return {
-        icon: <Languages />,
-        bg: "linear-gradient(135deg, #c70929, #ca3051)",
-        color: "#ffffff",
-      };
-
-    if (name.includes("اللغة العربية") || name.includes("عربية"))
-      return {
-        icon: <ScrollText />,
-        bg: "linear-gradient(135deg, #943f0e, #bd6b20)",
-        color: "#ffffff",
-      };
-
-    if (name.includes("الرياضيات"))
-      return {
-        icon: <Calculator />,
-        bg: "linear-gradient(135deg, #e9cc29, #f1ba42)",
-        color: "#c03a3a",
-      };
-
-    if (name.includes("التاريخ"))
-      return {
-        icon: <Landmark />,
-        bg: "linear-gradient(135deg, #bbf7d0, #4ade80)",
-        color: "#14532d",
-      };
-
-    if (name.includes("الجغرافيا"))
-      return {
-        icon: <Globe />,
-        bg: "linear-gradient(135deg, #a5f3fc, #22d3ee)",
-        color: "#164e63",
-      };
-
-    if (name.includes("تكنولوجيا المعلومات"))
-      return {
-        icon: <Laptop />,
-        bg: "linear-gradient(135deg, #3b82f6, #1e40af)",
-        color: "#ffffff",
-      };
-
-    if (name.includes("كيمياء"))
-      return {
-        icon: <FlaskConical />,
-        bg: "linear-gradient(135deg, #fce7f3, #fbcfe8)",
-        color: "#9d174d",
-      };
-
-    if (name.includes("فيزياء"))
-      return {
-        icon: <Atom />,
-        bg: "linear-gradient(135deg, #e0f2fe, #579bc0)",
-        color: "#0369a1",
-      };
-
-    if (name.includes("أحياء"))
-      return {
-        icon: <Microscope />,
-        bg: "linear-gradient(135deg, #dcfce7, #0ee43cb4)",
-        color: "#166534",
-      };
-
-    if (name.includes("الثقافة العلمية"))
-      return {
-        icon: <Leaf />,
-        bg: "linear-gradient(135deg, #fef9c3, #fde047)",
-        color: "#854d0e",
-      };
-
-    if (
-      name.includes("التربية الإسلامية") ||
-      name.includes("إسلامية") ||
-      name.includes("دين")
-    )
-      return {
-        icon: <BookOpen />,
-        bg: "linear-gradient(135deg, #178042, #2a9c30)",
-        color: "#f1f1f1",
-      };
-
+const getSubjectStyle = useCallback((subjectName) => {
+  if (!subjectName)
     return {
       icon: <BookOpen />,
-      bg: "linear-gradient(135deg, #f1f5f9, #cbd5e1)",
-      color: "#334155",
+      bg: "linear-gradient(135deg, #f1f5f9, #cbd5e1)", // رمادي فاتح محايد
+      color: "#1e293b",
     };
-  }, []);
+
+  const name = subjectName.toLowerCase();
+
+  // 1. اللغة الإنجليزية - أزرق بحري هادئ
+  if (name.includes("اللغة الإنجليزية") || name.includes("english"))
+    return {
+      icon: <Languages />,
+      bg: "linear-gradient(135deg, #4f709c, #213555)",
+      color: "#f0f3f8",
+    };
+
+  // 2. اللغة العربية - بني رملي دافئ
+  if (name.includes("اللغة العربية") || name.includes("عربية"))
+    return {
+      icon: <ScrollText />,
+      bg: "linear-gradient(135deg, #d4a373, #8b5a2b)",
+      color: "#fefae0",
+    };
+
+  // 3. الرياضيات - أحمر خمري ناعم
+  if (name.includes("الرياضيات"))
+    return {
+      icon: <Calculator />,
+      bg: "linear-gradient(135deg, #d56b6b, #9d4040)",
+      color: "#fff5f5",
+    };
+
+  // 4. التاريخ - أخضر زيتوني ترابي
+  if (name.includes("التاريخ"))
+    return {
+      icon: <Landmark />,
+      bg: "linear-gradient(135deg, #7d9b76, #4a5d47)",
+      color: "#edf2e9",
+    };
+
+  // 5. الجغرافيا - فيروزي مخضر (Teal)
+  if (name.includes("الجغرافيا"))
+    return {
+      icon: <Globe />,
+      bg: "linear-gradient(135deg, #61a5a4, #2e5a5a)",
+      color: "#e0f2f1",
+    };
+
+  // 6. تكنولوجيا المعلومات - بنفسجي فاتح (Lavender)
+  if (name.includes("تكنولوجيا المعلومات"))
+    return {
+      icon: <Laptop />,
+      bg: "linear-gradient(135deg, #a88bbd, #6b4e7a)",
+      color: "#f4edf8",
+    };
+
+  // 7. كيمياء - وردي خوخي ناعم
+  if (name.includes("كيمياء"))
+    return {
+      icon: <FlaskConical />,
+      bg: "linear-gradient(135deg, #e5989b, #b56576)",
+      color: "#fdf0f0",
+    };
+
+  // 8. فيزياء - أزرق سماوي بارد
+  if (name.includes("فيزياء"))
+    return {
+      icon: <Atom />,
+      bg: "linear-gradient(135deg, #74b9cf, #3f729b)",
+      color: "#e6f3fa",
+    };
+
+  // 9. أحياء - أخضر فاتح منعش
+  if (name.includes("أحياء"))
+    return {
+      icon: <Microscope />,
+      bg: "linear-gradient(135deg, #7fbf7f, #4a7a4a)",
+      color: "#eaf5ea",
+    };
+
+  // 10. الثقافة العلمية - أصفر خردلي هادئ
+  if (name.includes("الثقافة العلمية"))
+    return {
+      icon: <Leaf />,
+      bg: "linear-gradient(135deg, #d9b650, #a8862a)",
+      color: "#fcf5e6",
+    };
+
+  // 11. التربية الإسلامية - أخضر فستقي ناعم
+  if (
+    name.includes("التربية الإسلامية") ||
+    name.includes("إسلامية") ||
+    name.includes("دين")
+  )
+    return {
+      icon: <BookOpen />,
+      bg: "linear-gradient(135deg, #8fbc8f, #557c55)",
+      color: "#f0f7f0",
+    };
+
+  // 12. افتراضي - رمادي محايد
+  return {
+    icon: <BookOpen />,
+    bg: "linear-gradient(135deg, #f1f5f9, #cbd5e1)",
+    color: "#1e293b",
+  };
+}, []);
 
   // دالة تصفية المواد حسب الفرع (مع تشخيص)
   const filterSubjectsByBranch = useCallback((subjectsList, studentBranch) => {

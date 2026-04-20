@@ -77,7 +77,6 @@ export default function Navbar({ userName = 'مستخدم', role = 'student' }) 
           <div className="user-info">
             <div className="user-text">
               <span className="user-name">{displayName}</span>
-              {branch && <span className="user-branch">الفرع: {branch}</span>}
             </div>
             <div className="user-avatar">
               <UserIcon />
