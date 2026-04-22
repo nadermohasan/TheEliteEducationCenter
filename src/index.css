@@ -107,3 +107,36 @@ code {
   padding: 4px 8px;
   background: var(--code-bg);
 }
+
+.table-responsive {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch; /* تمرير سلس على iOS */
+  position: relative;
+  /* إشارات بصرية على الحواف */
+  background:
+    linear-gradient(to right, white 30%, rgba(255,255,255,0)),
+    linear-gradient(to right, rgba(255,255,255,0), white 70%) 0 100%,
+    radial-gradient(farthest-side at 0% 50%, rgba(0,0,0,0.2), rgba(0,0,0,0)),
+    radial-gradient(farthest-side at 100% 50%, rgba(0,0,0,0.2), rgba(0,0,0,0)) 0 100%;
+  background-repeat: no-repeat;
+  background-color: white;
+  background-size: 40px 100%, 40px 100%, 14px 100%, 14px 100%;
+  background-position: 0 0, 100%, 0 0, 100%;
+  background-attachment: local, local, scroll, scroll;
+}
+
+/* إخفاء شريط التمرير في بعض المتصفحات (اختياري) */
+.table-responsive::-webkit-scrollbar {
+  display: none; /* لمتصفحات WebKit */
+}
+.table-responsive {
+  -ms-overflow-style: none;  /* لـ IE و Edge */
+  scrollbar-width: none;      /* لـ Firefox */
+}
+
+/* للجداول ذات العرض الثابت */
+.modern-table {
+  min-width: 700px; /* يضمن التمرير فقط عند الحاجة */
+  width: max-content; /* أو 100% إذا أردت */
+}
