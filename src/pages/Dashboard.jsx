@@ -52,116 +52,115 @@ export default function Dashboard() {
   const [userBranch, setUserBranch] = useState("");
   const [subjects, setSubjects] = useState([]);
   const [loading, setLoading] = useState(true);
-const getSubjectStyle = useCallback((subjectName) => {
-  if (!subjectName)
+  const getSubjectStyle = useCallback((subjectName) => {
+    if (!subjectName)
+      return {
+        icon: <BookOpen />,
+        bg: "linear-gradient(135deg, #64748b, #1e293b)",
+        color: "#f8fafc",
+      };
+
+    const name = subjectName.toLowerCase();
+
+    // 1. English – royal blue
+    if (name.includes("اللغة الإنجليزية") || name.includes("english"))
+      return {
+        icon: <Languages />,
+        bg: "linear-gradient(135deg, #2563eb, #1e40af)",
+        color: "#eff6ff",
+      };
+
+    // 2. Arabic – orange gold
+    if (name.includes("اللغة العربية") || name.includes("عربية"))
+      return {
+        icon: <ScrollText />,
+        bg: "linear-gradient(135deg, #f97316, #7c2d12)",
+        color: "#fff7ed",
+      };
+
+    // 3. Math – crimson red
+    if (name.includes("الرياضيات"))
+      return {
+        icon: <Calculator />,
+        bg: "linear-gradient(135deg, #dc2626, #450a0a)",
+        color: "#fef2f2",
+      };
+
+    // 4. History – brown (distinct)
+    if (name.includes("التاريخ"))
+      return {
+        icon: <Landmark />,
+        bg: "linear-gradient(135deg, #a16207, #422006)",
+        color: "#fefce8",
+      };
+
+    // 5. Geography – cyan (مش شبه أي حاجة)
+    if (name.includes("الجغرافيا"))
+      return {
+        icon: <Globe />,
+        bg: "linear-gradient(135deg, #06b6d4, #083344)",
+        color: "#ecfeff",
+      };
+
+    // 6. IT – purple
+    if (name.includes("تكنولوجيا المعلومات"))
+      return {
+        icon: <Laptop />,
+        bg: "linear-gradient(135deg, #9333ea, #3b0764)",
+        color: "#faf5ff",
+      };
+
+    // 7. Chemistry – pink
+    if (name.includes("كيمياء"))
+      return {
+        icon: <FlaskConical />,
+        bg: "linear-gradient(135deg, #ec4899, #500724)",
+        color: "#fdf2f8",
+      };
+
+    // 8. Physics – dark navy (مختلف عن الإنجليزي)
+    if (name.includes("فيزياء"))
+      return {
+        icon: <Atom />,
+        bg: "linear-gradient(135deg, #0f172a, #020617)",
+        color: "#e0f2fe",
+      };
+
+    // 9. Biology – lime green (فاتح ومميز)
+    if (name.includes("أحياء"))
+      return {
+        icon: <Microscope />,
+        bg: "linear-gradient(135deg, #84cc16, #2d4b0e)",
+        color: "#f7fee7",
+      };
+
+    // 10. Science culture – yellow
+    if (name.includes("الثقافة العلمية"))
+      return {
+        icon: <Leaf />,
+        bg: "linear-gradient(135deg, #eab308, #713f12)",
+        color: "#fefce8",
+      };
+
+    // 11. Islamic studies – emerald dark (غير الأحياء تمامًا)
+    if (
+      name.includes("التربية الإسلامية") ||
+      name.includes("إسلامية") ||
+      name.includes("دين")
+    )
+      return {
+        icon: <BookOpen />,
+        bg: "linear-gradient(135deg, #065f46, #022c22)",
+        color: "#ecfdf5",
+      };
+
+    // Default
     return {
       icon: <BookOpen />,
-      bg: "linear-gradient(135deg, #f1f5f9, #cbd5e1)", // رمادي فاتح محايد
-      color: "#1e293b",
+      bg: "linear-gradient(135deg, #64748b, #1e293b)",
+      color: "#f8fafc",
     };
-
-  const name = subjectName.toLowerCase();
-
-  // 1. اللغة الإنجليزية - أزرق بحري هادئ
-  if (name.includes("اللغة الإنجليزية") || name.includes("english"))
-    return {
-      icon: <Languages />,
-      bg: "linear-gradient(135deg, #4f709c, #213555)",
-      color: "#f0f3f8",
-    };
-
-  // 2. اللغة العربية - بني رملي دافئ
-  if (name.includes("اللغة العربية") || name.includes("عربية"))
-    return {
-      icon: <ScrollText />,
-      bg: "linear-gradient(135deg, #d4a373, #8b5a2b)",
-      color: "#fefae0",
-    };
-
-  // 3. الرياضيات - أحمر خمري ناعم
-  if (name.includes("الرياضيات"))
-    return {
-      icon: <Calculator />,
-      bg: "linear-gradient(135deg, #d56b6b, #9d4040)",
-      color: "#fff5f5",
-    };
-
-  // 4. التاريخ - أخضر زيتوني ترابي
-  if (name.includes("التاريخ"))
-    return {
-      icon: <Landmark />,
-      bg: "linear-gradient(135deg, #7d9b76, #4a5d47)",
-      color: "#edf2e9",
-    };
-
-  // 5. الجغرافيا - فيروزي مخضر (Teal)
-  if (name.includes("الجغرافيا"))
-    return {
-      icon: <Globe />,
-      bg: "linear-gradient(135deg, #61a5a4, #2e5a5a)",
-      color: "#e0f2f1",
-    };
-
-  // 6. تكنولوجيا المعلومات - بنفسجي فاتح (Lavender)
-  if (name.includes("تكنولوجيا المعلومات"))
-    return {
-      icon: <Laptop />,
-      bg: "linear-gradient(135deg, #a88bbd, #6b4e7a)",
-      color: "#f4edf8",
-    };
-
-  // 7. كيمياء - وردي خوخي ناعم
-  if (name.includes("كيمياء"))
-    return {
-      icon: <FlaskConical />,
-      bg: "linear-gradient(135deg, #e5989b, #b56576)",
-      color: "#fdf0f0",
-    };
-
-  // 8. فيزياء - أزرق سماوي بارد
-  if (name.includes("فيزياء"))
-    return {
-      icon: <Atom />,
-      bg: "linear-gradient(135deg, #74b9cf, #3f729b)",
-      color: "#e6f3fa",
-    };
-
-  // 9. أحياء - أخضر فاتح منعش
-  if (name.includes("أحياء"))
-    return {
-      icon: <Microscope />,
-      bg: "linear-gradient(135deg, #7fbf7f, #4a7a4a)",
-      color: "#eaf5ea",
-    };
-
-  // 10. الثقافة العلمية - أصفر خردلي هادئ
-  if (name.includes("الثقافة العلمية"))
-    return {
-      icon: <Leaf />,
-      bg: "linear-gradient(135deg, #d9b650, #a8862a)",
-      color: "#fcf5e6",
-    };
-
-  // 11. التربية الإسلامية - أخضر فستقي ناعم
-  if (
-    name.includes("التربية الإسلامية") ||
-    name.includes("إسلامية") ||
-    name.includes("دين")
-  )
-    return {
-      icon: <BookOpen />,
-      bg: "linear-gradient(135deg, #8fbc8f, #557c55)",
-      color: "#f0f7f0",
-    };
-
-  // 12. افتراضي - رمادي محايد
-  return {
-    icon: <BookOpen />,
-    bg: "linear-gradient(135deg, #f1f5f9, #cbd5e1)",
-    color: "#1e293b",
-  };
-}, []);
-
+  }, []);
 
   // دالة تصفية المواد حسب الفرع (مع تشخيص)
   const filterSubjectsByBranch = useCallback((subjectsList, studentBranch) => {
@@ -256,8 +255,7 @@ const getSubjectStyle = useCallback((subjectName) => {
         <h1>قم بمحاولة أداء الاختبارات الآن!</h1>
 
         {subjects.length === 0 ? (
-          <div className="no-subjects">
-            <div className="no-subjects-icon">📚</div>
+          <div>
             <h3>لا توجد مواد متاحة حالياً</h3>
             <p>يرجى التواصل مع الإدارة لإضافة المواد والاختبارات</p>
           </div>
@@ -294,7 +292,7 @@ const getSubjectStyle = useCallback((subjectName) => {
         .dashboard-main{flex-grow:1;max-width:1000px;margin:0 auto;padding:20px;text-align:center}
         .dashboard-main h1{font-size:24px;color:#1e293b;margin-bottom:40px;font-weight:700}
         .subjects-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:20px}
-        .no-subjects{text-align:center;padding:60px 20px;background:white;border-radius:24px;margin-top:20px}
+        .no-subjects{text-align:center;padding:60px 20px;border-radius:24px;margin-top:20px}
         .no-subjects-icon{font-size:64px;margin-bottom:16px;opacity:0.6}
         .no-subjects h3{color:#1e293b;margin-bottom:8px}
         .no-subjects p{color:#64748b}
