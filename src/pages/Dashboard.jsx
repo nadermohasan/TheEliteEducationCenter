@@ -162,6 +162,7 @@ const getSubjectStyle = useCallback((subjectName) => {
   };
 }, []);
 
+
   // دالة تصفية المواد حسب الفرع (مع تشخيص)
   const filterSubjectsByBranch = useCallback((subjectsList, studentBranch) => {
     console.log("👤 فرع الطالب:", studentBranch);

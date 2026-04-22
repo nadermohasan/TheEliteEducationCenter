@@ -252,8 +252,8 @@ export default function TeacherDashboard() {
       if (!user) { navigate("/login"); return; }
 
       let finalBranch = formData.branch;
-      if (isScientificOnly()) finalBranch = "علمي";
-      else if (isLiteraryOnly()) finalBranch = "أدبي";
+      if (isScientificOnly()) finalBranch = "العلمي";
+      else if (isLiteraryOnly()) finalBranch = "الأدبي";
 
       const newQuestion = {
         teacher_id: user.id,
@@ -292,8 +292,8 @@ export default function TeacherDashboard() {
     setLoading(true);
     try {
       let finalBranch = formData.branch;
-      if (isScientificOnly()) finalBranch = "علمي";
-      else if (isLiteraryOnly()) finalBranch = "أدبي";
+      if (isScientificOnly()) finalBranch = "العلمي";
+      else if (isLiteraryOnly()) finalBranch = "الأدبي";
 
       const updatedQuestion = {
         subject_id: formData.subject_id,
@@ -777,7 +777,7 @@ export default function TeacherDashboard() {
               <div className="empty-state"><div className="loading-spinner"></div><p>جاري تحميل الأسئلة...</p></div>
             ) : filteredQuestions.length > 0 ? (
               <table className="modern-table">
-                <thead><tr><th>المادة</th><th>الوحدة</th><th>نص السؤال</th><th>الوسائط</th><th className="text-center">الإجابة</th><th className="text-center">الإجراءات</th></tr></thead>
+                <thead><tr><th>المادة</th><th>الفرع</th><th>الوحدة</th><th>نص السؤال</th><th>الوسائط</th><th className="text-center">الإجابة</th><th className="text-center">الإجراءات</th></tr></thead>
                 <tbody>
                   {filteredQuestions.map((q) => {
                     const labels = getQuestionOptionLabels(q);
@@ -786,6 +786,7 @@ export default function TeacherDashboard() {
                     return (
                       <tr key={q.id} style={{ opacity: q.is_active ? 1 : 0.6 }}>
                         <td><span className="subject-badge">{q.subjects?.name || "غير محدد"}</span></td>
+                        <td className="text-center">{q.branch || "-"}</td>
                         <td className="text-center">{q.unit_number || "-"}</td>
                         <td className="q-text-cell" title={q.question_text}>{q.question_text}</td>
                         <td className="text-center"><div style={{ display: "flex", gap: "6px", justifyContent: "center" }}>{hasImage && <CheckCircle2 size={16} color="#3b82f6" title="يحتوي على صورة للسؤال" />}{imagesCount > 0 && <span title={`${imagesCount} صور للخيارات`}><ImageIcon size={16} color="#8b5cf6" /></span>}{!hasImage && imagesCount === 0 && "-"}</div></td>

@@ -1,15 +1,12 @@
-import { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { supabase } from "../supabaseClient";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-hot-toast";
 import Footer from "./Footer";
 import Navbar from "./Navbar";
 import {
-  Users,
-  CheckCircle,
-  Search,
-  TrendingUp,
-  RefreshCw,
+  Users, CheckCircle, Search, TrendingUp, RefreshCw,
+  Award, ChevronDown, ChevronRight
 } from "lucide-react";
 
 export default function AdminDashboard() {
@@ -20,6 +17,14 @@ export default function AdminDashboard() {
   const [adminProfile, setAdminProfile] = useState(null);
   const [stats, setStats] = useState({ totalStudents: 0, activeAttempts: 0 });
   const [activeAttemptsMap, setActiveAttemptsMap] = useState({});
+
+  // نتائج الطلاب مجمعة حسب الطالب ثم حسب المحاولة
+  const [studentResults, setStudentResults] = useState([]);
+  const [resultsLoading, setResultsLoading] = useState(false);
+  const [resultsSearchTerm, setResultsSearchTerm] = useState("");
+  const [showResults, setShowResults] = useState(false);
+  const [expandedStudentId, setExpandedStudentId] = useState(null);
+
   const navigate = useNavigate();
 
   const fetchStats = useCallback(async () => {
@@ -46,9 +51,7 @@ export default function AdminDashboard() {
   }, []);
 
   const fetchAdminProfile = useCallback(async () => {
-    const {
-      data: { user: currentUser },
-    } = await supabase.auth.getUser();
+    const { data: { user: currentUser } } = await supabase.auth.getUser();
     if (currentUser) {
       const { data: profile } = await supabase
         .from("profiles")
@@ -67,9 +70,7 @@ export default function AdminDashboard() {
 
     if (!error && data) {
       const map = {};
-      data.forEach((attempt) => {
-        map[attempt.student_id] = true;
-      });
+      data.forEach((attempt) => { map[attempt.student_id] = true; });
       setActiveAttemptsMap(map);
     }
   }, []);
@@ -83,6 +84,7 @@ export default function AdminDashboard() {
       .order("created_at", { ascending: false });
 
     if (!error) setUsers(data);
+    else console.error("fetchUsers error:", error);
     setLoading(false);
   }, []);
 
@@ -92,28 +94,97 @@ export default function AdminDashboard() {
     fetchActiveAttempts();
   }, [fetchUsers, fetchStats, fetchActiveAttempts]);
 
-  useEffect(() => {
-    fetchUsers();
-    fetchAdminProfile();
-    fetchStats();
-    fetchActiveAttempts();
-  }, [fetchUsers, fetchAdminProfile, fetchStats, fetchActiveAttempts]);
+  const fetchResults = useCallback(async () => {
+    setResultsLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from("results")
+        .select(`
+          id, score, created_at, student_id, subject_id, attempt_id,
+          profiles ( name ),
+          subjects ( name, questions_count )
+        `)
+        .order("created_at", { ascending: false });
 
-  useEffect(() => {
-    document.title = " مسؤول النظام";
+      if (error) throw error;
+
+      const studentMap = new Map();
+      (data || []).forEach((result) => {
+        const studentId = result.student_id;
+        const studentName = result.profiles?.name || "غير معروف";
+        const attemptId = result.attempt_id;
+
+        if (!studentMap.has(studentId)) {
+          studentMap.set(studentId, {
+            studentId,
+            studentName,
+            attempts: new Map()
+          });
+        }
+
+        const studentRecord = studentMap.get(studentId);
+        if (!studentRecord.attempts.has(attemptId)) {
+          studentRecord.attempts.set(attemptId, {
+            attemptId,
+            attemptDate: result.created_at,
+            results: []
+          });
+        }
+
+        studentRecord.attempts.get(attemptId).results.push({
+          id: result.id,
+          subjectName: result.subjects?.name || "غير معروف",
+          subjectId: result.subject_id,
+          score: result.score,
+          questionsCount: result.subjects?.questions_count || 40,
+          created_at: result.created_at
+        });
+      });
+
+      const aggregated = Array.from(studentMap.values()).map(student => {
+        const attemptsArray = Array.from(student.attempts.values()).sort(
+          (a, b) => new Date(b.attemptDate) - new Date(a.attemptDate)
+        );
+        const uniqueSubjects = new Set();
+        attemptsArray.forEach(att => att.results.forEach(res => uniqueSubjects.add(res.subjectId)));
+        const totalSubjects = uniqueSubjects.size;
+        const lastAttempt = attemptsArray[0];
+        const lastResult = lastAttempt?.results[0];
+
+        return {
+          studentId: student.studentId,
+          studentName: student.studentName,
+          totalSubjects,
+          lastResult: lastResult ? {
+            ...lastResult,
+            percentage: Math.round((lastResult.score / lastResult.questionsCount) * 100)
+          } : null,
+          attempts: attemptsArray
+        };
+      }).sort((a, b) => {
+        const aLatest = a.lastResult?.created_at || "";
+        const bLatest = b.lastResult?.created_at || "";
+        return bLatest.localeCompare(aLatest);
+      });
+
+      setStudentResults(aggregated);
+    } catch (error) {
+      console.error("Error fetching results:", error);
+      toast.error("فشل جلب النتائج");
+    } finally {
+      setResultsLoading(false);
+    }
   }, []);
 
   const handleActivateAttempt = async (studentId) => {
     setProcessingId(studentId);
     try {
-      // إنهاء أي محاولة نشطة حالية
       await supabase
         .from("attempts")
         .update({ status: "completed" })
         .eq("student_id", studentId)
         .eq("status", "active");
 
-      // إنشاء محاولة جديدة
       const { data: newAttempt, error: attemptError } = await supabase
         .from("attempts")
         .insert([{ student_id: studentId, status: "active" }])
@@ -121,14 +192,12 @@ export default function AdminDashboard() {
         .single();
       if (attemptError) throw attemptError;
 
-      // ✅ جلب فرع الطالب
       const { data: studentProfile } = await supabase
         .from("profiles")
         .select("branch")
         .eq("id", studentId)
         .single();
       const studentBranch = studentProfile?.branch?.trim() || null;
-      console.log("👤 فرع الطالب:", studentBranch);
 
       const { data: subjects } = await supabase
         .from("subjects")
@@ -141,7 +210,6 @@ export default function AdminDashboard() {
       for (const subject of subjects) {
         const targetCount = subject.questions_count || 40;
 
-        // ✅ بناء استعلام الأسئلة مع فلترة الفرع
         let query = supabase
           .from("questions")
           .select("id, passage_id, unit_number")
@@ -149,7 +217,6 @@ export default function AdminDashboard() {
           .eq("is_active", true);
 
         if (studentBranch) {
-          // الأسئلة العامة (branch = null) أو المطابقة لفرع الطالب
           query = query.or(`branch.is.null,branch.eq.${studentBranch}`);
         }
 
@@ -164,21 +231,18 @@ export default function AdminDashboard() {
           const standaloneQuestions = [];
           questions.forEach((q) => {
             if (q.passage_id) {
-              if (!passageMap.has(q.passage_id))
-                passageMap.set(q.passage_id, []);
+              if (!passageMap.has(q.passage_id)) passageMap.set(q.passage_id, []);
               passageMap.get(q.passage_id).push(q);
             } else {
               standaloneQuestions.push(q);
             }
           });
 
-          const passages = Array.from(passageMap.entries()).map(
-            ([passageId, qs]) => ({
-              passageId,
-              questions: qs,
-              count: qs.length,
-            }),
-          );
+          const passages = Array.from(passageMap.entries()).map(([passageId, qs]) => ({
+            passageId,
+            questions: qs,
+            count: qs.length,
+          }));
           passages.sort((a, b) => b.count - a.count);
 
           let selectedQuestions = [];
@@ -190,9 +254,7 @@ export default function AdminDashboard() {
               selectedQuestions.push(...passage.questions);
               remaining -= passage.count;
             } else {
-              const shuffled = [...passage.questions].sort(
-                () => 0.5 - Math.random(),
-              );
+              const shuffled = [...passage.questions].sort(() => 0.5 - Math.random());
               selectedQuestions.push(...shuffled.slice(0, remaining));
               remaining = 0;
               break;
@@ -200,9 +262,7 @@ export default function AdminDashboard() {
           }
 
           if (remaining > 0 && standaloneQuestions.length > 0) {
-            const shuffledStandalone = [...standaloneQuestions].sort(
-              () => 0.5 - Math.random(),
-            );
+            const shuffledStandalone = [...standaloneQuestions].sort(() => 0.5 - Math.random());
             const take = Math.min(remaining, shuffledStandalone.length);
             selectedQuestions.push(...shuffledStandalone.slice(0, take));
             remaining -= take;
@@ -210,9 +270,7 @@ export default function AdminDashboard() {
 
           if (remaining > 0) {
             const selectedIds = new Set(selectedQuestions.map((q) => q.id));
-            const allRemaining = questions.filter(
-              (q) => !selectedIds.has(q.id),
-            );
+            const allRemaining = questions.filter((q) => !selectedIds.has(q.id));
             const shuffled = [...allRemaining].sort(() => 0.5 - Math.random());
             selectedQuestions.push(...shuffled.slice(0, remaining));
           }
@@ -240,11 +298,7 @@ export default function AdminDashboard() {
 
           for (const unit of units) {
             const unitQuestions = unitMap.get(unit);
-            const take = Math.min(
-              targetPerUnit,
-              unitQuestions.length,
-              remaining,
-            );
+            const take = Math.min(targetPerUnit, unitQuestions.length, remaining);
             const shuffled = [...unitQuestions].sort(() => 0.5 - Math.random());
             selectedQuestions.push(...shuffled.slice(0, take));
             remaining -= take;
@@ -252,9 +306,7 @@ export default function AdminDashboard() {
 
           if (remaining > 0) {
             const selectedIds = new Set(selectedQuestions.map((q) => q.id));
-            const allRemaining = questions.filter(
-              (q) => !selectedIds.has(q.id),
-            );
+            const allRemaining = questions.filter((q) => !selectedIds.has(q.id));
             const shuffled = [...allRemaining].sort(() => 0.5 - Math.random());
             selectedQuestions.push(...shuffled.slice(0, remaining));
           }
@@ -287,13 +339,30 @@ export default function AdminDashboard() {
   };
 
   const filteredUsers = users.filter(
-    (u) => u.name?.includes(searchTerm) || u.username?.includes(searchTerm),
+    (u) => u.name?.includes(searchTerm) || u.username?.includes(searchTerm)
   );
+
+  const filteredStudentResults = studentResults.filter((student) =>
+    student.studentName?.includes(resultsSearchTerm)
+  );
+
   const todayNewStudents = users.filter((u) => {
     const createdDate = new Date(u.created_at);
     const today = new Date();
     return createdDate.toDateString() === today.toDateString();
   }).length;
+
+  const toggleStudentExpand = (studentId) => {
+    setExpandedStudentId(expandedStudentId === studentId ? null : studentId);
+  };
+
+  useEffect(() => {
+    fetchUsers();
+    fetchAdminProfile();
+    fetchStats();
+    fetchActiveAttempts();
+    fetchResults();
+  }, [fetchUsers, fetchAdminProfile, fetchStats, fetchActiveAttempts, fetchResults]);
 
   return (
     <div className="dashboard-container">
@@ -308,31 +377,16 @@ export default function AdminDashboard() {
 
         <div className="stats-grid">
           <div className="stat-card">
-            <div className="stat-icon-wrapper blue">
-              <Users size={24} />
-            </div>
-            <div className="stat-content">
-              <span className="stat-label">إجمالي الطلاب</span>
-              <span className="stat-number">{stats.totalStudents}</span>
-            </div>
+            <div className="stat-icon-wrapper blue"><Users size={24} /></div>
+            <div className="stat-content"><span className="stat-label">إجمالي الطلاب</span><span className="stat-number">{stats.totalStudents}</span></div>
           </div>
           <div className="stat-card">
-            <div className="stat-icon-wrapper green">
-              <CheckCircle size={24} />
-            </div>
-            <div className="stat-content">
-              <span className="stat-label">محاولات نشطة</span>
-              <span className="stat-number">{stats.activeAttempts}</span>
-            </div>
+            <div className="stat-icon-wrapper green"><CheckCircle size={24} /></div>
+            <div className="stat-content"><span className="stat-label">محاولات نشطة</span><span className="stat-number">{stats.activeAttempts}</span></div>
           </div>
           <div className="stat-card">
-            <div className="stat-icon-wrapper purple">
-              <TrendingUp size={24} />
-            </div>
-            <div className="stat-content">
-              <span className="stat-label">طلاب مسجلين اليوم</span>
-              <span className="stat-number">{todayNewStudents}</span>
-            </div>
+            <div className="stat-icon-wrapper purple"><TrendingUp size={24} /></div>
+            <div className="stat-content"><span className="stat-label">طلاب مسجلين اليوم</span><span className="stat-number">{todayNewStudents}</span></div>
           </div>
         </div>
 
@@ -349,9 +403,7 @@ export default function AdminDashboard() {
 
         <div className="table-card">
           <div className="card-header">
-            <h2 className="card-title">
-              <Users size={20} className="icon-blue" /> قائمة الطلاب
-            </h2>
+            <h2 className="card-title"><Users size={20} className="icon-blue" /> قائمة الطلاب</h2>
             <div className="card-header-actions">
               <span className="badge-count">{filteredUsers.length} طالب</span>
               <button className="refresh-btn-table" onClick={refreshAllData}>
@@ -361,74 +413,26 @@ export default function AdminDashboard() {
           </div>
           <div className="table-responsive">
             {loading ? (
-              <div className="empty-state">
-                <div className="loading-spinner"></div>
-                <p>جاري تحميل الطلاب...</p>
-              </div>
+              <div className="empty-state"><div className="loading-spinner"></div><p>جاري تحميل الطلاب...</p></div>
             ) : filteredUsers.length > 0 ? (
               <table className="modern-table">
                 <thead>
-                  <tr>
-                    <th class = "nameColumn">الاسم</th>
-                    <th>الفرع</th>
-                    <th>تاريخ التسجيل</th>
-                    <th className="text-center">الإجراءات</th>
-                  </tr>
+                  <tr><th className="nameColumn">الاسم</th><th>الفرع</th><th>تاريخ التسجيل</th><th className="text-center">الإجراءات</th></tr>
                 </thead>
                 <tbody>
                   {filteredUsers.map((user) => {
                     const hasActiveAttempt = activeAttemptsMap[user.id];
                     return (
                       <tr key={user.id}>
-                        <td>
-                          <div className="user-cell">
-                            <div className="user-avatar-small">
-                              {user.name?.charAt(0) || "ط"}
-                            </div>
-                            <span className="user-name-cell">
-                              {user.name || "غير محدد"}
-                            </span>
-                          </div>
-                        </td>
-                        <td>
-                          <span
-                            className="subject-badge"
-                            style={{ color: "#475569" }}
-                          >
-                            {user.branch || "—"}
-                          </span>
-                        </td>
-                        <td>
-                          {new Date(user.created_at).toLocaleDateString(
-                            "ar-EG",
-                          )}
-                        </td>
+                        <td><div className="user-cell"><div className="user-avatar-small">{user.name?.charAt(0) || "ط"}</div><span className="user-name-cell">{user.name || "غير محدد"}</span></div></td>
+                        <td><span className="subject-badge" style={{ color: "#475569" }}>{user.branch || "—"}</span></td>
+                        <td>{new Date(user.created_at).toLocaleDateString("ar-EG")}</td>
                         <td className="text-center">
                           {hasActiveAttempt ? (
-                            <button
-                              className="activate-btn-table active-attempt"
-                              disabled
-                              style={{
-                                background: "#10b981",
-                                cursor: "default",
-                              }}
-                            >
-                              ✔ محاولة مفعلة
-                            </button>
+                            <button className="activate-btn-table active-attempt" disabled style={{ background: "#10b981", cursor: "default" }}>✔ محاولة مفعلة</button>
                           ) : (
-                            <button
-                              className="activate-btn-table"
-                              onClick={() => handleActivateAttempt(user.id)}
-                              disabled={processingId === user.id}
-                            >
-                              {processingId === user.id ? (
-                                <>
-                                  <span className="spinner-small"></span>
-                                  جاري...
-                                </>
-                              ) : (
-                                "✚ تفعيل محاولـة"
-                              )}
+                            <button className="activate-btn-table" onClick={() => handleActivateAttempt(user.id)} disabled={processingId === user.id}>
+                              {processingId === user.id ? (<><span className="spinner-small"></span>جاري...</>) : ("✚ تفعيل محاولـة")}
                             </button>
                           )}
                         </td>
@@ -438,13 +442,125 @@ export default function AdminDashboard() {
                 </tbody>
               </table>
             ) : (
-              <div className="empty-state">
-                <div className="empty-icon">📭</div>
-                <h3>لا يوجد طلاب</h3>
-                <p>لم يتم العثور على أي طالب مطابق لبحثك</p>
-              </div>
+              <div className="empty-state"><div className="empty-icon">📭</div><h3>لا يوجد طلاب</h3><p>لم يتم العثور على أي طالب مطابق لبحثك</p></div>
             )}
           </div>
+        </div>
+
+        {/* قسم نتائج الطلاب مجمعة حسب الطالب والمحاولة */}
+        <div className="table-card" style={{ marginTop: "20px" }}>
+          <div
+            className="card-header"
+            style={{ cursor: "pointer" }}
+            onClick={() => {
+              if (!showResults && studentResults.length === 0) fetchResults();
+              setShowResults(!showResults);
+            }}
+          >
+            <h2 className="card-title"><Award size={20} className="icon-blue" /> نتائج الاختبارات</h2>
+            <div className="card-header-actions">
+              {showResults && (
+                <div style={{ width: "260px" }} onClick={(e) => e.stopPropagation()}>
+                  <div className="search-wrapper" style={{ marginBottom: 0 }}>
+                    <Search className="search-icon" size={16} />
+                    <input
+                      type="text"
+                      placeholder="بحث عن طالب..."
+                      value={resultsSearchTerm}
+                      onChange={(e) => setResultsSearchTerm(e.target.value)}
+                      className="search-input"
+                      style={{ padding: "10px 40px 10px 15px", fontSize: "0.9rem" }}
+                    />
+                  </div>
+                </div>
+              )}
+              <span className="badge-count">{filteredStudentResults.length} طالب</span>
+              <ChevronDown size={20} style={{ transform: showResults ? "rotate(180deg)" : "none", transition: "transform 0.2s" }} />
+            </div>
+          </div>
+
+          {showResults && (
+            <div className="table-responsive">
+              {resultsLoading ? (
+                <div className="empty-state"><div className="loading-spinner"></div><p>جاري تحميل النتائج...</p></div>
+              ) : filteredStudentResults.length > 0 ? (
+                <table className="modern-table">
+                  <thead>
+                    <tr><th></th><th>الطالب</th><th>عدد المواد</th><th>آخر نتيجة</th></tr>
+                  </thead>
+                  <tbody>
+                    {filteredStudentResults.map((student) => {
+                      const isExpanded = expandedStudentId === student.studentId;
+                      const lastResult = student.lastResult;
+                      const totalSubjects = student.totalSubjects;
+
+                      return (
+                        <React.Fragment key={student.studentId}>
+                          <tr style={{ cursor: "pointer" }} onClick={() => toggleStudentExpand(student.studentId)}>
+                            <td style={{ width: "40px" }}>
+                              <ChevronRight size={18} style={{ transform: isExpanded ? "rotate(90deg)" : "none", transition: "transform 0.2s" }} />
+                            </td>
+                            <td style={{ fontWeight: 600 }}>{student.studentName}</td>
+                            <td>{totalSubjects} مادة</td>
+                            <td>
+                              {lastResult ? (
+                                <>
+                                  <span style={{ color: lastResult.percentage >= 70 ? "#10b981" : lastResult.percentage >= 50 ? "#f59e0b" : "#ef4444", fontWeight: 700 }}>
+                                    {lastResult.score}/{lastResult.questionsCount} ({lastResult.percentage}%)
+                                  </span>
+                                  <span style={{ marginRight: "8px", fontSize: "0.8rem", color: "#64748b" }}>({lastResult.subjectName})</span>
+                                </>
+                              ) : "—"}
+                            </td>
+                          </tr>
+                          {isExpanded && (
+                            <tr>
+                              <td colSpan={4} style={{ padding: 0 }}>
+                                <div style={{ padding: "16px 20px", backgroundColor: "#fafbfc" }}>
+                                  {student.attempts.map((attempt, idx) => (
+                                    <div key={attempt.attemptId} style={{ marginBottom: idx < student.attempts.length - 1 ? "24px" : 0 }}>
+                                      <h4 style={{ margin: "0 0 12px 0", color: "#1e293b", fontSize: "1rem", fontWeight: 700 }}>
+                                        📅 محاولة {student.attempts.length - idx} - {new Date(attempt.attemptDate).toLocaleDateString("ar-EG")}
+                                      </h4>
+                                      <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                                        <thead>
+                                          <tr style={{ borderBottom: "1px solid #e2e8f0" }}>
+                                            <th style={{ padding: "8px", textAlign: "right", color: "#475569" }}>المادة</th>
+                                            <th style={{ padding: "8px", textAlign: "center", color: "#475569" }}>الدرجة</th>
+                                            <th style={{ padding: "8px", textAlign: "center", color: "#475569" }}>النسبة</th>
+                                          </tr>
+                                        </thead>
+                                        <tbody>
+                                          {attempt.results.map((res) => {
+                                            const percentage = Math.round((res.score / res.questionsCount) * 100);
+                                            return (
+                                              <tr key={res.id} style={{ borderBottom: "1px solid #edf2f7" }}>
+                                                <td style={{ padding: "8px", textAlign: "right" }}>{res.subjectName}</td>
+                                                <td style={{ padding: "8px", textAlign: "center" }}>{res.score} / {res.questionsCount}</td>
+                                                <td style={{ padding: "8px", textAlign: "center" }}>
+                                                  <span style={{ color: percentage >= 70 ? "#10b981" : percentage >= 50 ? "#f59e0b" : "#ef4444", fontWeight: 700 }}>{percentage}%</span>
+                                                </td>
+                                              </tr>
+                                            );
+                                          })}
+                                        </tbody>
+                                      </table>
+                                    </div>
+                                  ))}
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                        </React.Fragment>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              ) : (
+                <div className="empty-state"><div className="empty-icon">📊</div><h3>لا توجد نتائج</h3><p>{resultsSearchTerm ? "لا توجد نتائج مطابقة لبحثك" : "لم يتم تسجيل أي نتائج بعد"}</p></div>
+              )}
+            </div>
+          )}
         </div>
       </main>
 
@@ -485,14 +601,8 @@ export default function AdminDashboard() {
         .modern-table td { padding: 16px 20px; border-bottom: 1px solid #f1f5f9; color: #334155; vertical-align: middle; text-align: center; }
         .modern-table tbody tr:hover { background: #fbfcfd; }
         .text-center { text-align: center !important; }
-          .user-cell {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    justify-content: flex-start; /* تغيير من center إلى flex-start */
-    padding-right: 24px; /* مسافة ثابتة من الحافة اليمنى */
-  }
-        .nameColumn{text-align: right;}
+        .user-cell { display: flex; align-items: center; gap: 12px; justify-content: flex-start; padding-right: 24px; }
+        .nameColumn { text-align: right; }
         .user-avatar-small { width: 36px; height: 36px; background: #eff6ff; color: #3b82f6; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 1rem; }
         .user-name-cell { font-weight: 600; color: #1e293b; }
         .activate-btn-table { background: #3b82f6; color: white; border: none; padding: 8px 20px; border-radius: 30px; font-family: 'Cairo'; font-weight: 600; font-size: 0.85rem; cursor: pointer; transition: all 0.2s; display: inline-flex; align-items: center; gap: 6px; }
@@ -503,6 +613,8 @@ export default function AdminDashboard() {
         @keyframes spin { to { transform: rotate(360deg); } }
         .empty-state { padding: 60px 20px; text-align: center; color: #64748b; }
         .loading-spinner { width: 40px; height: 40px; border: 4px solid #e2e8f0; border-top-color: #3b82f6; border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 20px; }
+        .card-header-actions .search-wrapper { margin-bottom: 0; }
+        .card-header-actions .search-input { padding: 8px 36px 8px 12px; font-size: 0.9rem; }
         @media (max-width: 768px) {
           .dashboard-main { padding: 0 16px 24px; }
           .page-header { flex-direction: column; align-items: center; padding-right: 0; margin-bottom: 20px; }
