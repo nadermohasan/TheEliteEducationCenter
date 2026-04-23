@@ -6,7 +6,7 @@ import { toast } from "react-hot-toast";
 import Footer from "./Footer";
 import ConfirmDialog from "./ConfirmDialog";
 
-// --- مكون شاشة التحميل ---
+// --- مكون شاشة التحميل (بدون تغيير) ---
 const LoadingScreen = () => (
   <div className="loading-overlay">
     <div className="loading-content">
@@ -18,95 +18,19 @@ const LoadingScreen = () => (
         <p className="loading-text">جاري تحضير محاولة الاختبار...</p>
       </div>
     </div>
-
     <style>{`
       @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap');
-
-      .loading-overlay {
-        position: fixed;
-        inset: 0;
-        background: #f8fafc;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        z-index: 9999;
-        direction: rtl;
-        font-family: 'Cairo', sans-serif;
-        overflow: hidden;
-      }
-
-      .loading-overlay::before {
-        content: '';
-        position: absolute;
-        width: 150%;
-        height: 150%;
-        background: radial-gradient(circle at center, rgba(59, 130, 246, 0.05) 0%, transparent 70%);
-        animation: rotateBg 10s linear infinite;
-      }
-
-      @keyframes rotateBg {
-        from { transform: rotate(0deg); }
-        to { transform: rotate(360deg); }
-      }
-
-      .loading-content {
-        position: relative;
-        text-align: center;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        gap: 20px; 
-      }
-
-      .loading-title {
-        color: #1e293b; 
-        font-size: 1.8rem;
-        font-weight: 700;
-        margin-bottom: 15px;
-        letter-spacing: 0.5px;
-      }
-
-      .loading-text {
-        color: #64748b; 
-        font-size: 1rem;
-        margin-top: 15px;
-        animation: fadeInOut 2s infinite;
-      }
-
-      .loading-bar-container {
-        width: 260px;
-        height: 6px;
-        background: #e2e8f0; 
-        border-radius: 10px;
-        position: relative;
-        overflow: hidden;
-        margin: 0 auto;
-      }
-
-      .loading-bar-shimmer {
-        position: absolute;
-        top: 0;
-        left: 0;
-        height: 100%;
-        width: 40%;
-        background: linear-gradient(90deg, transparent, #3b82f6, transparent);
-        animation: shimmer 1.5s infinite ease-in-out;
-      }
-
-      @keyframes shimmer {
-        0% { left: -50%; }
-        100% { left: 150%; }
-      }
-
-      @keyframes fadeInOut {
-        0%, 100% { opacity: 0.7; }
-        50% { opacity: 1; }
-      }
-
-      @media (max-width: 480px) {
-        .loading-title { font-size: 1.5rem; }
-        .loading-bar-container { width: 200px; }
-      }
+      .loading-overlay{position:fixed;inset:0;background:#f8fafc;display:flex;align-items:center;justify-content:center;z-index:9999;direction:rtl;font-family:'Cairo',sans-serif;overflow:hidden}
+      .loading-overlay::before{content:'';position:absolute;width:150%;height:150%;background:radial-gradient(circle at center,rgba(59,130,246,0.05) 0%,transparent 70%);animation:rotateBg 10s linear infinite}
+      @keyframes rotateBg{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+      .loading-content{position:relative;text-align:center;display:flex;flex-direction:column;align-items:center;gap:20px}
+      .loading-title{color:#1e293b;font-size:1.8rem;font-weight:700;margin-bottom:15px;letter-spacing:0.5px}
+      .loading-text{color:#64748b;font-size:1rem;margin-top:15px;animation:fadeInOut 2s infinite}
+      .loading-bar-container{width:260px;height:6px;background:#e2e8f0;border-radius:10px;position:relative;overflow:hidden;margin:0 auto}
+      .loading-bar-shimmer{position:absolute;top:0;left:0;height:100%;width:40%;background:linear-gradient(90deg,transparent,#3b82f6,transparent);animation:shimmer 1.5s infinite ease-in-out}
+      @keyframes shimmer{0%{left:-50%}100%{left:150%}}
+      @keyframes fadeInOut{0%,100%{opacity:0.7}50%{opacity:1}}
+      @media (max-width:480px){.loading-title{font-size:1.5rem}.loading-bar-container{width:200px}}
     `}</style>
   </div>
 );
@@ -145,6 +69,7 @@ export default function QuizPage() {
     blocksRef.current = blocks;
     selectedAnswersRef.current = selectedAnswers;
   }, [blocks, selectedAnswers]);
+
   useEffect(() => {
     if (subjectName) {
       document.title = `${subjectName} - مركز النخبة التعليمي`;
@@ -168,7 +93,7 @@ export default function QuizPage() {
       const data = { timeLeft: currentTimeLeft, timestamp: Date.now() };
       localStorage.setItem(key, JSON.stringify(data));
     },
-    [getTimerStorageKey],
+    [getTimerStorageKey]
   );
 
   const clearTimerState = useCallback(() => {
@@ -293,7 +218,7 @@ export default function QuizPage() {
         return false;
       }
     },
-    [navigate, submitting, clearTimerState],
+    [navigate, submitting, clearTimerState]
   );
 
   const handleAutoSubmit = useCallback(() => {
@@ -334,17 +259,8 @@ export default function QuizPage() {
     }
   }, [timeLeft, loading, studentId, attemptId, saveTimerState]);
 
-  // --- جلب بيانات الاختبار ---
+  // --- جلب بيانات الاختبار (مع تعديل بسيط لحساب displayTotalCount) ---
   const fetchQuizData = useCallback(async () => {
-    const { data: subjectInfo } = await supabase
-      .from("subjects")
-      .select("name, duration_minutes")
-      .eq("id", numericSubjectId)
-      .single();
-
-    const isEnglish = subjectInfo?.name?.includes("إنجليزية") || false;
-    setIsEnglishSubject(isEnglish);
-    setSubjectName(subjectInfo?.name || "اختبار");
     setLoading(true);
     try {
       const {
@@ -390,7 +306,7 @@ export default function QuizPage() {
       let { data: qData } = await supabase
         .from("questions")
         .select(
-          "*, image_option_a, image_option_b, image_option_c, image_option_d",
+          "*, image_option_a, image_option_b, image_option_c, image_option_d"
         )
         .in("id", questionIds)
         .order("created_at", { ascending: true });
@@ -409,6 +325,7 @@ export default function QuizPage() {
 
       const isEnglish = subjectInfo?.name?.includes("إنجليزية") || false;
       setIsEnglishSubject(isEnglish);
+      setSubjectName(subjectInfo?.name || "اختبار");
 
       const durationMinutes = subjectInfo?.duration_minutes || 60;
       const defaultTime = durationMinutes * 60;
@@ -452,12 +369,12 @@ export default function QuizPage() {
           } else standalone.push(q);
         });
         const sortedPassages = passages.sort(
-          (a, b) => new Date(a.created_at) - new Date(b.created_at),
+          (a, b) => new Date(a.created_at) - new Date(b.created_at)
         );
         for (const passage of sortedPassages) {
           const questionsOfPassage = passageQuestionsMap.get(passage.id) || [];
           questionsOfPassage.sort(
-            (a, b) => new Date(a.created_at) - new Date(b.created_at),
+            (a, b) => new Date(a.created_at) - new Date(b.created_at)
           );
           finalBlocks.push({
             type: "passage",
@@ -466,7 +383,7 @@ export default function QuizPage() {
           });
         }
         standalone.forEach((q) =>
-          finalBlocks.push({ type: "single", question: q }),
+          finalBlocks.push({ type: "single", question: q })
         );
       } else {
         finalBlocks = qData.map((q) => ({ type: "single", question: q }));
@@ -490,6 +407,7 @@ export default function QuizPage() {
       if (timerRef.current) clearInterval(timerRef.current);
     };
   }, [subjectId, fetchQuizData, numericSubjectId]);
+
   useEffect(() => {
     document.title = "محاولة اختبار";
   }, []);
@@ -499,7 +417,7 @@ export default function QuizPage() {
     const totalQuestions = blocks.reduce(
       (acc, block) =>
         acc + (block.type === "passage" ? block.questions.length : 1),
-      0,
+      0
     );
     const answeredCount = Object.keys(selectedAnswers).length;
     const unanswered = totalQuestions - answeredCount;
@@ -611,14 +529,25 @@ export default function QuizPage() {
   const passagesCount = blocks.filter((b) => b.type === "passage").length;
   const totalQuestionsCount = blocks.reduce(
     (acc, b) => acc + (b.type === "passage" ? b.questions.length : 1),
-    0,
+    0
   );
+
+  // --- حساب الترقيم القديم (للإجمالي الفعلي) ---
   let currentQuestionNumber = 0;
   for (let i = 0; i < currentBlockIndex; i++) {
     const b = blocks[i];
     currentQuestionNumber += b.type === "passage" ? b.questions.length : 1;
   }
   currentQuestionNumber++;
+
+  // --- حساب الترقيم للعرض (للغة الإنجليزية) ---
+  // كل قطعة = 1، كل سؤال منفرد = 1
+  const displayTotalCount = blocks.length;
+  let currentDisplayNumber = 0;
+  for (let i = 0; i < currentBlockIndex; i++) {
+    currentDisplayNumber++;
+  }
+  currentDisplayNumber++;
 
   const answeredCount = Object.keys(selectedAnswers).length;
   const progress =
@@ -640,8 +569,8 @@ export default function QuizPage() {
               timeLeft < 60
                 ? "time-critical"
                 : timeLeft < 300
-                  ? "time-warning"
-                  : ""
+                ? "time-warning"
+                : ""
             }
           >
             {formatTime(timeLeft)}
@@ -673,11 +602,15 @@ export default function QuizPage() {
           <div className="question-card">
             <div className="q-header">
               <span className="q-number">
-                {isEnglishSubject && currentBlock.type === "passage" ? (
-                  <>
-                    القطعة {currentBlockIndex + 1} من {passagesCount} • السؤال{" "}
-                    {currentQuestionNumber} من {totalQuestionsCount}
-                  </>
+                {isEnglishSubject ? (
+                  currentBlock.type === "passage" ? (
+                    <>
+                      القطعة {currentBlockIndex + 1} من {passagesCount} • السؤال{" "}
+                      {currentDisplayNumber} من {displayTotalCount}
+                    </>
+                  ) : (
+                    `السؤال ${currentDisplayNumber} من ${displayTotalCount}`
+                  )
                 ) : (
                   `السؤال ${currentQuestionNumber} من ${totalQuestionsCount}`
                 )}
@@ -779,7 +712,7 @@ export default function QuizPage() {
                 let isCompleted = false;
                 if (block.type === "passage") {
                   const allAnswered = block.questions.every(
-                    (q) => selectedAnswers[q.id] !== undefined,
+                    (q) => selectedAnswers[q.id] !== undefined
                   );
                   isCompleted = allAnswered;
                   label = `${idx + 1}`;
