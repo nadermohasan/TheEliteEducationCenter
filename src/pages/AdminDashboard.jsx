@@ -1,10 +1,12 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { supabase } from "../supabaseClient";
+import { useNavigate } from "react-router-dom";
 import { toast } from "react-hot-toast";
 import Footer from "./Footer";
 import Navbar from "./Navbar";
 import {
-  Users, CheckCircle, Search, TrendingUp, RefreshCw
+  Users, CheckCircle, Search, TrendingUp, RefreshCw,
+  Award, ChevronDown, ChevronRight
 } from "lucide-react";
 
 export default function AdminDashboard() {
@@ -12,68 +14,170 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [processingId, setProcessingId] = useState(null);
+  const [adminProfile, setAdminProfile] = useState(null);
   const [stats, setStats] = useState({ totalStudents: 0, activeAttempts: 0 });
   const [activeAttemptsMap, setActiveAttemptsMap] = useState({});
 
-  // ================= FETCH =================
+  // نتائج الطلاب مجمعة حسب الطالب ثم حسب المحاولة
+  const [studentResults, setStudentResults] = useState([]);
+  const [resultsLoading, setResultsLoading] = useState(false);
+  const [resultsSearchTerm, setResultsSearchTerm] = useState("");
+  const [showResults, setShowResults] = useState(false);
+  const [expandedStudentId, setExpandedStudentId] = useState(null);
+
+  const navigate = useNavigate();
 
   const fetchStats = useCallback(async () => {
-    const { count: totalStudents } = await supabase
-      .from("profiles")
-      .select("*", { count: "exact", head: true })
-      .eq("role", "student");
+    try {
+      const { count: totalStudents, error: studentsError } = await supabase
+        .from("profiles")
+        .select("*", { count: "exact", head: true })
+        .eq("role", "student");
+      if (studentsError) throw studentsError;
 
-    const { count: activeAttempts } = await supabase
+      const { count: activeAttempts, error: attemptsError } = await supabase
+        .from("attempts")
+        .select("*", { count: "exact", head: true })
+        .eq("status", "active");
+      if (attemptsError) throw attemptsError;
+
+      setStats({
+        totalStudents: totalStudents || 0,
+        activeAttempts: activeAttempts || 0,
+      });
+    } catch (error) {
+      console.error("Error fetching stats:", error);
+    }
+  }, []);
+
+  const fetchAdminProfile = useCallback(async () => {
+    const { data: { user: currentUser } } = await supabase.auth.getUser();
+    if (currentUser) {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("name")
+        .eq("id", currentUser.id)
+        .single();
+      setAdminProfile(profile);
+    }
+  }, []);
+
+  const fetchActiveAttempts = useCallback(async () => {
+    const { data, error } = await supabase
       .from("attempts")
-      .select("*", { count: "exact", head: true })
+      .select("student_id, status")
       .eq("status", "active");
 
-    setStats({
-      totalStudents: totalStudents || 0,
-      activeAttempts: activeAttempts || 0,
-    });
+    if (!error && data) {
+      const map = {};
+      data.forEach((attempt) => { map[attempt.student_id] = true; });
+      setActiveAttemptsMap(map);
+    }
   }, []);
 
   const fetchUsers = useCallback(async () => {
     setLoading(true);
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("profiles")
       .select("*")
       .eq("role", "student")
       .order("created_at", { ascending: false });
 
-    setUsers(data || []);
+    if (!error) setUsers(data);
+    else console.error("fetchUsers error:", error);
     setLoading(false);
   }, []);
 
-  const fetchActiveAttempts = useCallback(async () => {
-    const { data } = await supabase
-      .from("attempts")
-      .select("student_id, status")
-      .eq("status", "active");
-
-    const map = {};
-    (data || []).forEach(a => (map[a.student_id] = true));
-    setActiveAttemptsMap(map);
-  }, []);
-
-  const refreshAll = () => {
+  const refreshAllData = useCallback(() => {
     fetchUsers();
     fetchStats();
     fetchActiveAttempts();
-  };
+  }, [fetchUsers, fetchStats, fetchActiveAttempts]);
 
-  useEffect(() => {
-    fetchUsers();
-    fetchStats();
-    fetchActiveAttempts();
+  const fetchResults = useCallback(async () => {
+    setResultsLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from("results")
+        .select(`
+          id, score, created_at, student_id, subject_id, attempt_id,
+          profiles ( name ),
+          subjects ( name, questions_count )
+        `)
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+
+      const studentMap = new Map();
+      (data || []).forEach((result) => {
+        const studentId = result.student_id;
+        const studentName = result.profiles?.name || "غير معروف";
+        const attemptId = result.attempt_id;
+
+        if (!studentMap.has(studentId)) {
+          studentMap.set(studentId, {
+            studentId,
+            studentName,
+            attempts: new Map()
+          });
+        }
+
+        const studentRecord = studentMap.get(studentId);
+        if (!studentRecord.attempts.has(attemptId)) {
+          studentRecord.attempts.set(attemptId, {
+            attemptId,
+            attemptDate: result.created_at,
+            results: []
+          });
+        }
+
+        studentRecord.attempts.get(attemptId).results.push({
+          id: result.id,
+          subjectName: result.subjects?.name || "غير معروف",
+          subjectId: result.subject_id,
+          score: result.score,
+          questionsCount: result.subjects?.questions_count || 40,
+          created_at: result.created_at
+        });
+      });
+
+      const aggregated = Array.from(studentMap.values()).map(student => {
+        const attemptsArray = Array.from(student.attempts.values()).sort(
+          (a, b) => new Date(b.attemptDate) - new Date(a.attemptDate)
+        );
+        const uniqueSubjects = new Set();
+        attemptsArray.forEach(att => att.results.forEach(res => uniqueSubjects.add(res.subjectId)));
+        const totalSubjects = uniqueSubjects.size;
+        const lastAttempt = attemptsArray[0];
+        const lastResult = lastAttempt?.results[0];
+
+        return {
+          studentId: student.studentId,
+          studentName: student.studentName,
+          totalSubjects,
+          lastResult: lastResult ? {
+            ...lastResult,
+            percentage: Math.round((lastResult.score / lastResult.questionsCount) * 100)
+          } : null,
+          attempts: attemptsArray
+        };
+      }).sort((a, b) => {
+        const aLatest = a.lastResult?.created_at || "";
+        const bLatest = b.lastResult?.created_at || "";
+        return bLatest.localeCompare(aLatest);
+      });
+
+      setStudentResults(aggregated);
+    } catch (error) {
+      console.error("Error fetching results:", error);
+      toast.error("فشل جلب النتائج");
+    } finally {
+      setResultsLoading(false);
+    }
   }, []);
-
-  // ================= ACTION =================
 
   const handleActivateAttempt = async (studentId) => {
     setProcessingId(studentId);
-
     try {
       await supabase
         .from("attempts")
@@ -81,239 +185,446 @@ export default function AdminDashboard() {
         .eq("student_id", studentId)
         .eq("status", "active");
 
-      await supabase
+      const { data: newAttempt, error: attemptError } = await supabase
         .from("attempts")
-        .insert([{ student_id: studentId, status: "active" }]);
+        .insert([{ student_id: studentId, status: "active" }])
+        .select()
+        .single();
+      if (attemptError) throw attemptError;
 
-      toast.success("تم التفعيل ✅");
-      refreshAll();
+      const { data: studentProfile } = await supabase
+        .from("profiles")
+        .select("branch")
+        .eq("id", studentId)
+        .single();
+      const studentBranch = studentProfile?.branch?.trim() || null;
+
+      const { data: subjects } = await supabase
+        .from("subjects")
+        .select("id, name, questions_count");
+      if (!subjects || subjects.length === 0)
+        throw new Error("لا توجد مواد مسجلة في النظام");
+
+      let allInsertData = [];
+
+      for (const subject of subjects) {
+        const targetCount = subject.questions_count || 40;
+
+        let query = supabase
+          .from("questions")
+          .select("id, passage_id, unit_number")
+          .eq("subject_id", subject.id)
+          .eq("is_active", true);
+
+        if (studentBranch) {
+          query = query.or(`branch.is.null,branch.eq.${studentBranch}`);
+        }
+
+        const { data: questions, error: qError } = await query;
+        if (qError) throw qError;
+        if (!questions || questions.length === 0) continue;
+
+        const isEnglish = subject.name.includes("إنجليزية");
+
+        if (isEnglish) {
+          const passageMap = new Map();
+          const standaloneQuestions = [];
+          questions.forEach((q) => {
+            if (q.passage_id) {
+              if (!passageMap.has(q.passage_id)) passageMap.set(q.passage_id, []);
+              passageMap.get(q.passage_id).push(q);
+            } else {
+              standaloneQuestions.push(q);
+            }
+          });
+
+          const passages = Array.from(passageMap.entries()).map(([passageId, qs]) => ({
+            passageId,
+            questions: qs,
+            count: qs.length,
+          }));
+          passages.sort((a, b) => b.count - a.count);
+
+          let selectedQuestions = [];
+          let remaining = targetCount;
+
+          for (const passage of passages) {
+            if (remaining <= 0) break;
+            if (passage.count <= remaining) {
+              selectedQuestions.push(...passage.questions);
+              remaining -= passage.count;
+            } else {
+              const shuffled = [...passage.questions].sort(() => 0.5 - Math.random());
+              selectedQuestions.push(...shuffled.slice(0, remaining));
+              remaining = 0;
+              break;
+            }
+          }
+
+          if (remaining > 0 && standaloneQuestions.length > 0) {
+            const shuffledStandalone = [...standaloneQuestions].sort(() => 0.5 - Math.random());
+            const take = Math.min(remaining, shuffledStandalone.length);
+            selectedQuestions.push(...shuffledStandalone.slice(0, take));
+            remaining -= take;
+          }
+
+          if (remaining > 0) {
+            const selectedIds = new Set(selectedQuestions.map((q) => q.id));
+            const allRemaining = questions.filter((q) => !selectedIds.has(q.id));
+            const shuffled = [...allRemaining].sort(() => 0.5 - Math.random());
+            selectedQuestions.push(...shuffled.slice(0, remaining));
+          }
+
+          const insertData = selectedQuestions.map((q) => ({
+            attempt_id: newAttempt.id,
+            subject_id: subject.id,
+            question_id: q.id,
+          }));
+          allInsertData.push(...insertData);
+        } else {
+          const unitMap = new Map();
+          questions.forEach((q) => {
+            const unit = q.unit_number || 0;
+            if (!unitMap.has(unit)) unitMap.set(unit, []);
+            unitMap.get(unit).push(q);
+          });
+
+          const units = Array.from(unitMap.keys());
+          if (units.length === 0) continue;
+
+          let selectedQuestions = [];
+          const targetPerUnit = Math.floor(targetCount / units.length);
+          let remaining = targetCount;
+
+          for (const unit of units) {
+            const unitQuestions = unitMap.get(unit);
+            const take = Math.min(targetPerUnit, unitQuestions.length, remaining);
+            const shuffled = [...unitQuestions].sort(() => 0.5 - Math.random());
+            selectedQuestions.push(...shuffled.slice(0, take));
+            remaining -= take;
+          }
+
+          if (remaining > 0) {
+            const selectedIds = new Set(selectedQuestions.map((q) => q.id));
+            const allRemaining = questions.filter((q) => !selectedIds.has(q.id));
+            const shuffled = [...allRemaining].sort(() => 0.5 - Math.random());
+            selectedQuestions.push(...shuffled.slice(0, remaining));
+          }
+
+          const insertData = selectedQuestions.map((q) => ({
+            attempt_id: newAttempt.id,
+            subject_id: subject.id,
+            question_id: q.id,
+          }));
+          allInsertData.push(...insertData);
+        }
+      }
+
+      if (allInsertData.length === 0)
+        throw new Error("لا توجد أسئلة نشطة مناسبة لهذا الطالب");
+
+      const { error: insertError } = await supabase
+        .from("attempt_questions")
+        .insert(allInsertData);
+      if (insertError) throw insertError;
+
+      toast.success("تم تفعيل محاولة جديدة بنجاح!");
+      await fetchStats();
+      await fetchActiveAttempts();
     } catch (e) {
-      toast.error("خطأ ❌");
+      toast.error("خطأ: " + e.message);
+    } finally {
+      setProcessingId(null);
     }
-
-    setProcessingId(null);
   };
 
   const filteredUsers = users.filter(
-    (u) =>
-      u.name?.includes(searchTerm) ||
-      u.username?.includes(searchTerm)
+    (u) => u.name?.includes(searchTerm) || u.username?.includes(searchTerm)
   );
 
-  // ================= UI =================
+  const filteredStudentResults = studentResults.filter((student) =>
+    student.studentName?.includes(resultsSearchTerm)
+  );
+
+  const todayNewStudents = users.filter((u) => {
+    const createdDate = new Date(u.created_at);
+    const today = new Date();
+    return createdDate.toDateString() === today.toDateString();
+  }).length;
+
+  const toggleStudentExpand = (studentId) => {
+    setExpandedStudentId(expandedStudentId === studentId ? null : studentId);
+  };
+
+  useEffect(() => {
+    fetchUsers();
+    fetchAdminProfile();
+    fetchStats();
+    fetchActiveAttempts();
+    fetchResults();
+  }, [fetchUsers, fetchAdminProfile, fetchStats, fetchActiveAttempts, fetchResults]);
 
   return (
-    <div className="container">
-      <Navbar userName="مدير النظام" />
+    <div className="dashboard-container">
+      <Navbar userName={adminProfile?.name || "مدير النظام"} />
 
-      <main className="main">
-
-        {/* HEADER */}
-        <div className="header">
-          <h1>إدارة الطلاب</h1>
-        </div>
-
-        {/* STATS */}
-        <div className="stats">
-          <div className="card">
-            <Users />
-            <div>
-              <span>عدد الطلاب</span>
-              <h2>{stats.totalStudents}</h2>
-            </div>
-          </div>
-
-          <div className="card">
-            <CheckCircle />
-            <div>
-              <span>محاولات نشطة</span>
-              <h2>{stats.activeAttempts}</h2>
-            </div>
-          </div>
-
-          <div className="card">
-            <TrendingUp />
-            <div>
-              <span>اليوم</span>
-              <h2>
-                {
-                  users.filter(u =>
-                    new Date(u.created_at).toDateString() === new Date().toDateString()
-                  ).length
-                }
-              </h2>
-            </div>
+      <main className="dashboard-main">
+        <div className="page-header">
+          <div>
+            <h1 className="page-title">إدارة الطلاب</h1>
           </div>
         </div>
 
-        {/* SEARCH */}
-        <div className="search">
-          <Search />
+        <div className="stats-grid">
+          <div className="stat-card">
+            <div className="stat-icon-wrapper blue"><Users size={24} /></div>
+            <div className="stat-content"><span className="stat-label">إجمالي الطلاب</span><span className="stat-number">{stats.totalStudents}</span></div>
+          </div>
+          <div className="stat-card">
+            <div className="stat-icon-wrapper green"><CheckCircle size={24} /></div>
+            <div className="stat-content"><span className="stat-label">محاولات نشطة</span><span className="stat-number">{stats.activeAttempts}</span></div>
+          </div>
+          <div className="stat-card">
+            <div className="stat-icon-wrapper purple"><TrendingUp size={24} /></div>
+            <div className="stat-content"><span className="stat-label">طلاب مسجلين اليوم</span><span className="stat-number">{todayNewStudents}</span></div>
+          </div>
+        </div>
+
+        <div className="search-wrapper">
+          <Search className="search-icon" size={20} />
           <input
-            placeholder="بحث..."
+            type="text"
+            placeholder="بحث عن اسم الطالب..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
+            className="search-input"
           />
-          {searchTerm && (
-            <button onClick={() => setSearchTerm("")}>✖</button>
+        </div>
+
+        <div className="table-card">
+          <div className="card-header">
+            <h2 className="card-title"><Users size={20} className="icon-blue" /> قائمة الطلاب</h2>
+            <div className="card-header-actions">
+              <span className="badge-count">{filteredUsers.length} طالب</span>
+              <button className="refresh-btn-table" onClick={refreshAllData}>
+                <RefreshCw size={16} /> <span>تحديث</span>
+              </button>
+            </div>
+          </div>
+          <div className="table-responsive">
+            {loading ? (
+              <div className="empty-state"><div className="loading-spinner"></div><p>جاري تحميل الطلاب...</p></div>
+            ) : filteredUsers.length > 0 ? (
+              <table className="modern-table">
+                <thead>
+                  <tr><th className="nameColumn">الاسم</th><th>الفرع</th><th>تاريخ التسجيل</th><th className="text-center">الإجراءات</th></tr>
+                </thead>
+                <tbody>
+                  {filteredUsers.map((user) => {
+                    const hasActiveAttempt = activeAttemptsMap[user.id];
+                    return (
+                      <tr key={user.id}>
+                        <td><div className="user-cell"><div className="user-avatar-small">{user.name?.charAt(0) || "ط"}</div><span className="user-name-cell">{user.name || "غير محدد"}</span></div></td>
+                        <td><span className="subject-badge" style={{ color: "#475569" }}>{user.branch || "—"}</span></td>
+                        <td>{new Date(user.created_at).toLocaleDateString("ar-EG")}</td>
+                        <td className="text-center">
+                          {hasActiveAttempt ? (
+                            <button className="activate-btn-table active-attempt" disabled style={{ background: "#10b981", cursor: "default" }}>✔ محاولة مفعلة</button>
+                          ) : (
+                            <button className="activate-btn-table" onClick={() => handleActivateAttempt(user.id)} disabled={processingId === user.id}>
+                              {processingId === user.id ? (<><span className="spinner-small"></span>جاري...</>) : ("✚ تفعيل محاولـة")}
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            ) : (
+              <div className="empty-state"><div className="empty-icon">📭</div><h3>لا يوجد طلاب</h3><p>لم يتم العثور على أي طالب مطابق لبحثك</p></div>
+            )}
+          </div>
+        </div>
+
+        {/* قسم نتائج الطلاب مجمعة حسب الطالب والمحاولة */}
+        <div className="table-card" style={{ marginTop: "20px" }}>
+          <div
+            className="card-header"
+            style={{ cursor: "pointer" }}
+            onClick={() => {
+              if (!showResults && studentResults.length === 0) fetchResults();
+              setShowResults(!showResults);
+            }}
+          >
+            <h2 className="card-title"><Award size={20} className="icon-blue" /> نتائج الاختبارات</h2>
+            <div className="card-header-actions">
+              {showResults && (
+                <div style={{ width: "260px" }} onClick={(e) => e.stopPropagation()}>
+                  <div className="search-wrapper" style={{ marginBottom: 0 }}>
+                    <Search className="search-icon" size={16} />
+                    <input
+                      type="text"
+                      placeholder="بحث عن طالب..."
+                      value={resultsSearchTerm}
+                      onChange={(e) => setResultsSearchTerm(e.target.value)}
+                      className="search-input"
+                      style={{ padding: "10px 40px 10px 15px", fontSize: "0.9rem" }}
+                    />
+                  </div>
+                </div>
+              )}
+              <span className="badge-count">{filteredStudentResults.length} طالب</span>
+              <ChevronDown size={20} style={{ transform: showResults ? "rotate(180deg)" : "none", transition: "transform 0.2s" }} />
+            </div>
+          </div>
+
+          {showResults && (
+            <div className="table-responsive">
+              {resultsLoading ? (
+                <div className="empty-state"><div className="loading-spinner"></div><p>جاري تحميل النتائج...</p></div>
+              ) : filteredStudentResults.length > 0 ? (
+                <table className="modern-table">
+                  <thead>
+                    <tr><th></th><th>الطالب</th><th>عدد المواد</th><th>آخر نتيجة</th></tr>
+                  </thead>
+                  <tbody>
+                    {filteredStudentResults.map((student) => {
+                      const isExpanded = expandedStudentId === student.studentId;
+                      const lastResult = student.lastResult;
+                      const totalSubjects = student.totalSubjects;
+
+                      return (
+                        <React.Fragment key={student.studentId}>
+                          <tr style={{ cursor: "pointer" }} onClick={() => toggleStudentExpand(student.studentId)}>
+                            <td style={{ width: "40px" }}>
+                              <ChevronRight size={18} style={{ transform: isExpanded ? "rotate(90deg)" : "none", transition: "transform 0.2s" }} />
+                            </td>
+                            <td style={{ fontWeight: 600 }}>{student.studentName}</td>
+                            <td>{totalSubjects} مادة</td>
+                            <td>
+                              {lastResult ? (
+                                <>
+                                  <span style={{ color: lastResult.percentage >= 70 ? "#10b981" : lastResult.percentage >= 50 ? "#f59e0b" : "#ef4444", fontWeight: 700 }}>
+                                    {lastResult.score}/{lastResult.questionsCount} ({lastResult.percentage}%)
+                                  </span>
+                                  <span style={{ marginRight: "8px", fontSize: "0.8rem", color: "#64748b" }}>({lastResult.subjectName})</span>
+                                </>
+                              ) : "—"}
+                            </td>
+                          </tr>
+                          {isExpanded && (
+                            <tr>
+                              <td colSpan={4} style={{ padding: 0 }}>
+                                <div style={{ padding: "16px 20px", backgroundColor: "#fafbfc" }}>
+                                  {student.attempts.map((attempt, idx) => (
+                                    <div key={attempt.attemptId} style={{ marginBottom: idx < student.attempts.length - 1 ? "24px" : 0 }}>
+                                      <h4 style={{ margin: "0 0 12px 0", color: "#1e293b", fontSize: "1rem", fontWeight: 700 }}>
+                                        📅 محاولة {student.attempts.length - idx} - {new Date(attempt.attemptDate).toLocaleDateString("ar-EG")}
+                                      </h4>
+                                      <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                                        <thead>
+                                          <tr style={{ borderBottom: "1px solid #e2e8f0" }}>
+                                            <th style={{ padding: "8px", textAlign: "right", color: "#475569" }}>المادة</th>
+                                            <th style={{ padding: "8px", textAlign: "center", color: "#475569" }}>الدرجة</th>
+                                            <th style={{ padding: "8px", textAlign: "center", color: "#475569" }}>النسبة</th>
+                                          </tr>
+                                        </thead>
+                                        <tbody>
+                                          {attempt.results.map((res) => {
+                                            const percentage = Math.round((res.score / res.questionsCount) * 100);
+                                            return (
+                                              <tr key={res.id} style={{ borderBottom: "1px solid #edf2f7" }}>
+                                                <td style={{ padding: "8px", textAlign: "right" }}>{res.subjectName}</td>
+                                                <td style={{ padding: "8px", textAlign: "center" }}>{res.score} / {res.questionsCount}</td>
+                                                <td style={{ padding: "8px", textAlign: "center" }}>
+                                                  <span style={{ color: percentage >= 70 ? "#10b981" : percentage >= 50 ? "#f59e0b" : "#ef4444", fontWeight: 700 }}>{percentage}%</span>
+                                                </td>
+                                              </tr>
+                                            );
+                                          })}
+                                        </tbody>
+                                      </table>
+                                    </div>
+                                  ))}
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                        </React.Fragment>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              ) : (
+                <div className="empty-state"><div className="empty-icon">📊</div><h3>لا توجد نتائج</h3><p>{resultsSearchTerm ? "لا توجد نتائج مطابقة لبحثك" : "لم يتم تسجيل أي نتائج بعد"}</p></div>
+              )}
+            </div>
           )}
         </div>
-
-        {/* DESKTOP TABLE */}
-        <div className="table">
-          {loading ? (
-            <p>Loading...</p>
-          ) : (
-            <table>
-              <thead>
-                <tr>
-                  <th>الاسم</th>
-                  <th>الفرع</th>
-                  <th>التاريخ</th>
-                  <th>الإجراء</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredUsers.map((u) => {
-                  const active = activeAttemptsMap[u.id];
-
-                  return (
-                    <tr key={u.id}>
-                      <td>{u.name}</td>
-                      <td>{u.branch}</td>
-                      <td>
-                        {new Date(u.created_at).toLocaleDateString()}
-                      </td>
-                      <td>
-                        <button
-                          onClick={() => handleActivateAttempt(u.id)}
-                          disabled={active || processingId === u.id}
-                        >
-                          {active ? "✔" : "تفعيل"}
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          )}
-        </div>
-
-        {/* MOBILE CARDS */}
-        <div className="cards">
-          {filteredUsers.map((u) => {
-            const active = activeAttemptsMap[u.id];
-
-            return (
-              <div className="user-card" key={u.id}>
-                <h3>{u.name}</h3>
-                <p>{u.branch}</p>
-                <small>
-                  {new Date(u.created_at).toLocaleDateString()}
-                </small>
-
-                <button
-                  onClick={() => handleActivateAttempt(u.id)}
-                  disabled={active || processingId === u.id}
-                >
-                  {active ? "✔ مفعلة" : "تفعيل"}
-                </button>
-              </div>
-            );
-          })}
-        </div>
-
       </main>
 
       <Footer />
 
-      {/* ================= CSS ================= */}
       <style>{`
-        body { font-family: Cairo; }
-
-        .main {
-          max-width: 1100px;
-          margin: auto;
-          padding: 20px;
-        }
-
-        .header {
-          text-align: center;
-          margin-bottom: 20px;
-        }
-
-        .stats {
-          display: grid;
-          grid-template-columns: repeat(auto-fit,minmax(200px,1fr));
-          gap: 10px;
-          margin-bottom: 20px;
-        }
-
-        .card {
-          background: white;
-          padding: 15px;
-          border-radius: 12px;
-          display: flex;
-          gap: 10px;
-          align-items: center;
-        }
-
-        .search {
-          display: flex;
-          gap: 10px;
-          margin-bottom: 20px;
-          background: white;
-          padding: 10px;
-          border-radius: 30px;
-        }
-
-        .search input {
-          flex: 1;
-          border: none;
-          outline: none;
-        }
-
-        table {
-          width: 100%;
-        }
-
-        th, td {
-          padding: 10px;
-          text-align: center;
-        }
-
-        button {
-          padding: 8px 12px;
-          border-radius: 10px;
-          border: none;
-          background: #3b82f6;
-          color: white;
-        }
-
-        /* MOBILE */
-        .cards { display: none; }
-
+        @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap');
+        * { box-sizing: border-box; margin: 0; }
+        .dashboard-container { direction: rtl; font-family: 'Cairo', sans-serif; background: linear-gradient(180deg, #f4f7fc 0%, #e9f0f9 100%); min-height: 100vh; display: flex; flex-direction: column; }
+        .dashboard-main { flex: 1; width: 100%; max-width: 1280px; margin: 0 auto; padding: 0 24px 32px; }
+        .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 32px; padding-right: 42%; }
+        .page-title { font-size: 2rem; font-weight: 800; color: #0f172a; margin-bottom: 6px; text-align: right; }
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 20px; margin-bottom: 32px; }
+        .stat-card { background: white; border-radius: 20px; padding: 20px 24px; display: flex; align-items: center; gap: 18px; box-shadow: 0 6px 14px rgba(0,0,0,0.02); border: 1px solid #edf2f7; transition: transform 0.2s, box-shadow 0.2s; }
+        .stat-card:hover { transform: translateY(-3px); box-shadow: 0 12px 20px rgba(0,0,0,0.04); }
+        .stat-icon-wrapper { width: 52px; height: 52px; border-radius: 16px; display: flex; align-items: center; justify-content: center; color: white; flex-shrink: 0; }
+        .stat-icon-wrapper.blue { background: linear-gradient(145deg, #3b82f6, #2563eb); }
+        .stat-icon-wrapper.green { background: linear-gradient(145deg, #10b981, #059669); }
+        .stat-icon-wrapper.purple { background: linear-gradient(145deg, #8b5cf6, #7c3aed); }
+        .stat-content { display: flex; flex-direction: column; align-items: center; flex: 1; text-align: center; }
+        .stat-label { font-size: 0.9rem; font-weight: 600; color: #64748b; margin-bottom: 4px; }
+        .stat-number { font-size: 2rem; font-weight: 800; color: #1e293b; line-height: 1; }
+        .search-wrapper { position: relative; margin-bottom: 32px; }
+        .search-icon { position: absolute; right: 18px; top: 50%; transform: translateY(-50%); color: #94a3b8; }
+        .search-input { width: 100%; padding: 16px 52px 16px 20px; border: 1px solid #e2e8f0; border-radius: 60px; font-family: 'Cairo'; font-size: 1rem; background: white; box-shadow: 0 4px 10px rgba(0,0,0,0.02); transition: all 0.2s; }
+        .search-input:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 4px rgba(59,130,246,0.1); }
+        .table-card { background: #ffffff; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.03); overflow: hidden; margin-bottom: 30px; }
+        .card-header { padding: 20px 25px; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: space-between; align-items: center; }
+        .card-header-actions { display: flex; align-items: center; gap: 12px; }
+        .card-title { margin: 0; font-size: 1.1rem; color: #1e293b; display: flex; align-items: center; gap: 10px; }
+        .icon-blue { color: #3b82f6; }
+        .badge-count { background: #eff6ff; color: #3b82f6; padding: 4px 12px; border-radius: 20px; font-size: 0.85rem; font-weight: 700; }
+        .refresh-btn-table { display: flex; align-items: center; gap: 6px; background: #f8fafc; border: 1px solid #e2e8f0; padding: 6px 12px; border-radius: 10px; font-family: 'Cairo'; font-weight: 600; font-size: 0.85rem; color: #475569; cursor: pointer; transition: 0.2s; }
+        .refresh-btn-table:hover { background: #eff6ff; color: #3b82f6; border-color: #3b82f6; }
+        .table-responsive { width: 100%; overflow-x: auto; }
+        .modern-table { width: 100%; border-collapse: collapse; min-width: 700px; text-align: right; }
+        .modern-table th { background: #f8fafc; padding: 16px 20px; color: #475569; font-weight: 700; font-size: 0.95rem; border-bottom: 2px solid #e2e8f0; text-align: center; }
+        .modern-table td { padding: 16px 20px; border-bottom: 1px solid #f1f5f9; color: #334155; vertical-align: middle; text-align: center; }
+        .modern-table tbody tr:hover { background: #fbfcfd; }
+        .text-center { text-align: center !important; }
+        .user-cell { display: flex; align-items: center; gap: 12px; justify-content: flex-start; padding-right: 24px; }
+        .nameColumn { text-align: right; }
+        .user-avatar-small { width: 36px; height: 36px; background: #eff6ff; color: #3b82f6; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 1rem; }
+        .user-name-cell { font-weight: 600; color: #1e293b; }
+        .activate-btn-table { background: #3b82f6; color: white; border: none; padding: 8px 20px; border-radius: 30px; font-family: 'Cairo'; font-weight: 600; font-size: 0.85rem; cursor: pointer; transition: all 0.2s; display: inline-flex; align-items: center; gap: 6px; }
+        .activate-btn-table:hover:not(:disabled) { background: #2563eb; transform: scale(1.02); }
+        .activate-btn-table:disabled { background: #cbd5e1; cursor: not-allowed; }
+        .activate-btn-table.active-attempt { background: #10b981 !important; color: white; cursor: default; }
+        .spinner-small { width: 14px; height: 14px; border: 2px solid rgba(255,255,255,0.3); border-top-color: white; border-radius: 50%; animation: spin 0.6s linear infinite; display: inline-block; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .empty-state { padding: 60px 20px; text-align: center; color: #64748b; }
+        .loading-spinner { width: 40px; height: 40px; border: 4px solid #e2e8f0; border-top-color: #3b82f6; border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 20px; }
+        .card-header-actions .search-wrapper { margin-bottom: 0; }
+        .card-header-actions .search-input { padding: 8px 36px 8px 12px; font-size: 0.9rem; }
         @media (max-width: 768px) {
-          .table { display: none; }
-
-          .cards {
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-          }
-
-          .user-card {
-            background: white;
-            padding: 15px;
-            border-radius: 12px;
-          }
-
-          .user-card button {
-            width: 100%;
-            padding: 12px;
-            margin-top: 10px;
-          }
+          .dashboard-main { padding: 0 16px 24px; }
+          .page-header { flex-direction: column; align-items: center; padding-right: 0; margin-bottom: 20px; }
+          .page-title { font-size: 1.6rem; text-align: center; width: 100%; }
+          .stats-grid { grid-template-columns: 1fr; }
+          .stat-card { justify-content: flex-start; }
+          .stat-content { align-items: flex-start; text-align: right; }
+          .card-header { padding: 15px; }
+          .refresh-btn-table span { display: none; }
+          .modern-table th, .modern-table td { padding: 12px; }
         }
       `}</style>
     </div>
