@@ -271,7 +271,7 @@ export default function Auth() {
                   type="text"
                   value={loginUsername}
                   onChange={(e) => setLoginUsername(e.target.value)}
-                  placeholder="اسم المستخدم"
+                  placeholder="مثال: nader"
                   required
                   className="auth-input"
                 />
