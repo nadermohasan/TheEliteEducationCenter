@@ -370,19 +370,15 @@ export default function QuizPage() {
 
       // 4. جلب تفاصيل الأسئلة من جدول questions
       const { data: questionsData, error: questionsError } = await supabase
-        .from("questions")
-        .select(
-          "*, image_option_a, image_option_b, image_option_c, image_option_d"
-        )
-        .in("id", questionIds)
-        .order("created_at", { ascending: true });
-        .select("*")
-        .in("id", questionIds);
+  .from("questions")
+  .select("*, image_option_a, image_option_b, image_option_c, image_option_d")
+  .in("id", questionIds)
+  .order("created_at", { ascending: true });
 
-      if (questionsError || !questionsData) {
-        setError("no_questions");
-        return;
-      }
+if (questionsError || !questionsData) {
+  setError("no_questions");
+  return;
+}
 
       // 5. جلب تفاصيل المادة
       const { data: subjectInfo } = await supabase
