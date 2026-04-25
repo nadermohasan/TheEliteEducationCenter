@@ -310,8 +310,7 @@ export default function QuizPage() {
   }, [timeLeft, loading, studentId, attemptId, saveTimerState, isReviewMode]);
 
   // --- جلب بيانات الاختبار (مع تعديل بسيط لحساب displayTotalCount) ---
-  // --- جلب بيانات الاختبار (مُصحَّح) ---
->>>>>>> d7a9108 (update project)
+  // --- جلب بيانات الاختبار (مُصحَّح) ---
   const fetchQuizData = useCallback(async () => {
     setLoading(true);
     try {
