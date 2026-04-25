@@ -35,7 +35,7 @@ const LoadingScreen = () => (
   </div>
 );
 
-// --- دالة مساعدة لعرض الدرجة ---
+// --- دالة مساعدة لعرض الدرجة بالعربية ---
 const formatDegree = (degree, isEnglish = false) => {
   if (!degree || degree === 0) return "";
   if (isEnglish) {
@@ -94,7 +94,7 @@ export default function QuizPage() {
 
   const numericSubjectId = parseInt(subjectId, 10);
 
-  // --- دوال المؤقت ---
+  // --- دوال المؤقت (بدون تغيير) ---
   const getTimerStorageKey = useCallback(() => {
     if (!studentId || !attemptId) return null;
     return `quiz_timer_${studentId}_${numericSubjectId}_${attemptId}`;
@@ -115,7 +115,7 @@ export default function QuizPage() {
     if (key) localStorage.removeItem(key);
   }, [getTimerStorageKey]);
 
-  // --- مودال التأكيد ---
+  // --- مودال التأكيد (بدون تغيير) ---
   const showConfirm = (options) => {
     return new Promise((resolve) => {
       setConfirmState({
@@ -139,7 +139,7 @@ export default function QuizPage() {
     setConfirmState((prev) => ({ ...prev, isOpen: false }));
   };
 
-  // --- تسليم الاختبار ---
+  // --- تسليم الاختبار (مُصحَّح) ---
   const performSubmit = useCallback(
     async (isAuto = false) => {
       if (hasAutoSubmitted.current || submitting) return false;
@@ -153,7 +153,9 @@ export default function QuizPage() {
       }
 
       try {
-        const { data: { user } } = await supabase.auth.getUser();
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
         if (!user) {
           navigate("/login");
           return false;
@@ -199,6 +201,7 @@ export default function QuizPage() {
 
         if (!activeAttempt) throw new Error("لا توجد محاولة نشطة لهذا الطالب");
 
+        // إدراج النتيجة
         const { error: resultError } = await supabase.from("results").insert([
           {
             attempt_id: activeAttempt.id,
@@ -258,7 +261,7 @@ export default function QuizPage() {
     performSubmit(true);
   }, [performSubmit, submitting, clearTimerState]);
 
-  // --- بدء المؤقت ---
+  // --- بدء المؤقت (تم تعطيله في وضع المراجعة) ---
   useEffect(() => {
     if (
       !loading &&
@@ -284,7 +287,7 @@ export default function QuizPage() {
     };
   }, [loading, blocks, timeLeft, handleAutoSubmit, submitting, isReviewMode]);
 
-  // --- إلغاء المؤقت في وضع المراجعة ---
+  // --- إلغاء المؤقت ومسح التخزين فور الدخول إلى وضع المراجعة ---
   useEffect(() => {
     if (isReviewMode) {
       clearTimerState();
@@ -302,17 +305,19 @@ export default function QuizPage() {
     }
   }, [timeLeft, loading, studentId, attemptId, saveTimerState, isReviewMode]);
 
-  // --- جلب بيانات الاختبار ---
+  // --- جلب بيانات الاختبار (مع تعديل جوهري لدعم المراجعة حتى بعد إغلاق المحاولة) ---
   const fetchQuizData = useCallback(async () => {
     setLoading(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) return navigate("/login");
 
       const currentStudentId = user.id;
       setStudentId(currentStudentId);
 
-      // 1. جلب أحدث محاولة
+      // 1. جلب أحدث محاولة للطالب (بغض النظر عن حالتها)
       const { data: attemptData } = await supabase
         .from("attempts")
         .select("*")
@@ -327,7 +332,7 @@ export default function QuizPage() {
       }
       setAttemptId(attemptData.id);
 
-      // 2. التحقق من وجود نتيجة سابقة للمادة (وضع المراجعة)
+      // 2. التحقق من وجود نتيجة سابقة لهذه المادة (أولوية على حالة المحاولة)
       const { data: existingResult } = await supabase
         .from("results")
         .select("*")
@@ -336,12 +341,15 @@ export default function QuizPage() {
         .maybeSingle();
 
       if (existingResult) {
+        // ✅ وضع المراجعة (حتى لو المحاولة مغلقة)
         setIsReviewMode(true);
         setSelectedAnswers(existingResult.student_answers || {});
       } else if (attemptData.status === "completed") {
+        // المحاولة مغلقة ولم يتم تقديم هذه المادة (ربما لم تضاف أسئلة لها)
         setError("attempt_closed");
         return;
       }
+      // إذا لم توجد نتيجة سابقة والمحاولة نشطة -> وضع الاختبار العادي
 
       // 3. جلب معرفات الأسئلة من attempt_questions
       const { data: aqData } = await supabase
@@ -358,13 +366,13 @@ export default function QuizPage() {
       const questionIds = aqData.map((item) => item.question_id);
 
       // 4. جلب تفاصيل الأسئلة
-      const { data: questionsData, error: questionsError } = await supabase
+      const { data: questionsData } = await supabase
         .from("questions")
         .select("*, image_option_a, image_option_b, image_option_c, image_option_d")
         .in("id", questionIds)
         .order("created_at", { ascending: true });
 
-      if (questionsError || !questionsData) {
+      if (!questionsData) {
         setError("no_questions");
         return;
       }
@@ -380,11 +388,11 @@ export default function QuizPage() {
       setIsEnglishSubject(isEnglish);
       setSubjectName(subjectInfo?.name || "اختبار");
 
-      const durationMinutes = subjectInfo?.duration_minutes || 60;
-      const defaultTime = durationMinutes * 60;
-
-      // 6. استعادة المؤقت (فقط لو لم نكن في وضع المراجعة)
+      // 6. إعداد المؤقت (فقط لو لم نكن في وضع المراجعة)
       if (!existingResult) {
+        const durationMinutes = subjectInfo?.duration_minutes || 60;
+        const defaultTime = durationMinutes * 60;
+
         const storageKey = `quiz_timer_${currentStudentId}_${numericSubjectId}_${attemptData.id}`;
         const saved = localStorage.getItem(storageKey);
         let savedTime = null;
@@ -395,36 +403,53 @@ export default function QuizPage() {
             savedTime = Math.max(0, savedTimeLeft - elapsed);
           } catch (e) {}
         }
-        const initialTime = savedTime !== null && savedTime < defaultTime ? savedTime : defaultTime;
+        const initialTime =
+          savedTime !== null && savedTime < defaultTime ? savedTime : defaultTime;
         setTimeLeft(initialTime);
       } else {
-        setTimeLeft(null);
+        setTimeLeft(null); // وضع المراجعة لا وقت
       }
 
       // 7. بناء الكتل (blocks)
       let finalBlocks = [];
       if (isEnglish) {
-        const passageIds = [...new Set(questionsData.map((q) => q.passage_id).filter((id) => id))];
+        const passageIds = [
+          ...new Set(questionsData.map((q) => q.passage_id).filter((id) => id)),
+        ];
         let passages = [];
         if (passageIds.length) {
-          const { data: pData } = await supabase.from("passages").select("*").in("id", passageIds);
+          const { data: pData } = await supabase
+            .from("passages")
+            .select("*")
+            .in("id", passageIds);
           passages = pData || [];
         }
         const passageQuestionsMap = new Map();
         const standalone = [];
         questionsData.forEach((q) => {
           if (q.passage_id) {
-            if (!passageQuestionsMap.has(q.passage_id)) passageQuestionsMap.set(q.passage_id, []);
+            if (!passageQuestionsMap.has(q.passage_id))
+              passageQuestionsMap.set(q.passage_id, []);
             passageQuestionsMap.get(q.passage_id).push(q);
           } else standalone.push(q);
         });
-        const sortedPassages = passages.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+        const sortedPassages = passages.sort(
+          (a, b) => new Date(a.created_at) - new Date(b.created_at)
+        );
         for (const passage of sortedPassages) {
           const questionsOfPassage = passageQuestionsMap.get(passage.id) || [];
-          questionsOfPassage.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
-          finalBlocks.push({ type: "passage", passage, questions: questionsOfPassage });
+          questionsOfPassage.sort(
+            (a, b) => new Date(a.created_at) - new Date(b.created_at)
+          );
+          finalBlocks.push({
+            type: "passage",
+            passage,
+            questions: questionsOfPassage,
+          });
         }
-        standalone.forEach((q) => finalBlocks.push({ type: "single", question: q }));
+        standalone.forEach((q) =>
+          finalBlocks.push({ type: "single", question: q })
+        );
       } else {
         finalBlocks = questionsData.map((q) => ({ type: "single", question: q }));
       }
@@ -443,14 +468,16 @@ export default function QuizPage() {
   useEffect(() => {
     fetchQuizData();
     numericSubjectIdRef.current = numericSubjectId;
-    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
   }, [subjectId, fetchQuizData, numericSubjectId]);
 
-  // --- دالة تقديم الاختبار ---
   const handleSubmitQuiz = async () => {
     if (hasAutoSubmitted.current || submitting) return;
     const totalQuestions = blocks.reduce(
-      (acc, block) => acc + (block.type === "passage" ? block.questions.length : 1),
+      (acc, block) =>
+        acc + (block.type === "passage" ? block.questions.length : 1),
       0
     );
     const answeredCount = Object.keys(selectedAnswers).length;
@@ -474,10 +501,12 @@ export default function QuizPage() {
   };
 
   const formatTime = (s) =>
-    s === null ? "--:--" : `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, "0")}`;
+    s === null
+      ? "--:--"
+      : `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, "0")}`;
 
   const handleAnswerSelect = (qId, idx) => {
-    if (isReviewMode) return;
+    if (isReviewMode) return; // تعطيل التعديل في المراجعة
     setSelectedAnswers((prev) => ({ ...prev, [qId]: idx }));
   };
 
@@ -485,32 +514,57 @@ export default function QuizPage() {
 
   if (error) {
     return (
-      <div className="quiz-page-wrapper" style={{ direction: isEnglishSubject ? "ltr" : "rtl" }}>
+      <div
+        className="quiz-page-wrapper"
+        style={{ direction: isEnglishSubject ? "ltr" : "rtl" }}
+      >
         <header className="quiz-header">
-          <div className="timer-pill"><span>⏱️</span><span>00:00</span></div>
+          <div className="timer-pill">
+            <span>⏱️</span>
+            <span>00:00</span>
+          </div>
           <div className="center-brand">
             <img src="https://i.imgur.com/p1hg12H.png" alt="Logo" className="quiz-logo" />
             <span className="quiz-brand-name">مركز النخبة التعليمي</span>
           </div>
-          <button onClick={() => navigate("/dashboard")} className="submit-quiz-btn" style={{ background: "#3b82f6" }}>
+          <button
+            onClick={() => navigate("/dashboard")}
+            className="submit-quiz-btn"
+            style={{ background: "#3b82f6" }}
+          >
             {isEnglishSubject ? "Back to Dashboard" : "العودة للرئيسية"}
           </button>
         </header>
-        <div className="progress-container"><div className="progress-bar" style={{ width: "0%" }}></div></div>
+        <div className="progress-container">
+          <div className="progress-bar" style={{ width: "0%" }}></div>
+        </div>
         <main className="quiz-main-content">
           <div className="empty-state-card">
-            <div className="empty-state-icon">{error === "no_questions" ? "" : ""}</div>
+            <div className="empty-state-icon">
+              {error === "no_questions" ? "" : ""}
+            </div>
             <h2 className="empty-state-title">
               {error === "no_questions"
-                ? (isEnglishSubject ? "No Questions" : "لا توجد أسئلة")
-                : (isEnglishSubject ? "No Active Attempt" : "لا توجد محاولة نشطة")}
+                ? isEnglishSubject
+                  ? "No Questions"
+                  : "لا توجد أسئلة"
+                : isEnglishSubject
+                ? "No Active Attempt"
+                : "لا توجد محاولة نشطة"}
             </h2>
             <p className="empty-state-description">
               {error === "no_questions"
-                ? (isEnglishSubject ? "Sorry, no questions were found for this subject." : "عذراً، لم يتم العثور على أسئلة لهذه المادة حالياً.")
-                : (isEnglishSubject ? "Please contact the administration to activate a new attempt." : "يرجى مراجعة الإدارة لتفعيل محاولة جديدة")}
+                ? isEnglishSubject
+                  ? "Sorry, no questions were found for this subject."
+                  : "عذراً، لم يتم العثور على أسئلة لهذه المادة حالياً."
+                : isEnglishSubject
+                ? "Please contact the administration to activate a new attempt."
+                : " يرجى مراجعة الإدارة لتفعيل محاولة جديدة"}
             </p>
-            <button onClick={() => navigate("/dashboard")} className="back-to-dashboard-btn">
+            <button
+              onClick={() => navigate("/dashboard")}
+              className="back-to-dashboard-btn"
+            >
               {isEnglishSubject ? "Back to Subjects" : "العودة إلى المواد الدراسية"}
             </button>
           </div>
@@ -560,8 +614,11 @@ export default function QuizPage() {
   currentQuestionNumber++;
 
   const answeredCount = Object.keys(selectedAnswers).length;
-  const progress = totalQuestionsCount > 0 ? (answeredCount / totalQuestionsCount) * 100 : 0;
-  const optionLabels = isEnglishSubject ? ["A", "B", "C", "D"] : ["أ", "ب", "ج", "د"];
+  const progress =
+    totalQuestionsCount > 0 ? (answeredCount / totalQuestionsCount) * 100 : 0;
+  const optionLabels = isEnglishSubject
+    ? ["A", "B", "C", "D"]
+    : ["أ", "ب", "ج", "د"];
 
   const currentQuestion = currentBlock.type === "passage"
     ? currentBlock.questions[0]
@@ -574,28 +631,47 @@ export default function QuizPage() {
   const prevLabel = isEnglishSubject ? "Previous" : "السابق";
   const nextLabel = isEnglishSubject ? "Next" : "التالي";
   const submitLabel = isEnglishSubject
-    ? (submitting ? "Submitting..." : "Submit Quiz")
-    : (submitting ? "جاري التسليم..." : "إنهاء الاختبار");
+    ? submitting ? "Submitting..." : "Submit Quiz"
+    : submitting ? "جاري التسليم..." : "إنهاء الاختبار";
 
   return (
-    <div className="quiz-page-wrapper" style={{ direction: isEnglishSubject ? "ltr" : "rtl" }}>
+    <div
+      className="quiz-page-wrapper"
+      style={{ direction: isEnglishSubject ? "ltr" : "rtl" }}
+    >
       <header className="quiz-header">
         <div className="timer-pill">
           <span>⏱️</span>
-          <span className={timeLeft < 60 ? "time-critical" : timeLeft < 300 ? "time-warning" : ""}>
+          <span
+            className={
+              timeLeft < 60 ? "time-critical" : timeLeft < 300 ? "time-warning" : ""
+            }
+          >
             {isReviewMode ? "--:--" : formatTime(timeLeft)}
           </span>
         </div>
         <div className="center-brand">
-          <img src="https://i.imgur.com/p1hg12H.png" alt="Logo" className="quiz-logo" />
+          <img
+            src="https://i.imgur.com/p1hg12H.png"
+            alt="Logo"
+            className="quiz-logo"
+          />
           <span className="quiz-brand-name">مركز النخبة التعليمي</span>
         </div>
         {!isReviewMode ? (
-          <button onClick={handleSubmitQuiz} disabled={submitting || hasAutoSubmitted.current} className="submit-quiz-btn">
+          <button
+            onClick={handleSubmitQuiz}
+            disabled={submitting || hasAutoSubmitted.current}
+            className="submit-quiz-btn"
+          >
             {submitLabel}
           </button>
         ) : (
-          <button onClick={() => navigate("/dashboard")} className="submit-quiz-btn" style={{ background: "#3b82f6" }}>
+          <button
+            onClick={() => navigate("/dashboard")}
+            className="submit-quiz-btn"
+            style={{ background: "#3b82f6" }}
+          >
             {isEnglishSubject ? "Back to Dashboard" : "العودة للرئيسية"}
           </button>
         )}
@@ -610,14 +686,26 @@ export default function QuizPage() {
           <div className="question-card">
             <div className="q-header">
               <span className="q-number">
-                {currentBlock.type === "passage" ? (
-                  <>
-                    {passageLabel} {currentBlockIndex + 1} {ofLabel} {passagesCount}
-                    {" • "}
-                    {questionLabel} {currentQuestionNumber} {ofLabel} {totalQuestionsCount}
-                  </>
+                {isEnglishSubject ? (
+                  currentBlock.type === "passage" ? (
+                    <>
+                      {passageLabel} {currentBlockIndex + 1} {ofLabel} {passagesCount}
+                      {" • "}
+                      {questionLabel} {currentQuestionNumber} {ofLabel} {totalQuestionsCount}
+                    </>
+                  ) : (
+                    `${questionLabel} ${currentQuestionNumber} ${ofLabel} ${totalQuestionsCount}`
+                  )
                 ) : (
-                  `${questionLabel} ${currentQuestionNumber} ${ofLabel} ${totalQuestionsCount}`
+                  currentBlock.type === "passage" ? (
+                    <>
+                      {passageLabel} {currentBlockIndex + 1} من {passagesCount}
+                      {" • "}
+                      {questionLabel} {currentQuestionNumber} {ofLabel} {totalQuestionsCount}
+                    </>
+                  ) : (
+                    `${questionLabel} ${currentQuestionNumber} ${ofLabel} ${totalQuestionsCount}`
+                  )
                 )}
                 <span className="question-degree">
                   ({formatDegree(questionDegree, isEnglishSubject)})
@@ -643,43 +731,65 @@ export default function QuizPage() {
                   className="single-question-wrapper"
                   style={{
                     marginBottom:
-                      qIdx < (currentBlock.type === "passage" ? currentBlock.questions.length - 1 : 0) ? "50px" : "0",
+                      qIdx <
+                      (currentBlock.type === "passage"
+                        ? currentBlock.questions.length - 1
+                        : 0)
+                        ? "50px"
+                        : "0",
                   }}
                 >
                   {currentBlock.type === "passage" && (
                     <div className="question-header">
                       <span className="question-number">
-                        {isEnglishSubject ? `Question ${qIdx + 1}` : `سؤال ${qIdx + 1}`}
+                        {isEnglishSubject
+                          ? `Question ${qIdx + 1}`
+                          : `سؤال ${qIdx + 1}`}
                       </span>
                     </div>
                   )}
 
                   {q.image_url ? (
                     <div className="question-image-container">
-                      <img src={q.image_url} alt="السؤال" className="question-image" />
+                      <img
+                        src={q.image_url}
+                        alt="السؤال"
+                        className="question-image"
+                      />
                     </div>
                   ) : (
                     <h2 className="question-text">{q.question_text}</h2>
                   )}
 
-                  <div className={`options-grid ${isEnglishSubject ? "english-options" : ""}`}>
+                  <div
+                    className={`options-grid ${isEnglishSubject ? "english-options" : ""}`}
+                  >
                     {q.options?.map((opt, idx) => {
                       const englishLetter = ["a", "b", "c", "d"][idx];
                       const imageKey = `image_option_${englishLetter}`;
                       const optionImageUrl = q[imageKey];
+                      const isSelected = selectedAnswers[q.id] === idx;
+                      const isCorrectAnswer = parseInt(q.correct_option) === idx;
                       return (
                         <div
                           key={idx}
                           className={`option-item 
-                            ${selectedAnswers[q.id] === idx ? "selected" : ""} 
-                            ${isReviewMode && parseInt(q.correct_option) === idx ? "correct-answer-view" : ""}
-                            ${isReviewMode && selectedAnswers[q.id] === idx && parseInt(q.correct_option) !== idx ? "wrong-answer-view" : ""}`}
+                            ${isSelected ? "selected" : ""} 
+                            ${isReviewMode && isCorrectAnswer ? "correct-answer-view" : ""}
+                            ${isReviewMode && isSelected && !isCorrectAnswer ? "wrong-answer-view" : ""}
+                          `}
                           onClick={() => handleAnswerSelect(q.id, idx)}
                         >
-                          <span className="option-label">{optionLabels[idx]}</span>
+                          <span className="option-label">
+                            {optionLabels[idx]}
+                          </span>
                           {optionImageUrl ? (
                             <div className="option-image-wrapper">
-                              <img src={optionImageUrl} alt={`خيار ${optionLabels[idx]}`} className="option-image" />
+                              <img
+                                src={optionImageUrl}
+                                alt={`خيار ${optionLabels[idx]}`}
+                                className="option-image"
+                              />
                             </div>
                           ) : (
                             <span className="option-value">{opt}</span>
@@ -695,17 +805,24 @@ export default function QuizPage() {
           </div>
 
           <div className="quiz-nav-controls">
-            <button className="nav-btn prev" disabled={currentBlockIndex === 0} onClick={() => setCurrentBlockIndex((prev) => prev - 1)}>
+            <button
+              className="nav-btn prev"
+              disabled={currentBlockIndex === 0}
+              onClick={() => setCurrentBlockIndex((prev) => prev - 1)}
+            >
               {prevLabel}
             </button>
             <div className="q-dots-nav">
               {blocks.map((block, idx) => {
                 let isCompleted = false;
                 if (block.type === "passage") {
-                  const allAnswered = block.questions.every((q) => selectedAnswers[q.id] !== undefined);
+                  const allAnswered = block.questions.every(
+                    (q) => selectedAnswers[q.id] !== undefined
+                  );
                   isCompleted = allAnswered;
                 } else {
-                  isCompleted = selectedAnswers[block.question.id] !== undefined;
+                  isCompleted =
+                    selectedAnswers[block.question.id] !== undefined;
                 }
                 return (
                   <div
@@ -718,7 +835,11 @@ export default function QuizPage() {
                 );
               })}
             </div>
-            <button className="nav-btn next" disabled={currentBlockIndex === totalBlocks - 1} onClick={() => setCurrentBlockIndex((prev) => prev + 1)}>
+            <button
+              className="nav-btn next"
+              disabled={currentBlockIndex === totalBlocks - 1}
+              onClick={() => setCurrentBlockIndex((prev) => prev + 1)}
+            >
               {nextLabel}
             </button>
           </div>
@@ -741,7 +862,9 @@ export default function QuizPage() {
         @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap');
         * { box-sizing: border-box; margin: 0; }
         body { margin: 0; background-color: #f4f7fb; font-family: 'Cairo', sans-serif; direction: rtl; -webkit-font-smoothing: antialiased; }
+
         .quiz-page-wrapper { min-height: 100vh; display: flex; flex-direction: column; background: #f4f7fb; }
+        
         .quiz-header { background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(16px); padding: 16px 40px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 4px 20px rgba(0,0,0,0.03); position: sticky; top: 0; z-index: 100; border-bottom: 1px solid rgba(255,255,255,0.5); }
         .timer-pill { background: #ffffff; border: 1px solid #eef2f6; padding: 8px 20px; border-radius: 50px; font-weight: 700; color: #1e293b; display: flex; align-items: center; gap: 8px; font-size: 1.1rem; box-shadow: 0 2px 10px rgba(0,0,0,0.02); }
         .time-warning { color: #f59e0b; animation: pulse 1.5s infinite; }
@@ -760,10 +883,29 @@ export default function QuizPage() {
         .q-header { margin-bottom: 24px; }
         .q-number { background: #f0fdf4; color: #16a34a; padding: 8px 18px; border-radius: 100px; font-weight: 700; font-size: 0.95rem; display: inline-block; border: 1px solid #dcfce7; }
         .question-degree { margin-inline-start: 8px; font-size: 0.85rem; color: #64748b; }
-        .passage-box { background: #f8fafc; padding: 30px; border-radius: 20px; margin-bottom: 35px; position: relative; overflow: hidden; border: 1px solid #f1f5f9; text-align: start; }
-        .passage-accent { position: absolute; top: 0; inset-inline-start: 0; bottom: 0; width: 4px; background: #3b82f6; border-radius: 4px; }
+        
+        .passage-box { 
+          background: #f8fafc; 
+          padding: 30px; 
+          border-radius: 20px; 
+          margin-bottom: 35px; 
+          position: relative; 
+          overflow: hidden; 
+          border: 1px solid #f1f5f9; 
+          text-align: start; 
+        }
+        .passage-accent { 
+          position: absolute; 
+          top: 0; 
+          inset-inline-start: 0; 
+          bottom: 0; 
+          width: 4px; 
+          background: #3b82f6; 
+          border-radius: 4px; 
+        }
         .passage-box h3 { margin: 0 0 16px 0; color: #0f172a; font-size: 1.35rem; font-weight: 800; }
         .passage-box p { line-height: 22px; color: #334155; font-size: 15px; text-align: justify; }
+        
         .questions-container { display: flex; flex-direction: column; gap: 45px; }
         .single-question-wrapper { border-top: 1px dashed #e2e8f0; padding-top: 35px; }
         .single-question-wrapper:first-child { border-top: none; padding-top: 0; }
@@ -773,40 +915,110 @@ export default function QuizPage() {
         .question-image-container { text-align: center; margin: 24px 0; }
         .question-image { max-width: 100%; max-height: 350px; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.08); border: 1px solid #f1f5f9; }
         .options-grid { display: flex; flex-direction: column; gap: 14px; }
-        .option-item { display: flex; align-items: center; padding: 20px 24px; background: #ffffff; border: 2px solid #eef2f6; border-radius: 20px; cursor: pointer; transition: all 0.25s cubic-bezier(0.4,0,0.2,1); gap: 12px; }
+
+        .option-item {
+          display: flex;
+          align-items: center;
+          padding: 20px 24px;
+          background: #ffffff;
+          border: 2px solid #eef2f6;
+          border-radius: 20px;
+          cursor: pointer;
+          transition: all 0.25s cubic-bezier(0.4,0,0.2,1);
+          gap: 12px;
+        }
         .option-item:hover { border-color: #bfdbfe; background: #fafcff; transform: translateY(-2px); box-shadow: 0 8px 20px rgba(59,130,246,0.06); }
         .option-item.selected { border-color: #3b82f6; background: #eff6ff; box-shadow: 0 8px 24px rgba(59,130,246,0.12); transform: translateY(-2px); }
-        .correct-answer-view { border-color: #10b981 !important; background: #ecfdf5 !important; }
-        .wrong-answer-view { border-color: #ef4444 !important; background: #fef2f2 !important; }
-        .option-label { width: 40px; height: 40px; background: #f1f5f9; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 1.15rem; color: #64748b; flex-shrink: 0; }
+        .option-item.correct-answer-view { border-color: #10b981; background: #f0fdf4; }
+        .option-item.wrong-answer-view { border-color: #ef4444; background: #fef2f2; }
+
+        .option-label {
+          width: 40px;
+          height: 40px;
+          background: #f1f5f9;
+          border-radius: 12px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-weight: 800;
+          font-size: 1.15rem;
+          color: #64748b;
+          flex-shrink: 0;
+        }
         .selected .option-label { background: #3b82f6; color: white; box-shadow: 0 4px 10px rgba(59,130,246,0.3); }
         .correct-answer-view .option-label { background: #10b981; color: white; }
         .wrong-answer-view .option-label { background: #ef4444; color: white; }
-        .option-value { flex: 1; font-size: 1.1rem; font-weight: 600; color: #334155; line-height: 1.5; text-align: right; }
+
+        .option-value {
+          flex: 1;
+          font-size: 1.1rem;
+          font-weight: 600;
+          color: #334155;
+          line-height: 1.5;
+          text-align: right;
+        }
         .selected .option-value { color: #1e3a8a; }
+        
         .english-options .option-value { text-align: left; }
         .quiz-page-wrapper[style*="direction: ltr"] .center-brand { flex-direction: row-reverse; }
+
         .option-image-wrapper { max-width: 130px; flex-shrink: 0; }
         .option-image { max-width: 100%; max-height: 100px; border-radius: 14px; object-fit: contain; background: white; border: 1px solid #e2e8f0; padding: 4px; }
-        .check-circle { width: 26px; height: 26px; border: 2.5px solid #cbd5e1; border-radius: 50%; flex-shrink: 0; margin-left: auto; }
+        
+        .check-circle {
+          width: 26px;
+          height: 26px;
+          border: 2.5px solid #cbd5e1;
+          border-radius: 50%;
+          flex-shrink: 0;
+          margin-left: auto;
+        }
         .selected .check-circle { border-color: #3b82f6; background: #3b82f6; position: relative; transform: scale(1.1); }
-        .selected .check-circle::after { content: '✓'; color: white; font-size: 14px; font-weight: bold; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); }
+        .selected .check-circle::after {
+          content: '✓';
+          color: white;
+          font-size: 14px;
+          font-weight: bold;
+          position: absolute;
+          top: 50%;
+          left: 50%;
+          transform: translate(-50%, -50%);
+        }
+
         .quiz-nav-controls { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-top: 40px; padding-top: 20px; border-top: 1px solid #eef2f6; }
         .nav-btn { padding: 14px 36px; border-radius: 16px; border: 1.5px solid #e2e8f0; background: white; font-family: 'Cairo'; font-weight: 700; cursor: pointer; transition: all 0.2s ease; color: #475569; font-size: 1.05rem; }
         .nav-btn:hover:not(:disabled) { background: #f8fafc; border-color: #cbd5e1; color: #0f172a; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
         .nav-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-        .q-dots-nav { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; overflow-x: auto; max-width: 100%; padding: 4px 0; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+        .q-dots-nav {
+          display: flex;
+          gap: 10px;
+          flex-wrap: wrap;
+          justify-content: center;
+          overflow-x: auto;
+          max-width: 100%;
+          padding: 4px 0;
+          -webkit-overflow-scrolling: touch;
+          scrollbar-width: none;
+        }
         .q-dots-nav::-webkit-scrollbar { display: none; }
         .dot { background: white; border: 1.5px solid #e2e8f0; border-radius: 14px; min-width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.95rem; cursor: pointer; color: #64748b; padding: 0 10px; transition: all 0.2s; flex-shrink: 0; }
         .dot.active { border-color: #3b82f6; color: #3b82f6; border-width: 2px; background: #eff6ff; transform: scale(1.08); box-shadow: 0 4px 12px rgba(59,130,246,0.15); }
         .dot.completed { background: #ecfdf5; color: #10b981; border-color: #a7f3d0; }
         .dot:hover:not(.active) { border-color: #cbd5e1; transform: translateY(-2px); }
+
         @media (max-width: 768px) {
           .quiz-header { padding: 12px 20px; }
           .quiz-brand-name { display: none; }
           .question-card { padding: 30px 24px; border-radius: 24px; }
           .question-text { font-size: 1.25rem; }
-          .q-dots-nav { display: flex; flex-wrap: nowrap; justify-content: flex-start; overflow-x: auto; max-width: 70vw; margin: 0 auto; }
+          .q-dots-nav {
+            display: flex;
+            flex-wrap: nowrap;
+            justify-content: flex-start;
+            overflow-x: auto;
+            max-width: 70vw;
+            margin: 0 auto;
+          }
           .option-item { padding: 16px; gap: 10px; }
           .option-label { width: 36px; height: 36px; font-size: 1rem; }
           .option-value { font-size: 1rem; }
