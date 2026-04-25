@@ -173,11 +173,6 @@ export default function Auth() {
           <div className="logo-text-group">
             <span className="logo-text">مركز النخبة التعليمي</span>
             <span className="logo-slogan">The Elite Education Center</span>
-            <div className="supervisors">
-              <p className="supervisor-name">
-                أ. محمد أبو سليمان _ أ. بلال أبو غلوة _ أ. فادي عليان
-              </p>
-            </div>
           </div>
         </div>
       </div>
@@ -362,13 +357,10 @@ export default function Auth() {
         .logo-text-group { display: flex; flex-direction: column; align-items: flex-start; }
         .logo-text { font-size: 24px; font-weight: 700; color: #1a4f8b; line-height: 1.3; }
         .logo-slogan { font-size: 15px; font-weight: 500; color: #3a6ea5; letter-spacing: 0.5px; margin-top: 2px; margin-right: 9%; }
-        .supervisors{font-size: 15px; font-weight: 500; color: #3a6ea5; letter-spacing: 0.5px; margin-top: 2px; margin-right: 9%; }
-        .supervisor-name{margin-left: 10px; font-size: 0.49rem;}
         .logo-image-wrapper { background: white; width: 70px; height: 70px; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(0,0,0,0.1); overflow: hidden; }
         .logo-image { max-width: 90%; max-height: 90%; object-fit: contain; }
         .auth-card { background: white; width: 100%; max-width: 400px; margin-top: 130px; padding: 30px; border-radius: 20px; box-shadow: 0 15px 35px rgba(0,0,0,0.05); z-index: 10; color: #2c3e50; }
         .auth-title { text-align: center; color: #2c3e50; margin-bottom: 25px; font-size: 22px; }
-        .strip-content{margin-top: 80px; font-size: 12px;}
         .error-alert { background: #fff5f5; color: #e74c3c; padding: 10px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #fed7d7; font-size: 13px; text-align: center; }
         .auth-form { display: flex; flex-direction: column; gap: 18px; }
         .input-group label { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; color: #4a5568; margin-bottom: 6px; }
