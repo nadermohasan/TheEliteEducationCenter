@@ -308,10 +308,8 @@ export default function QuizPage() {
       saveTimerState(timeLeft);
     }
   }, [timeLeft, loading, studentId, attemptId, saveTimerState, isReviewMode]);
-
-<<<<<<< HEAD
-  // --- جلب بيانات الاختبار (مع تعديل بسيط لحساب displayTotalCount) ---
-=======
+
+  // --- جلب بيانات الاختبار (مع تعديل بسيط لحساب displayTotalCount) ---
   // --- جلب بيانات الاختبار (مُصحَّح) ---
 >>>>>>> d7a9108 (update project)
   const fetchQuizData = useCallback(async () => {
@@ -373,17 +371,14 @@ export default function QuizPage() {
 
       // 4. جلب تفاصيل الأسئلة من جدول questions
       const { data: questionsData, error: questionsError } = await supabase
-        .from("questions")
-<<<<<<< HEAD
+        .from("questions")
         .select(
           "*, image_option_a, image_option_b, image_option_c, image_option_d"
         )
         .in("id", questionIds)
-        .order("created_at", { ascending: true });
-=======
+        .order("created_at", { ascending: true });
         .select("*")
         .in("id", questionIds);
->>>>>>> d7a9108 (update project)
 
       if (questionsError || !questionsData) {
         setError("no_questions");
@@ -485,15 +480,11 @@ export default function QuizPage() {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [subjectId, fetchQuizData, numericSubjectId]);
-<<<<<<< HEAD
+  }, [subjectId, fetchQuizData, numericSubjectId]);
 
   useEffect(() => {
     document.title = "محاولة اختبار";
-  }, []);
-=======
->>>>>>> d7a9108 (update project)
-
+  }, []);
   const handleSubmitQuiz = async () => {
     if (hasAutoSubmitted.current || submitting) return;
     const totalQuestions = blocks.reduce(
@@ -728,14 +719,12 @@ export default function QuizPage() {
               <span className="q-number">
                 {isEnglishSubject ? (
                   currentBlock.type === "passage" ? (
-                    <>
-<<<<<<< HEAD
+                    <>
                       القطعة {currentBlockIndex + 1} من {passagesCount} • السؤال{" "}
                       {currentDisplayNumber} من {displayTotalCount}
                     </>
                   ) : (
-                    `السؤال ${currentDisplayNumber} من ${displayTotalCount}`
-=======
+                    `السؤال ${currentDisplayNumber} من ${displayTotalCount}`
                       {passageLabel} {currentBlockIndex + 1} {ofLabel} {passagesCount}
                       {" • "}
                       {questionLabel} {currentQuestionNumber} {ofLabel} {totalQuestionsCount}
