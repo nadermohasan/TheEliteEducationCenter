@@ -94,7 +94,7 @@ export default function QuizPage() {
 
   const numericSubjectId = parseInt(subjectId, 10);
 
-  // --- دوال المؤقت (بدون تغيير) ---
+  // --- دوال المؤقت ---
   const getTimerStorageKey = useCallback(() => {
     if (!studentId || !attemptId) return null;
     return `quiz_timer_${studentId}_${numericSubjectId}_${attemptId}`;
@@ -115,7 +115,7 @@ export default function QuizPage() {
     if (key) localStorage.removeItem(key);
   }, [getTimerStorageKey]);
 
-  // --- مودال التأكيد (بدون تغيير) ---
+  // --- مودال التأكيد ---
   const showConfirm = (options) => {
     return new Promise((resolve) => {
       setConfirmState({
@@ -201,10 +201,11 @@ export default function QuizPage() {
 
         if (!activeAttempt) throw new Error("لا توجد محاولة نشطة لهذا الطالب");
 
-        // إدراج النتيجة
+        // ✅ الإدراج مع student_id
         const { error: resultError } = await supabase.from("results").insert([
           {
             attempt_id: activeAttempt.id,
+            student_id: user.id,               // تمت إضافة معرف الطالب
             subject_id: numericSubjectIdRef.current,
             student_answers: currentAnswers,
             score: finalScore,
@@ -261,7 +262,7 @@ export default function QuizPage() {
     performSubmit(true);
   }, [performSubmit, submitting, clearTimerState]);
 
-  // --- بدء المؤقت (تم تعطيله في وضع المراجعة) ---
+  // --- بدء المؤقت (معطل في المراجعة) ---
   useEffect(() => {
     if (
       !loading &&
@@ -287,7 +288,7 @@ export default function QuizPage() {
     };
   }, [loading, blocks, timeLeft, handleAutoSubmit, submitting, isReviewMode]);
 
-  // --- إلغاء المؤقت ومسح التخزين فور الدخول إلى وضع المراجعة ---
+  // --- إلغاء المؤقت ومسح التخزين في المراجعة ---
   useEffect(() => {
     if (isReviewMode) {
       clearTimerState();
@@ -305,7 +306,7 @@ export default function QuizPage() {
     }
   }, [timeLeft, loading, studentId, attemptId, saveTimerState, isReviewMode]);
 
-  // --- جلب بيانات الاختبار (مع تعديل جوهري لدعم المراجعة حتى بعد إغلاق المحاولة) ---
+  // --- جلب بيانات الاختبار ---
   const fetchQuizData = useCallback(async () => {
     setLoading(true);
     try {
@@ -317,7 +318,7 @@ export default function QuizPage() {
       const currentStudentId = user.id;
       setStudentId(currentStudentId);
 
-      // 1. جلب أحدث محاولة للطالب (بغض النظر عن حالتها)
+      // 1. جلب أحدث محاولة للطالب
       const { data: attemptData } = await supabase
         .from("attempts")
         .select("*")
@@ -332,7 +333,7 @@ export default function QuizPage() {
       }
       setAttemptId(attemptData.id);
 
-      // 2. التحقق من وجود نتيجة سابقة لهذه المادة (أولوية على حالة المحاولة)
+      // 2. التحقق من وجود نتيجة سابقة لهذه المادة
       const { data: existingResult } = await supabase
         .from("results")
         .select("*")
@@ -341,15 +342,12 @@ export default function QuizPage() {
         .maybeSingle();
 
       if (existingResult) {
-        // ✅ وضع المراجعة (حتى لو المحاولة مغلقة)
         setIsReviewMode(true);
         setSelectedAnswers(existingResult.student_answers || {});
       } else if (attemptData.status === "completed") {
-        // المحاولة مغلقة ولم يتم تقديم هذه المادة (ربما لم تضاف أسئلة لها)
         setError("attempt_closed");
         return;
       }
-      // إذا لم توجد نتيجة سابقة والمحاولة نشطة -> وضع الاختبار العادي
 
       // 3. جلب معرفات الأسئلة من attempt_questions
       const { data: aqData } = await supabase
@@ -388,7 +386,7 @@ export default function QuizPage() {
       setIsEnglishSubject(isEnglish);
       setSubjectName(subjectInfo?.name || "اختبار");
 
-      // 6. إعداد المؤقت (فقط لو لم نكن في وضع المراجعة)
+      // 6. إعداد المؤقت (فقط لو لم نكن في المراجعة)
       if (!existingResult) {
         const durationMinutes = subjectInfo?.duration_minutes || 60;
         const defaultTime = durationMinutes * 60;
@@ -407,7 +405,7 @@ export default function QuizPage() {
           savedTime !== null && savedTime < defaultTime ? savedTime : defaultTime;
         setTimeLeft(initialTime);
       } else {
-        setTimeLeft(null); // وضع المراجعة لا وقت
+        setTimeLeft(null);
       }
 
       // 7. بناء الكتل (blocks)
@@ -506,7 +504,7 @@ export default function QuizPage() {
       : `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, "0")}`;
 
   const handleAnswerSelect = (qId, idx) => {
-    if (isReviewMode) return; // تعطيل التعديل في المراجعة
+    if (isReviewMode) return;
     setSelectedAnswers((prev) => ({ ...prev, [qId]: idx }));
   };
 
