@@ -66,7 +66,7 @@ export default function Dashboard() {
     if (name.includes("اللغة الإنجليزية") || name.includes("english"))
       return {
         icon: <Languages />,
-        bg: "linear-gradient(135deg, #2563eb, #1e40af)",
+        bg: "linear-gradient(135deg, #ec4899, #500724)",
         color: "#eff6ff",
       };
 
@@ -74,7 +74,7 @@ export default function Dashboard() {
     if (name.includes("اللغة العربية") || name.includes("عربية"))
       return {
         icon: <ScrollText />,
-        bg: "linear-gradient(135deg, #f97316, #7c2d12)",
+        bg: "linear-gradient(135deg, #2563eb, #1e40af)",
         color: "#fff7ed",
       };
 
@@ -94,7 +94,6 @@ export default function Dashboard() {
         color: "#fefce8",
       };
 
-    // 5. Geography – cyan (مش شبه أي حاجة)
     if (name.includes("الجغرافيا"))
       return {
         icon: <Globe />,
@@ -114,7 +113,7 @@ export default function Dashboard() {
     if (name.includes("كيمياء"))
       return {
         icon: <FlaskConical />,
-        bg: "linear-gradient(135deg, #ec4899, #500724)",
+        bg: "linear-gradient(135deg, #f97316, #7c2d12)",
         color: "#fdf2f8",
       };
 
@@ -122,8 +121,8 @@ export default function Dashboard() {
     if (name.includes("فيزياء"))
       return {
         icon: <Atom />,
-        bg: "linear-gradient(135deg, #0f172a, #020617)",
-        color: "#e0f2fe",
+        bg: "linear-gradient(135deg, #050a1f, #1e293b)",
+        color: "#fdf2f8",
       };
 
     // 9. Biology – lime green (فاتح ومميز)
