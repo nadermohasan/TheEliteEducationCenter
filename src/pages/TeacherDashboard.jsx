@@ -954,9 +954,8 @@ export default function TeacherDashboard() {
 
   {isSharedSubject() && (
   <div className="form-group">
-    <label>الفرع الدراسي <span className="required">*</span></label>
+    <label>الفرع الدراسي <span>*</span></label>
     <select
-      required
       className="modern-input"
       value={formData.branch}
       onChange={(e) => setFormData({ ...formData, branch: e.target.value })}
