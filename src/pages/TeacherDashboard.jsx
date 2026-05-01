@@ -954,7 +954,7 @@ export default function TeacherDashboard() {
 
   {isSharedSubject() && (
   <div className="form-group">
-    <label>الفرع الدراسي <span>*</span></label>
+    <label>الفرع الدراسي</label>
     <select
       className="modern-input"
       value={formData.branch}
