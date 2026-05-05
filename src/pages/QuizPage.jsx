@@ -78,6 +78,9 @@ export default function QuizPage() {
   const blocksRef = useRef([]);
   const selectedAnswersRef = useRef({});
   const numericSubjectIdRef = useRef(parseInt(subjectId, 10));
+  
+  // Ref جديد لحاوية الأرقام
+  const dotsContainerRef = useRef(null);
 
   useEffect(() => {
     blocksRef.current = blocks;
@@ -492,6 +495,20 @@ export default function QuizPage() {
     };
   }, [subjectId, fetchQuizData, numericSubjectId]);
 
+  // تمرير الأرقام تلقائياً لتكون في المنتصف
+  useEffect(() => {
+    if (dotsContainerRef.current) {
+      const activeDot = dotsContainerRef.current.querySelector('.dot.active');
+      if (activeDot) {
+        activeDot.scrollIntoView({
+          behavior: 'smooth',
+          block: 'nearest',
+          inline: 'center'
+        });
+      }
+    }
+  }, [currentBlockIndex]);
+
   const handleSubmitQuiz = async () => {
     if (hasAutoSubmitted.current || submitting) return;
     const totalQuestions = blocks.reduce(
@@ -527,17 +544,6 @@ export default function QuizPage() {
   const handleAnswerSelect = (qId, idx) => {
     if (isReviewMode) return;
     setSelectedAnswers((prev) => ({ ...prev, [qId]: idx }));
-  };
-
-  // --- دالة الترقيم الديناميكي ---
-  const getVisibleDots = (current, total) => {
-    if (total <= 5) return Array.from({ length: total }, (_, i) => i);
-    
-    if (current <= 2) return [0, 1, 2, 3, "...", total - 1];
-    
-    if (current >= total - 3) return [0, "...", total - 4, total - 3, total - 2, total - 1];
-    
-    return [0, "...", current - 1, current, current + 1, "...", total - 1];
   };
 
   if (loading) return <LoadingScreen />;
@@ -872,13 +878,8 @@ export default function QuizPage() {
               {prevLabel}
             </button>
             
-            <div className="q-dots-nav">
-              {getVisibleDots(currentBlockIndex, totalBlocks).map((item, idx) => {
-                if (item === "...") {
-                  return <span key={`ellipsis-${idx}`} className="dot-ellipsis">...</span>;
-                }
-
-                const block = blocks[item];
+            <div className="q-dots-scroll-container" ref={dotsContainerRef}>
+              {blocks.map((block, idx) => {
                 let isCompleted = false;
                 if (block.type === "passage") {
                   isCompleted = block.questions.every(
@@ -890,13 +891,13 @@ export default function QuizPage() {
 
                 return (
                   <div
-                    key={item}
+                    key={idx}
                     className={`dot ${
-                      currentBlockIndex === item ? "active" : ""
+                      currentBlockIndex === idx ? "active" : ""
                     } ${isCompleted ? "completed" : ""}`}
-                    onClick={() => setCurrentBlockIndex(item)}
+                    onClick={() => setCurrentBlockIndex(idx)}
                   >
-                    {item + 1}
+                    {idx + 1}
                   </div>
                 );
               })}
@@ -952,13 +953,13 @@ export default function QuizPage() {
         .question-degree { margin-inline-start: 8px; font-size: 0.85rem; color: #64748b; }
         
         .passage-box { 
-          background: #f8fafc; 
+          /*background: #f8fafc;*/
           padding: 30px; 
           border-radius: 20px; 
           margin-bottom: 35px; 
-          position: relative; 
+          /*position: relative;*/
           overflow: hidden; 
-          border: 1px solid #f1f5f9; 
+          /*border: 1px solid #f1f5f9; */
           text-align: start; 
         }
         .passage-accent { 
@@ -1057,7 +1058,7 @@ export default function QuizPage() {
           display: flex; 
           align-items: center; 
           justify-content: space-between; 
-          gap: 10px; 
+          gap: 12px; 
           margin-top: 40px; 
           padding-top: 25px; 
           border-top: 1px solid #eef2f6; 
@@ -1076,10 +1077,11 @@ export default function QuizPage() {
           color: #475569; 
           font-size: 1rem; 
           white-space: nowrap;
-          flex-shrink: 0;
+          flex-shrink: 0; /* لمنع تقلص الأزرار */
           display: flex;
           align-items: center;
           justify-content: center;
+          z-index: 2;
         }
         
         .nav-btn:hover:not(:disabled) { 
@@ -1096,37 +1098,48 @@ export default function QuizPage() {
           background: #f8fafc;
         }
 
-        .q-dots-nav {
-          display: flex;
-          gap: 8px;
-          align-items: center;
-          justify-content: center;
-          flex: 1;
+        /* الحاوية الجديدة الاحترافية */
+        .q-dots-scroll-container {
+              display: flex;
+    gap: 8px;
+    align-items: center;
+    flex: 1;
+    overflow-x: auto;
+    scroll-behavior: smooth;
+    padding: 10px 18px;
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+    mask-image: linear-gradient(to right, transparent, black 5%, black 95%, transparent);
+    -webkit-mask-image: linear-gradient(to right, transparent, black 5%, black 95%, transparent);
+        }
+        .q-dots-scroll-container::-webkit-scrollbar {
+          display: none;
         }
 
         .dot { 
           background: white; 
-          border: 1.5px solid #e2e8f0; 
-          border-radius: 12px; 
-          min-width: 40px; 
-          height: 40px; 
+          border: 2px solid #e2e8f0; 
+          border-radius: 30%; /* شكل دائري احترافي بدلاً من المربع */
+          min-width: 44px; 
+          height: 44px; 
           display: flex; 
           align-items: center; 
           justify-content: center; 
           font-weight: 700; 
-          font-size: 0.95rem; 
+          font-size: 1rem; 
           cursor: pointer; 
           color: #64748b; 
-          transition: all 0.25s cubic-bezier(0.4,0,0.2,1); 
+          transition: all 0.3s cubic-bezier(0.4,0,0.2,1); 
           user-select: none;
+          flex-shrink: 0; /* مهم جداً لمنع انضغاط الدوائر */
         }
 
         .dot.active { 
           border-color: #3b82f6; 
           color: white; 
           background: #3b82f6; 
-          transform: scale(1.1); 
-          box-shadow: 0 4px 14px rgba(59,130,246,0.3); 
+          transform: scale(1.15); 
+          z-index: 10;
         }
 
         .dot.completed:not(.active) { 
@@ -1138,15 +1151,6 @@ export default function QuizPage() {
         .dot:hover:not(.active) { 
           border-color: #94a3b8; 
           transform: translateY(-2px); 
-        }
-
-        .dot-ellipsis {
-          color: #94a3b8;
-          font-weight: 800;
-          font-size: 1.2rem;
-          letter-spacing: 2px;
-          padding: 0 4px;
-          user-select: none;
         }
 
         /* === تحسينات شريط التمرير الاحترافي (Custom Scrollbar) === */
@@ -1203,35 +1207,27 @@ export default function QuizPage() {
           .question-text { font-size: 1.2rem; }
           
           .quiz-nav-controls {
-            gap: 6px;
-            padding-top: 20px;
+            gap: 8px;
           }
           
           .nav-btn {
             padding: 10px 14px;
             font-size: 0.9rem;
-            border-radius: 12px;
+            border-radius: 14px;
           }
 
-          .q-dots-nav {
-            gap: 4px;
+          .q-dots-scroll-container {
+            gap: 8px;
+            padding: 10px 0;
+            mask-image: none; /* إزالة التدرج في الشاشات الصغيرة لتحسين الأداء */
+            -webkit-mask-image: none;
           }
 
           .dot {
-            min-width: 32px;
-            height: 32px;
-            font-size: 0.85rem;
-            border-radius: 10px;
-          }
-
-          .dot.active {
-            transform: scale(1.08);
-          }
-
-          .dot-ellipsis {
-            font-size: 1rem;
-            letter-spacing: 1px;
-            padding: 0 2px;
+            min-width: 38px;
+            height: 38px;
+            font-size: 0.9rem;
+            border-width: 1.5px;
           }
 
           .option-item { padding: 14px; gap: 8px; }
@@ -1240,7 +1236,7 @@ export default function QuizPage() {
           .questions-container { gap: 32px; }
 
           .passage-box {
-            max-height: 200px;
+            max-height: 350px;
             overflow-y: auto;
             -webkit-overflow-scrolling: touch;
             padding: 16px;
@@ -1253,7 +1249,7 @@ export default function QuizPage() {
             flex-wrap: wrap;
             justify-content: center;
           }
-          .q-dots-nav {
+          .q-dots-scroll-container {
             order: -1;
             width: 100%;
             margin-bottom: 12px;
