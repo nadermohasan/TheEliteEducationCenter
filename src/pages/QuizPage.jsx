@@ -1207,7 +1207,7 @@ export default function QuizPage() {
 
           .q-dots-scroll-container {
             gap: 8px;
-            padding: 10px 0;
+            padding: 10px 20px;
             mask-image: none;
             -webkit-mask-image: none;
           }
