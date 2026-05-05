@@ -139,7 +139,7 @@ export default function QuizPage() {
     setConfirmState((prev) => ({ ...prev, isOpen: false }));
   };
 
-  // --- تسليم الاختبار (مُصحَّح) ---
+  // --- تسليم الاختبار ---
   const performSubmit = useCallback(
     async (isAuto = false) => {
       if (hasAutoSubmitted.current || submitting) return false;
@@ -188,7 +188,10 @@ export default function QuizPage() {
           const questionDegree = q.degree || 1;
           totalPossible += questionDegree;
           const userAns = currentAnswers[q.id];
-          if (userAns !== undefined && parseInt(userAns) === parseInt(q.correct_option))
+          if (
+            userAns !== undefined &&
+            parseInt(userAns) === parseInt(q.correct_option)
+          )
             finalScore += questionDegree;
         });
 
@@ -199,13 +202,13 @@ export default function QuizPage() {
           .eq("status", "active")
           .maybeSingle();
 
-        if (!activeAttempt) throw new Error("لا توجد محاولة نشطة لهذا الطالب");
+        if (!activeAttempt)
+          throw new Error("لا توجد محاولة نشطة لهذا الطالب");
 
-        // ✅ الإدراج مع student_id
         const { error: resultError } = await supabase.from("results").insert([
           {
             attempt_id: activeAttempt.id,
-            student_id: user.id,               // تمت إضافة معرف الطالب
+            student_id: user.id,
             subject_id: numericSubjectIdRef.current,
             student_answers: currentAnswers,
             score: finalScore,
@@ -219,7 +222,9 @@ export default function QuizPage() {
           .select("subject_id")
           .eq("attempt_id", activeAttempt.id);
 
-        const requiredSubjectIds = [...new Set(allQuestionsInAttempt.map((q) => q.subject_id))];
+        const requiredSubjectIds = [
+          ...new Set(allQuestionsInAttempt.map((q) => q.subject_id)),
+        ];
 
         const { data: finishedResults } = await supabase
           .from("results")
@@ -227,10 +232,15 @@ export default function QuizPage() {
           .eq("attempt_id", activeAttempt.id);
 
         const finishedSubjectIds = finishedResults.map((r) => r.subject_id);
-        const isLastSubject = requiredSubjectIds.every((id) => finishedSubjectIds.includes(id));
+        const isLastSubject = requiredSubjectIds.every((id) =>
+          finishedSubjectIds.includes(id)
+        );
 
         if (isLastSubject) {
-          await supabase.from("attempts").update({ status: "completed" }).eq("id", activeAttempt.id);
+          await supabase
+            .from("attempts")
+            .update({ status: "completed" })
+            .eq("id", activeAttempt.id);
         }
 
         navigate("/result", {
@@ -301,7 +311,13 @@ export default function QuizPage() {
 
   // --- حفظ المؤقت ---
   useEffect(() => {
-    if (timeLeft !== null && !loading && studentId && attemptId && !isReviewMode) {
+    if (
+      timeLeft !== null &&
+      !loading &&
+      studentId &&
+      attemptId &&
+      !isReviewMode
+    ) {
       saveTimerState(timeLeft);
     }
   }, [timeLeft, loading, studentId, attemptId, saveTimerState, isReviewMode]);
@@ -402,7 +418,9 @@ export default function QuizPage() {
           } catch (e) {}
         }
         const initialTime =
-          savedTime !== null && savedTime < defaultTime ? savedTime : defaultTime;
+          savedTime !== null && savedTime < defaultTime
+            ? savedTime
+            : defaultTime;
         setTimeLeft(initialTime);
       } else {
         setTimeLeft(null);
@@ -449,7 +467,10 @@ export default function QuizPage() {
           finalBlocks.push({ type: "single", question: q })
         );
       } else {
-        finalBlocks = questionsData.map((q) => ({ type: "single", question: q }));
+        finalBlocks = questionsData.map((q) => ({
+          type: "single",
+          question: q,
+        }));
       }
 
       setBlocks(finalBlocks);
@@ -508,6 +529,17 @@ export default function QuizPage() {
     setSelectedAnswers((prev) => ({ ...prev, [qId]: idx }));
   };
 
+  // --- دالة الترقيم الديناميكي ---
+  const getVisibleDots = (current, total) => {
+    if (total <= 5) return Array.from({ length: total }, (_, i) => i);
+    
+    if (current <= 2) return [0, 1, 2, 3, "...", total - 1];
+    
+    if (current >= total - 3) return [0, "...", total - 4, total - 3, total - 2, total - 1];
+    
+    return [0, "...", current - 1, current, current + 1, "...", total - 1];
+  };
+
   if (loading) return <LoadingScreen />;
 
   if (error) {
@@ -522,7 +554,11 @@ export default function QuizPage() {
             <span>00:00</span>
           </div>
           <div className="center-brand">
-            <img src="https://i.imgur.com/p1hg12H.png" alt="Logo" className="quiz-logo" />
+            <img
+              src="https://i.imgur.com/p1hg12H.png"
+              alt="Logo"
+              className="quiz-logo"
+            />
             <span className="quiz-brand-name">مركز النخبة التعليمي</span>
           </div>
           <button
@@ -563,7 +599,9 @@ export default function QuizPage() {
               onClick={() => navigate("/dashboard")}
               className="back-to-dashboard-btn"
             >
-              {isEnglishSubject ? "Back to Subjects" : "العودة إلى المواد الدراسية"}
+              {isEnglishSubject
+                ? "Back to Subjects"
+                : "العودة إلى المواد الدراسية"}
             </button>
           </div>
         </main>
@@ -618,9 +656,10 @@ export default function QuizPage() {
     ? ["A", "B", "C", "D"]
     : ["أ", "ب", "ج", "د"];
 
-  const currentQuestion = currentBlock.type === "passage"
-    ? currentBlock.questions[0]
-    : currentBlock.question;
+  const currentQuestion =
+    currentBlock.type === "passage"
+      ? currentBlock.questions[0]
+      : currentBlock.question;
   const questionDegree = currentQuestion?.degree || 1;
 
   const questionLabel = isEnglishSubject ? "Question" : "السؤال";
@@ -629,8 +668,12 @@ export default function QuizPage() {
   const prevLabel = isEnglishSubject ? "Previous" : "السابق";
   const nextLabel = isEnglishSubject ? "Next" : "التالي";
   const submitLabel = isEnglishSubject
-    ? submitting ? "Submitting..." : "Submit Quiz"
-    : submitting ? "جاري التسليم..." : "إنهاء الاختبار";
+    ? submitting
+      ? "Submitting..."
+      : "Submit Quiz"
+    : submitting
+    ? "جاري التسليم..."
+    : "إنهاء الاختبار";
 
   return (
     <div
@@ -642,7 +685,11 @@ export default function QuizPage() {
           <span>⏱️</span>
           <span
             className={
-              timeLeft < 60 ? "time-critical" : timeLeft < 300 ? "time-warning" : ""
+              timeLeft < 60
+                ? "time-critical"
+                : timeLeft < 300
+                ? "time-warning"
+                : ""
             }
           >
             {isReviewMode ? "--:--" : formatTime(timeLeft)}
@@ -687,23 +734,24 @@ export default function QuizPage() {
                 {isEnglishSubject ? (
                   currentBlock.type === "passage" ? (
                     <>
-                      {passageLabel} {currentBlockIndex + 1} {ofLabel} {passagesCount}
+                      {passageLabel} {currentBlockIndex + 1} {ofLabel}{" "}
+                      {passagesCount}
                       {" • "}
-                      {questionLabel} {currentQuestionNumber} {ofLabel} {totalQuestionsCount}
+                      {questionLabel} {currentQuestionNumber} {ofLabel}{" "}
+                      {totalQuestionsCount}
                     </>
                   ) : (
                     `${questionLabel} ${currentQuestionNumber} ${ofLabel} ${totalQuestionsCount}`
                   )
+                ) : currentBlock.type === "passage" ? (
+                  <>
+                    {passageLabel} {currentBlockIndex + 1} من {passagesCount}
+                    {" • "}
+                    {questionLabel} {currentQuestionNumber} {ofLabel}{" "}
+                    {totalQuestionsCount}
+                  </>
                 ) : (
-                  currentBlock.type === "passage" ? (
-                    <>
-                      {passageLabel} {currentBlockIndex + 1} من {passagesCount}
-                      {" • "}
-                      {questionLabel} {currentQuestionNumber} {ofLabel} {totalQuestionsCount}
-                    </>
-                  ) : (
-                    `${questionLabel} ${currentQuestionNumber} ${ofLabel} ${totalQuestionsCount}`
-                  )
+                  `${questionLabel} ${currentQuestionNumber} ${ofLabel} ${totalQuestionsCount}`
                 )}
                 <span className="question-degree">
                   ({formatDegree(questionDegree, isEnglishSubject)})
@@ -760,21 +808,34 @@ export default function QuizPage() {
                   )}
 
                   <div
-                    className={`options-grid ${isEnglishSubject ? "english-options" : ""}`}
+                    className={`options-grid ${
+                      isEnglishSubject ? "english-options" : ""
+                    }`}
                   >
                     {q.options?.map((opt, idx) => {
                       const englishLetter = ["a", "b", "c", "d"][idx];
                       const imageKey = `image_option_${englishLetter}`;
                       const optionImageUrl = q[imageKey];
                       const isSelected = selectedAnswers[q.id] === idx;
-                      const isCorrectAnswer = parseInt(q.correct_option) === idx;
+                      const isCorrectAnswer =
+                        parseInt(q.correct_option) === idx;
                       return (
                         <div
                           key={idx}
                           className={`option-item 
                             ${isSelected ? "selected" : ""} 
-                            ${isReviewMode && isCorrectAnswer ? "correct-answer-view" : ""}
-                            ${isReviewMode && isSelected && !isCorrectAnswer ? "wrong-answer-view" : ""}
+                            ${
+                              isReviewMode && isCorrectAnswer
+                                ? "correct-answer-view"
+                                : ""
+                            }
+                            ${
+                              isReviewMode &&
+                              isSelected &&
+                              !isCorrectAnswer
+                                ? "wrong-answer-view"
+                                : ""
+                            }
                           `}
                           onClick={() => handleAnswerSelect(q.id, idx)}
                         >
@@ -810,29 +871,37 @@ export default function QuizPage() {
             >
               {prevLabel}
             </button>
+            
             <div className="q-dots-nav">
-              {blocks.map((block, idx) => {
+              {getVisibleDots(currentBlockIndex, totalBlocks).map((item, idx) => {
+                if (item === "...") {
+                  return <span key={`ellipsis-${idx}`} className="dot-ellipsis">...</span>;
+                }
+
+                const block = blocks[item];
                 let isCompleted = false;
                 if (block.type === "passage") {
-                  const allAnswered = block.questions.every(
+                  isCompleted = block.questions.every(
                     (q) => selectedAnswers[q.id] !== undefined
                   );
-                  isCompleted = allAnswered;
                 } else {
-                  isCompleted =
-                    selectedAnswers[block.question.id] !== undefined;
+                  isCompleted = selectedAnswers[block.question.id] !== undefined;
                 }
+
                 return (
                   <div
-                    key={idx}
-                    className={`dot ${currentBlockIndex === idx ? "active" : ""} ${isCompleted ? "completed" : ""}`}
-                    onClick={() => setCurrentBlockIndex(idx)}
+                    key={item}
+                    className={`dot ${
+                      currentBlockIndex === item ? "active" : ""
+                    } ${isCompleted ? "completed" : ""}`}
+                    onClick={() => setCurrentBlockIndex(item)}
                   >
-                    {idx + 1}
+                    {item + 1}
                   </div>
                 );
               })}
             </div>
+
             <button
               className="nav-btn next"
               disabled={currentBlockIndex === totalBlocks - 1}
@@ -983,47 +1052,215 @@ export default function QuizPage() {
           transform: translate(-50%, -50%);
         }
 
-        .quiz-nav-controls { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-top: 40px; padding-top: 20px; border-top: 1px solid #eef2f6; }
-        .nav-btn { padding: 14px 36px; border-radius: 16px; border: 1.5px solid #e2e8f0; background: white; font-family: 'Cairo'; font-weight: 700; cursor: pointer; transition: all 0.2s ease; color: #475569; font-size: 1.05rem; }
-        .nav-btn:hover:not(:disabled) { background: #f8fafc; border-color: #cbd5e1; color: #0f172a; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
-        .nav-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+        /* === أزرار التنقل وحاوية النقاط الديناميكية === */
+        .quiz-nav-controls { 
+          display: flex; 
+          align-items: center; 
+          justify-content: space-between; 
+          gap: 10px; 
+          margin-top: 40px; 
+          padding-top: 25px; 
+          border-top: 1px solid #eef2f6; 
+          width: 100%;
+        }
+        
+        .nav-btn { 
+          padding: 12px 20px; 
+          border-radius: 16px; 
+          border: 1.5px solid #e2e8f0; 
+          background: white; 
+          font-family: 'Cairo'; 
+          font-weight: 700; 
+          cursor: pointer; 
+          transition: all 0.2s ease; 
+          color: #475569; 
+          font-size: 1rem; 
+          white-space: nowrap;
+          flex-shrink: 0;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        
+        .nav-btn:hover:not(:disabled) { 
+          background: #f8fafc; 
+          border-color: #cbd5e1; 
+          color: #0f172a; 
+          transform: translateY(-2px); 
+          box-shadow: 0 4px 12px rgba(0,0,0,0.05); 
+        }
+        
+        .nav-btn:disabled { 
+          opacity: 0.4; 
+          cursor: not-allowed; 
+          background: #f8fafc;
+        }
+
         .q-dots-nav {
           display: flex;
-          gap: 10px;
-          flex-wrap: wrap;
+          gap: 8px;
+          align-items: center;
           justify-content: center;
-          overflow-x: auto;
-          max-width: 100%;
-          padding: 4px 4px;
-          -webkit-overflow-scrolling: touch;
-          scrollbar-width: none;
+          flex: 1;
         }
-        .q-dots-nav::-webkit-scrollbar { display: none; }
-        .dot { background: white; border: 1.5px solid #e2e8f0; border-radius: 14px; min-width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.95rem; cursor: pointer; color: #64748b; padding: 0 10px; transition: all 0.2s; flex-shrink: 0; }
-        .dot.active { border-color: #3b82f6; color: #3b82f6; border-width: 2px; background: #eff6ff; transform: scale(1.08); box-shadow: 0 4px 12px rgba(59,130,246,0.15); }
-        .dot.completed { background: #ecfdf5; color: #10b981; border-color: #a7f3d0; }
-        .dot:hover:not(.active) { border-color: #cbd5e1; transform: translateY(-2px); }
 
+        .dot { 
+          background: white; 
+          border: 1.5px solid #e2e8f0; 
+          border-radius: 12px; 
+          min-width: 40px; 
+          height: 40px; 
+          display: flex; 
+          align-items: center; 
+          justify-content: center; 
+          font-weight: 700; 
+          font-size: 0.95rem; 
+          cursor: pointer; 
+          color: #64748b; 
+          transition: all 0.25s cubic-bezier(0.4,0,0.2,1); 
+          user-select: none;
+        }
+
+        .dot.active { 
+          border-color: #3b82f6; 
+          color: white; 
+          background: #3b82f6; 
+          transform: scale(1.1); 
+          box-shadow: 0 4px 14px rgba(59,130,246,0.3); 
+        }
+
+        .dot.completed:not(.active) { 
+          background: #ecfdf5; 
+          color: #10b981; 
+          border-color: #a7f3d0; 
+        }
+
+        .dot:hover:not(.active) { 
+          border-color: #94a3b8; 
+          transform: translateY(-2px); 
+        }
+
+        .dot-ellipsis {
+          color: #94a3b8;
+          font-weight: 800;
+          font-size: 1.2rem;
+          letter-spacing: 2px;
+          padding: 0 4px;
+          user-select: none;
+        }
+
+        /* === تحسينات شريط التمرير الاحترافي (Custom Scrollbar) === */
+        * {
+          scrollbar-width: thin;
+          scrollbar-color: #cbd5e1 transparent;
+        }
+
+        ::-webkit-scrollbar {
+          width: 8px;
+          height: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+          background: rgba(241, 245, 249, 0.4); 
+          border-radius: 10px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+          background: linear-gradient(180deg, #94a3b8, #cbd5e1);
+          border-radius: 10px;
+          border: 2px solid transparent;
+          background-clip: padding-box;
+          transition: background 0.3s ease;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+          background: linear-gradient(180deg, #3b82f6, #60a5fa);
+          border: 1px solid transparent;
+          background-clip: padding-box;
+        }
+
+        /* تخصيص شريط تمرير صندوق القطعة (Passage Box) للموبايل */
+        .passage-box::-webkit-scrollbar {
+          width: 5px;
+        }
+        .passage-box::-webkit-scrollbar-track {
+          background: #f8fafc;
+          border-radius: 8px;
+        }
+        .passage-box::-webkit-scrollbar-thumb {
+          background: #cbd5e1;
+          border-radius: 8px;
+        }
+        .passage-box::-webkit-scrollbar-thumb:hover {
+          background: #3b82f6;
+        }
+
+        /* نسخة الموبايل المُحسنة */
         @media (max-width: 768px) {
           .quiz-header { padding: 12px 20px; }
           .quiz-brand-name { display: none; }
-          .question-card { padding: 30px 24px; border-radius: 24px; }
-          .question-text { font-size: 1.25rem; }
-          .q-dots-nav {
-            display: flex;
-            flex-wrap: nowrap;
-            justify-content: flex-start;
-            overflow-x: auto;
-            max-width: 70vw;
-            margin: 0 auto;
+          .question-card { padding: 24px 20px; border-radius: 24px; }
+          .question-text { font-size: 1.2rem; }
+          
+          .quiz-nav-controls {
+            gap: 6px;
+            padding-top: 20px;
           }
-          .option-item { padding: 16px; gap: 10px; }
-          .option-label { width: 36px; height: 36px; font-size: 1rem; }
-          .option-value { font-size: 1rem; }
-          .option-image { max-height: 80px; }
-          .option-image-wrapper { max-width: 100px; }
-          .questions-container { gap: 35px; }
-          .nav-btn { padding: 12px 24px; font-size: 1rem; }
+          
+          .nav-btn {
+            padding: 10px 14px;
+            font-size: 0.9rem;
+            border-radius: 12px;
+          }
+
+          .q-dots-nav {
+            gap: 4px;
+          }
+
+          .dot {
+            min-width: 32px;
+            height: 32px;
+            font-size: 0.85rem;
+            border-radius: 10px;
+          }
+
+          .dot.active {
+            transform: scale(1.08);
+          }
+
+          .dot-ellipsis {
+            font-size: 1rem;
+            letter-spacing: 1px;
+            padding: 0 2px;
+          }
+
+          .option-item { padding: 14px; gap: 8px; }
+          .option-label { width: 34px; height: 34px; font-size: 0.95rem; }
+          .option-value { font-size: 0.95rem; }
+          .questions-container { gap: 32px; }
+
+          .passage-box {
+            max-height: 200px;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+            padding: 16px;
+          }
+        }
+        
+        /* للهواتف الصغيرة جداً (مثل iPhone SE) */
+        @media (max-width: 380px) {
+          .quiz-nav-controls {
+            flex-wrap: wrap;
+            justify-content: center;
+          }
+          .q-dots-nav {
+            order: -1;
+            width: 100%;
+            margin-bottom: 12px;
+          }
+          .nav-btn {
+            flex: 1;
+          }
         }
       `}</style>
     </div>
