@@ -643,17 +643,18 @@ export default function QuizPage() {
 
   const totalBlocks = blocks.length;
   const passagesCount = blocks.filter((b) => b.type === "passage").length;
+  
+  // إجمالي الأسئلة الفعلية (مستخدم في شريط التقدم فقط)
   const totalQuestionsCount = blocks.reduce(
     (acc, b) => acc + (b.type === "passage" ? b.questions.length : 1),
     0
   );
 
-  let currentQuestionNumber = 0;
-  for (let i = 0; i < currentBlockIndex; i++) {
-    const b = blocks[i];
-    currentQuestionNumber += b.type === "passage" ? b.questions.length : 1;
-  }
-  currentQuestionNumber++;
+  // العدد الجديد للعرض: عدد الكتل (كل قطعة تعتبر وحدة واحدة)
+  const displayTotal = totalBlocks;
+
+  // رقم السؤال الحالي بنظام الكتل
+  const displayCurrent = currentBlockIndex + 1;
 
   const answeredCount = Object.keys(selectedAnswers).length;
   const progress =
@@ -740,24 +741,19 @@ export default function QuizPage() {
                 {isEnglishSubject ? (
                   currentBlock.type === "passage" ? (
                     <>
-                      {passageLabel} {currentBlockIndex + 1} {ofLabel}{" "}
-                      {passagesCount}
-                      {" • "}
-                      {questionLabel} {currentQuestionNumber} {ofLabel}{" "}
-                      {totalQuestionsCount}
+                      {questionLabel} {displayCurrent} {ofLabel} {displayTotal}
                     </>
                   ) : (
-                    `${questionLabel} ${currentQuestionNumber} ${ofLabel} ${totalQuestionsCount}`
+                    `${questionLabel} ${displayCurrent} ${ofLabel} ${displayTotal}`
                   )
                 ) : currentBlock.type === "passage" ? (
                   <>
-                    {passageLabel} {currentBlockIndex + 1} من {passagesCount}
+                    {passageLabel} {displayCurrent} من {passagesCount || displayTotal}
                     {" • "}
-                    {questionLabel} {currentQuestionNumber} {ofLabel}{" "}
-                    {totalQuestionsCount}
+                    {questionLabel} {displayCurrent} {ofLabel} {displayTotal}
                   </>
                 ) : (
-                  `${questionLabel} ${currentQuestionNumber} ${ofLabel} ${totalQuestionsCount}`
+                  `${questionLabel} ${displayCurrent} ${ofLabel} ${displayTotal}`
                 )}
                 <span className="question-degree">
                   ({formatDegree(questionDegree, isEnglishSubject)})
@@ -953,13 +949,10 @@ export default function QuizPage() {
         .question-degree { margin-inline-start: 8px; font-size: 0.85rem; color: #64748b; }
         
         .passage-box { 
-          /*background: #f8fafc;*/
           padding: 30px; 
           border-radius: 20px; 
           margin-bottom: 35px; 
-          /*position: relative;*/
           overflow: hidden; 
-          /*border: 1px solid #f1f5f9; */
           text-align: start; 
         }
         .passage-accent { 
@@ -1077,7 +1070,7 @@ export default function QuizPage() {
           color: #475569; 
           font-size: 1rem; 
           white-space: nowrap;
-          flex-shrink: 0; /* لمنع تقلص الأزرار */
+          flex-shrink: 0;
           display: flex;
           align-items: center;
           justify-content: center;
@@ -1098,19 +1091,18 @@ export default function QuizPage() {
           background: #f8fafc;
         }
 
-        /* الحاوية الجديدة الاحترافية */
         .q-dots-scroll-container {
-              display: flex;
-    gap: 8px;
-    align-items: center;
-    flex: 1;
-    overflow-x: auto;
-    scroll-behavior: smooth;
-    padding: 10px 18px;
-    -ms-overflow-style: none;
-    scrollbar-width: none;
-    mask-image: linear-gradient(to right, transparent, black 5%, black 95%, transparent);
-    -webkit-mask-image: linear-gradient(to right, transparent, black 5%, black 95%, transparent);
+          display: flex;
+          gap: 8px;
+          align-items: center;
+          flex: 1;
+          overflow-x: auto;
+          scroll-behavior: smooth;
+          padding: 10px 40px;
+          -ms-overflow-style: none;
+          scrollbar-width: none;
+          mask-image: linear-gradient(to right, transparent, black 5%, black 95%, transparent);
+          -webkit-mask-image: linear-gradient(to right, transparent, black 5%, black 95%, transparent);
         }
         .q-dots-scroll-container::-webkit-scrollbar {
           display: none;
@@ -1119,7 +1111,7 @@ export default function QuizPage() {
         .dot { 
           background: white; 
           border: 2px solid #e2e8f0; 
-          border-radius: 30%; /* شكل دائري احترافي بدلاً من المربع */
+          border-radius: 30%;
           min-width: 44px; 
           height: 44px; 
           display: flex; 
@@ -1131,7 +1123,7 @@ export default function QuizPage() {
           color: #64748b; 
           transition: all 0.3s cubic-bezier(0.4,0,0.2,1); 
           user-select: none;
-          flex-shrink: 0; /* مهم جداً لمنع انضغاط الدوائر */
+          flex-shrink: 0;
         }
 
         .dot.active { 
@@ -1153,7 +1145,6 @@ export default function QuizPage() {
           transform: translateY(-2px); 
         }
 
-        /* === تحسينات شريط التمرير الاحترافي (Custom Scrollbar) === */
         * {
           scrollbar-width: thin;
           scrollbar-color: #cbd5e1 transparent;
@@ -1183,7 +1174,6 @@ export default function QuizPage() {
           background-clip: padding-box;
         }
 
-        /* تخصيص شريط تمرير صندوق القطعة (Passage Box) للموبايل */
         .passage-box::-webkit-scrollbar {
           width: 5px;
         }
@@ -1199,7 +1189,6 @@ export default function QuizPage() {
           background: #3b82f6;
         }
 
-        /* نسخة الموبايل المُحسنة */
         @media (max-width: 768px) {
           .quiz-header { padding: 12px 20px; }
           .quiz-brand-name { display: none; }
@@ -1219,7 +1208,7 @@ export default function QuizPage() {
           .q-dots-scroll-container {
             gap: 8px;
             padding: 10px 0;
-            mask-image: none; /* إزالة التدرج في الشاشات الصغيرة لتحسين الأداء */
+            mask-image: none;
             -webkit-mask-image: none;
           }
 
@@ -1243,7 +1232,6 @@ export default function QuizPage() {
           }
         }
         
-        /* للهواتف الصغيرة جداً (مثل iPhone SE) */
         @media (max-width: 380px) {
           .quiz-nav-controls {
             flex-wrap: wrap;
