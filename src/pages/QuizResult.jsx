@@ -56,10 +56,10 @@ export default function QuizResult() {
             <div className="icon-wrap">
               <FileText size={24} />
             </div>
-            <div>
-              <h1>ملخص محاولة الاختبار</h1>
-              <p>اسم الطالب: {result.studentName}</p>
-            </div>
+            <div className="title-content">
+  <h1>ملخص محاولة الاختبار</h1>
+  <p>اسم الطالب: {result.studentName}</p>
+</div>
           </div>
 
           <div className="grade-card">
@@ -125,10 +125,10 @@ export default function QuizResult() {
                         </span>
                       </td>
                       <td className="text-center">
-                        <span className="answer-badge is-model">
-                          {getOptionText(q, q.correct_option)}
-                        </span>
-                      </td>
+  <span className="answer-badge is-correct-model">
+    {getOptionText(q, q.correct_option)}
+  </span>
+</td>
                       <td className="text-center">
                         <span className="max-point-badge">{q.points || "1.00"}</span>
                       </td>
@@ -303,32 +303,41 @@ export default function QuizResult() {
         }
 
         .q-text-cell {
-          max-width: 300px;
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          font-weight: 600;
-          color: #0f172a;
-        }
+  max-width: 320px;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: unset;
+  font-weight: 600;
+  color: #0f172a;
+  line-height: 1.7;
+  word-break: break-word;
+}
 
         /* استبدال choice-pill بـ answer-badge للنصوص */
         .answer-badge {
-          display: inline-block;
-          padding: 4px 12px;
-          border-radius: 20px;
-          font-weight: 600;
-          font-size: 0.85rem;
-          max-width: 220px;
-          word-break: break-word;
-          line-height: 1.4;
-        }
+  display: inline-block;
+  padding: 6px 14px;
+  border-radius: 14px;
+  font-weight: 600;
+  font-size: 0.85rem;
+  max-width: 100%;
+  word-break: break-word;
+  white-space: normal;
+  line-height: 1.6;
+  text-align: start;
+}
 
-        .answer-badge.is-correct {
+        .answer-badge.is-correct-model {
+  background: #ecfdf5;
+  color: #065f46;
+  border: 1px solid #a7f3d0;
+}
+
+.answer-badge.is-correct {
           background: #ecfdf5;
           color: #065f46;
           border: 1px solid #a7f3d0;
         }
-
         .answer-badge.is-wrong {
           background: #fef2f2;
           color: #991b1b;
@@ -439,7 +448,13 @@ export default function QuizResult() {
           font-size: 0.8rem;
           color: #475569;
         }
-
+.q-text-cell,
+.row-question-text,
+.answer-badge,
+.badge-wrong,
+.badge-model {
+  unicode-bidi: plaintext;
+}
         .meta-item {
           display: flex;
           align-items: center;
@@ -450,31 +465,32 @@ export default function QuizResult() {
           white-space: nowrap;
         }
 
-        .badge-wrong {
-          background: #fef2f2;
-          color: #991b1b;
-          padding: 2px 10px;
-          border-radius: 6px;
-          font-weight: 700;
-          border: 1px solid #fecaca;
-          max-width: 140px;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          white-space: nowrap;
-        }
+        .badge-wrong,
+.badge-model {
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-weight: 700;
+  border: 1px solid;
+  max-width: 100%;
+  overflow: visible;
+  text-overflow: unset;
+  white-space: normal;
+  word-break: break-word;
+  line-height: 1.5;
+  display: inline-block;
+}
 
-        .badge-model {
-          background: #eff6ff;
-          color: #1e40af;
-          padding: 2px 10px;
-          border-radius: 6px;
-          font-weight: 700;
-          border: 1px solid #bfdbfe;
-          max-width: 140px;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          white-space: nowrap;
-        }
+.badge-wrong {
+  background: #fef2f2;
+  color: #991b1b;
+  border-color: #fecaca;
+}
+
+.badge-model {
+  background: #ecfdf5;
+  color: #065f46;
+  border-color: #a7f3d0;
+}
 
         .row-divider {
           height: 1px;
