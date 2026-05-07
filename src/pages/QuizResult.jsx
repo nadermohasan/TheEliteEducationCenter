@@ -505,32 +505,109 @@ export default function QuizResult() {
         }
 
         @media (max-width: 768px) {
-          .report-header { 
-            flex-direction: column; 
-            align-items: center; 
-            text-align: center; 
-            gap: 20px; 
-          }
-          .grade-card { 
-            border-right: none; 
-            border-top: 1px solid #edf2f7; 
-            padding: 20px 0 0; 
-            width: 100%; 
-            text-align: center;
-          }
-          .grade-value {
-            justify-content: center;
-          }
-          .summary-bar { flex-direction: column; gap: 10px; }
+  .main-wrapper {
+    padding: 24px 14px 80px;
+  }
 
-          .table-responsive {
-            display: none;
-          }
+  .report-header {
+    flex-direction: column;
+    align-items: stretch;
+    text-align: right;
+    gap: 18px;
+    padding: 18px;
+    border-radius: 18px;
+  }
 
-          .single-card-mobile {
-            display: block;
-          }
-        }
+  .title-section {
+    gap: 12px;
+    align-items: center;
+  }
+
+  .icon-wrap {
+    width: 42px;
+    height: 42px;
+    flex-shrink: 0;
+  }
+
+  .title-content {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: nowrap;
+  }
+
+  .title-content h1 {
+    font-size: 0.95rem;
+    margin: 0;
+    white-space: nowrap;
+  }
+
+  .title-content p {
+    font-size: 0.78rem;
+    margin: 0;
+    color: #64748b;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .grade-card {
+    border-right: none;
+    border-top: 1px solid #edf2f7;
+    padding: 18px 0 0;
+    width: 100%;
+    text-align: center;
+  }
+
+  .grade-value {
+    justify-content: center;
+  }
+
+  .summary-bar {
+    flex-direction: column;
+    gap: 12px;
+    padding: 18px;
+    border-radius: 16px;
+  }
+
+  .summary-item {
+    font-size: 0.85rem;
+  }
+
+  .table-responsive {
+    display: none;
+  }
+
+  .single-card-mobile {
+    display: block;
+  }
+
+  .mobile-card {
+    border-radius: 18px;
+    padding: 18px 14px;
+  }
+
+  .row-meta {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .meta-item {
+    width: 100%;
+    justify-content: space-between;
+    align-items: flex-start;
+    white-space: normal;
+  }
+
+  .btn-dashboard {
+    width: 100%;
+    justify-content: center;
+    padding: 16px;
+    font-size: 0.9rem;
+  }
+}
       `}</style>
     </div>
   );
