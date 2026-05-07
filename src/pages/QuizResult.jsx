@@ -20,7 +20,7 @@ export default function QuizResult() {
     }
   }, [state, navigate]);
 
-  // كشف إذا كان المحتوى إنجليزياً
+  // كشف إذا كان المحتوى الأساسي (أسئلة وإجابات) إنجليزياً
   useEffect(() => {
     if (!result?.questions) return;
     const allTexts = result.questions.flatMap(q => [
@@ -55,10 +55,11 @@ export default function QuizResult() {
   };
 
   return (
-    <div className={`nokhba-institutional-v4 ${isEnglishContent ? 'english-mode' : ''}`}>
+    <div className={`nokhba-institutional-v4 ${isEnglishContent ? 'english-answers-mode' : ''}`}>
       <Navbar userName={result.studentName} />
 
       <main className="main-wrapper">
+        {/* رأس التقرير يبقى محاذاة يمين دائماً */}
         <header className="report-header">
           <div className="title-section">
             <div className="icon-wrap">
@@ -101,7 +102,7 @@ export default function QuizResult() {
             <h2>تفاصيل ورقة الإجابة</h2>
           </div>
 
-          {/* الجدول للشاشات الكبيرة */}
+          {/* الجدول للشاشات الكبيرة - المحاذاة تتأثر بـ english-answers-mode */}
           <div className="table-responsive">
             <table className="modern-table">
               <thead>
@@ -147,42 +148,48 @@ export default function QuizResult() {
             </table>
           </div>
 
-          {/* عرض جميع الأسئلة في الموبايل (بطاقات) */}
-          <div className="mobile-questions-list">
-            {result.questions.map((q, idx) => {
-              const userAnswerId = result.selectedAnswers?.[q.id];
-              const isCorrect = parseInt(userAnswerId) === parseInt(q.correct_option);
-              return (
-                <div key={idx} className={`mobile-question-card ${isCorrect ? 'correct-card' : 'wrong-card'}`}>
-                  <div className="card-header">
-                    <span className="q-num">السؤال {idx + 1}</span>
-                    {isCorrect ? (
-                      <Check size={20} className="icon-correct" />
-                    ) : (
-                      <X size={20} className="icon-wrong" />
-                    )}
-                  </div>
-                  <div className="card-question">{q.question_text}</div>
-                  <div className="card-answers">
-                    <div className="answer-row">
-                      <span className="answer-label">إجابتك:</span>
-                      <span className={`user-answer ${isCorrect ? 'correct-answer' : 'wrong-answer'}`}>
-                        {getOptionText(q, userAnswerId)}
-                      </span>
+          {/* الموبايل: بطاقة واحدة فقط تحتوي على جميع الأسئلة */}
+          <div className="single-card-mobile">
+            <div className="mobile-answers-card">
+              <div className="card-inner-header">
+                <span className="card-title">📋 قائمة الأسئلة</span>
+                <span className="card-badge">{total} سؤال</span>
+              </div>
+              <div className="questions-list">
+                {result.questions.map((q, idx) => {
+                  const userAnswerId = result.selectedAnswers?.[q.id];
+                  const isCorrect = parseInt(userAnswerId) === parseInt(q.correct_option);
+                  return (
+                    <div key={idx} className={`question-item ${isCorrect ? 'item-correct' : 'item-wrong'}`}>
+                      <div className="item-header">
+                        <span className="q-num">سؤال {idx + 1}</span>
+                        {isCorrect ? <Check size={18} /> : <X size={18} />}
+                      </div>
+                      <div className="item-question">{q.question_text}</div>
+                      <div className="item-details">
+                        <div className="detail-row">
+                          <span className="detail-label">إجابتك:</span>
+                          <span className={`detail-answer user-ans ${isCorrect ? 'correct-ans' : 'wrong-ans'}`}>
+                            {getOptionText(q, userAnswerId)}
+                          </span>
+                        </div>
+                        <div className="detail-row">
+                          <span className="detail-label">النموذجية:</span>
+                          <span className="detail-answer model-ans">
+                            {getOptionText(q, q.correct_option)}
+                          </span>
+                        </div>
+                        <div className="detail-points">
+                          <span>الدرجة: </span>
+                          <strong>{isCorrect ? (q.points || "1.00") : "0.00"}</strong>
+                          <span> / {q.points || "1.00"}</span>
+                        </div>
+                      </div>
                     </div>
-                    <div className="answer-row">
-                      <span className="answer-label">الإجابة الصحيحة:</span>
-                      <span className="model-answer">{getOptionText(q, q.correct_option)}</span>
-                    </div>
-                  </div>
-                  <div className="card-points">
-                    <span>الدرجة: </span>
-                    <strong>{isCorrect ? (q.points || "1.00") : "0.00"}</strong>
-                    <span> / {q.points || "1.00"}</span>
-                  </div>
-                </div>
-              );
-            })}
+                  );
+                })}
+              </div>
+            </div>
           </div>
         </section>
 
@@ -206,15 +213,21 @@ export default function QuizResult() {
           color: #2d3748;
         }
 
-        /* الوضع الإنجليزي */
-        .nokhba-institutional-v4.english-mode {
+        /* عند وجود محتوى إنجليزي، يتم تطبيق المحاذاة لليسار فقط على النصوص الإنجليزية (الأسئلة والإجابات) */
+        .english-answers-mode .q-text-cell,
+        .english-answers-mode .answer-badge,
+        .english-answers-mode .question-item,
+        .english-answers-mode .modern-table td,
+        .english-answers-mode .modern-table th {
           direction: ltr;
           text-align: left;
         }
-        .english-mode .title-section,
-        .english-mode .summary-bar,
-        .english-mode .mobile-question-card {
-          text-align: left;
+        /* نعيد الاتجاه الصحيح للأعمدة التي تحتوي على أرقام ونقاط */
+        .english-answers-mode .id-col,
+        .english-answers-mode .max-point-badge,
+        .english-answers-mode .point-badge {
+          direction: rtl;
+          text-align: center;
         }
 
         .main-wrapper {
@@ -223,7 +236,6 @@ export default function QuizResult() {
           padding: 50px 20px 100px;
         }
 
-        /* رأس التقرير */
         .report-header {
           display: flex;
           justify-content: space-between;
@@ -232,10 +244,8 @@ export default function QuizResult() {
           padding: 30px;
           border-radius: 12px;
           border: 1px solid #e2e8f0;
-          box-shadow: 0 1px 3px rgba(0,0,0,0.02);
           margin-bottom: 25px;
         }
-
         .title-section { display: flex; align-items: center; gap: 20px; }
         .icon-wrap { 
           width: 50px; height: 50px; background: #f1f5f9; color: #1e3a8a; 
@@ -251,7 +261,6 @@ export default function QuizResult() {
         .grade-value .of { color: #cbd5e0; font-size: 1.2rem; }
         .grade-value .total { font-size: 1.2rem; font-weight: 700; color: #718096; }
 
-        /* شريط الإحصائيات */
         .summary-bar {
           display: flex; gap: 30px; padding: 15px 30px; 
           background: #f8fafc; border-radius: 10px; margin-bottom: 40px;
@@ -266,7 +275,6 @@ export default function QuizResult() {
         .section-title { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; }
         .section-title h2 { font-size: 1.1rem; font-weight: 700; color: #2d3748; margin: 0; }
 
-        /* الجدول العادي */
         .table-responsive {
           width: 100%;
           overflow-x: auto;
@@ -274,279 +282,102 @@ export default function QuizResult() {
           border: 1px solid #e2e8f0;
           background: #ffffff;
         }
-        .modern-table {
-          width: 100%;
-          border-collapse: separate;
-          border-spacing: 0;
-          min-width: 700px;
-        }
+        .modern-table { width: 100%; border-collapse: separate; border-spacing: 0; min-width: 700px; }
         .modern-table th {
-          background: #f1f5f9;
-          padding: 16px 20px;
-          color: #475569;
-          font-weight: 700;
-          font-size: 0.8rem;
-          text-transform: uppercase;
-          border-bottom: 2px solid #e2e8f0;
+          background: #f1f5f9; padding: 16px 20px; color: #475569; font-weight: 700;
+          font-size: 0.8rem; text-transform: uppercase; border-bottom: 2px solid #e2e8f0;
           text-align: center;
         }
-        .modern-table td {
-          padding: 20px 15px;
-          border-bottom: 1px solid #f1f5f9;
-          color: #334155;
-          vertical-align: middle;
-          font-size: 0.95rem;
-        }
+        .modern-table td { padding: 20px 15px; border-bottom: 1px solid #f1f5f9; color: #334155; vertical-align: middle; font-size: 0.95rem; }
         .modern-table tbody tr:hover td { background-color: #f8fafc; }
         .modern-table tbody tr:last-child td { border-bottom: none; }
-        .id-col { 
-          background: #f8fafc; 
-          border-radius: 6px; 
-          text-align: center; 
-          font-weight: 700; 
-          color: #1e3a8a; 
-        }
-        .q-text-cell {
-          max-width: 320px;
-          white-space: normal;
-          word-break: break-word;
-          font-weight: 600;
-          color: #0f172a;
-          line-height: 1.7;
-        }
-        .answer-badge {
-          display: inline-block;
-          padding: 6px 14px;
-          border-radius: 14px;
-          font-weight: 600;
-          font-size: 0.85rem;
-          word-break: break-word;
-          white-space: normal;
-          line-height: 1.6;
-        }
-        .answer-badge.is-correct {
-          background: #ecfdf5;
-          color: #065f46;
-          border: 1px solid #a7f3d0;
-        }
-        .answer-badge.is-wrong {
-          background: #fef2f2;
-          color: #991b1b;
-          border: 1px solid #fecaca;
-        }
-        .answer-badge.is-model {
-          background: #eff6ff;
-          color: #1e40af;
-          border: 1px solid #bfdbfe;
-        }
-        .max-point-badge, .point-badge {
-          display: inline-block;
-          padding: 4px 12px;
-          border-radius: 20px;
-          font-weight: 600;
-          font-size: 0.85rem;
-        }
+        .id-col { background: #f8fafc; border-radius: 6px; text-align: center; font-weight: 700; color: #1e3a8a; }
+        .q-text-cell { max-width: 320px; white-space: normal; word-break: break-word; font-weight: 600; color: #0f172a; line-height: 1.7; }
+        .answer-badge { display: inline-block; padding: 6px 14px; border-radius: 14px; font-weight: 600; font-size: 0.85rem; word-break: break-word; white-space: normal; line-height: 1.6; }
+        .answer-badge.is-correct { background: #ecfdf5; color: #065f46; border: 1px solid #a7f3d0; }
+        .answer-badge.is-wrong { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
+        .answer-badge.is-model { background: #eff6ff; color: #1e40af; border: 1px solid #bfdbfe; }
+        .max-point-badge, .point-badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-weight: 600; font-size: 0.85rem; }
         .max-point-badge { background: #f1f5f9; color: #475569; }
         .point-badge.plus { background: #ecfdf5; color: #065f46; border: 1px solid #a7f3d0; }
         .point-badge.zero { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
         .text-center { text-align: center !important; }
 
-        /* ========== تصميم الموبايل ========== */
-        .mobile-questions-list {
+        /* ===== بطاقة واحدة للموبايل ===== */
+        .single-card-mobile {
           display: none;
-          flex-direction: column;
-          gap: 20px;
+          margin-top: 20px;
         }
-
-        .mobile-question-card {
+        .mobile-answers-card {
           background: white;
-          border-radius: 20px;
+          border-radius: 24px;
           border: 1px solid #e2e8f0;
-          padding: 18px;
-          box-shadow: 0 4px 12px rgba(0,0,0,0.03);
-          transition: all 0.2s;
+          overflow: hidden;
+          box-shadow: 0 4px 12px rgba(0,0,0,0.04);
         }
-        .mobile-question-card.correct-card {
-          border-right: 6px solid #10b981;
+        .card-inner-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 16px 20px;
+          background: #f8fafc;
+          border-bottom: 1px solid #e2e8f0;
+          font-weight: 700;
         }
-        .mobile-question-card.wrong-card {
-          border-right: 6px solid #ef4444;
+        .card-title { font-size: 1rem; color: #1e3a8a; }
+        .card-badge { background: #e2e8f0; padding: 4px 12px; border-radius: 30px; font-size: 0.75rem; color: #334155; }
+        .questions-list { display: flex; flex-direction: column; }
+        .question-item {
+          padding: 18px 20px;
+          border-bottom: 1px solid #edf2f7;
+          transition: background 0.2s;
         }
-        .english-mode .mobile-question-card {
-          border-right: none;
-          border-left: 6px solid;
-        }
-        .english-mode .mobile-question-card.correct-card { border-left-color: #10b981; }
-        .english-mode .mobile-question-card.wrong-card { border-left-color: #ef4444; }
-
-        .card-header {
+        .question-item:last-child { border-bottom: none; }
+        .item-correct { background: #fefefa; }
+        .item-wrong { background: #fffbfb; }
+        .item-header {
           display: flex;
           justify-content: space-between;
           align-items: center;
           margin-bottom: 12px;
-          padding-bottom: 8px;
-          border-bottom: 1px dashed #e2e8f0;
         }
-        .q-num {
-          font-weight: 800;
-          color: #1e3a8a;
-          background: #f1f5f9;
-          padding: 4px 12px;
-          border-radius: 30px;
-          font-size: 0.8rem;
-        }
-        .icon-correct { color: #10b981; }
-        .icon-wrong { color: #ef4444; }
-
-        .card-question {
-          font-weight: 700;
-          font-size: 1rem;
-          color: #0f172a;
-          line-height: 1.6;
-          margin-bottom: 16px;
-          word-break: break-word;
-        }
-
-        .card-answers {
-          background: #f8fafc;
-          border-radius: 16px;
-          padding: 12px;
-          margin-bottom: 16px;
-        }
-        .answer-row {
-          display: flex;
-          align-items: flex-start;
-          gap: 12px;
-          margin-bottom: 12px;
-          flex-wrap: wrap;
-        }
-        .answer-row:last-child { margin-bottom: 0; }
-        .answer-label {
-          font-weight: 600;
-          color: #475569;
-          min-width: 95px;
-          font-size: 0.85rem;
-        }
-        .user-answer, .model-answer {
-          flex: 1;
-          padding: 6px 12px;
-          border-radius: 12px;
-          font-size: 0.85rem;
-          font-weight: 500;
-          word-break: break-word;
-          background: white;
-          border: 1px solid #e2e8f0;
-        }
-        .correct-answer {
-          background: #ecfdf5;
-          border-color: #a7f3d0;
-          color: #065f46;
-        }
-        .wrong-answer {
-          background: #fef2f2;
-          border-color: #fecaca;
-          color: #991b1b;
-        }
-        .model-answer {
-          background: #eff6ff;
-          border-color: #bfdbfe;
-          color: #1e40af;
-        }
-
-        .card-points {
-          text-align: left;
-          font-size: 0.85rem;
-          color: #475569;
-          padding-top: 8px;
-          border-top: 1px solid #edf2f7;
-        }
-        .card-points strong {
-          font-size: 1rem;
-          color: #1e3a8a;
-        }
+        .q-num { font-weight: 800; color: #1e3a8a; background: #eff6ff; padding: 2px 12px; border-radius: 50px; font-size: 0.8rem; }
+        .item-question { font-weight: 700; font-size: 0.95rem; color: #0f172a; margin-bottom: 14px; line-height: 1.6; word-break: break-word; }
+        .item-details { background: #f9f9fc; border-radius: 16px; padding: 12px; }
+        .detail-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; align-items: flex-start; }
+        .detail-label { font-weight: 600; color: #475569; min-width: 85px; font-size: 0.8rem; }
+        .detail-answer { flex: 1; padding: 4px 12px; border-radius: 12px; font-size: 0.85rem; word-break: break-word; background: white; border: 1px solid #e2e8f0; }
+        .correct-ans { background: #ecfdf5; border-color: #a7f3d0; color: #065f46; }
+        .wrong-ans { background: #fef2f2; border-color: #fecaca; color: #991b1b; }
+        .model-ans { background: #eff6ff; border-color: #bfdbfe; color: #1e40af; }
+        .detail-points { margin-top: 10px; font-size: 0.8rem; color: #475569; text-align: left; padding-top: 8px; border-top: 1px solid #edf2f7; }
+        .detail-points strong { color: #1e3a8a; font-size: 0.9rem; }
 
         /* أزرار */
         .footer-actions { margin-top: 50px; text-align: center; }
         .btn-dashboard {
-          background: #4776ff;
-          color: #ffffff;
-          border: none;
-          border-radius: 50px;
-          padding: 14px 36px;
-          font-weight: 700;
-          font-size: 0.95rem;
-          cursor: pointer;
-          display: inline-flex;
-          align-items: center;
-          gap: 12px;
-          transition: all 0.25s;
+          background: #4776ff; color: white; border: none; border-radius: 50px;
+          padding: 14px 36px; font-weight: 700; font-size: 0.95rem; cursor: pointer;
+          display: inline-flex; align-items: center; gap: 12px; transition: 0.25s;
           box-shadow: 0 4px 12px rgba(30,58,138,0.2);
         }
-        .btn-dashboard:hover {
-          background: #153072;
-          transform: translateY(-2px);
-        }
+        .btn-dashboard:hover { background: #153072; transform: translateY(-2px); }
 
-        /* ========== استجابة الهواتف ========== */
+        /* استجابة الهواتف */
         @media (max-width: 768px) {
-          .main-wrapper {
-            padding: 24px 14px 80px;
-          }
-          .report-header {
-            flex-direction: column;
-            align-items: stretch;
-            text-align: right;
-            gap: 18px;
-            padding: 18px;
-          }
-          .title-section {
-            gap: 12px;
-          }
-          .icon-wrap {
-            width: 42px;
-            height: 42px;
-          }
-          .title-content {
-            display: flex;
-            align-items: baseline;
-            gap: 10px;
-            flex-wrap: wrap;
-          }
-          .title-content h1 {
-            font-size: 1rem;
-            white-space: nowrap;
-          }
-          .title-content p {
-            font-size: 0.75rem;
-            margin: 0;
-            white-space: nowrap;
-          }
-          .grade-card {
-            border-right: none;
-            border-top: 1px solid #edf2f7;
-            padding: 18px 0 0;
-            width: 100%;
-            text-align: center;
-          }
-          .grade-value {
-            justify-content: center;
-          }
-          .summary-bar {
-            flex-direction: column;
-            gap: 12px;
-            padding: 18px;
-          }
-          .table-responsive {
-            display: none;
-          }
-          .mobile-questions-list {
-            display: flex;
-          }
-          .btn-dashboard {
-            width: 100%;
-            justify-content: center;
-            padding: 16px;
-          }
+          .main-wrapper { padding: 24px 14px 80px; }
+          .report-header { flex-direction: column; align-items: stretch; gap: 18px; padding: 18px; }
+          .title-section { gap: 12px; }
+          .icon-wrap { width: 42px; height: 42px; }
+          .title-content { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+          .title-content h1 { font-size: 1rem; white-space: nowrap; }
+          .title-content p { font-size: 0.75rem; margin: 0; white-space: nowrap; }
+          .grade-card { border-right: none; border-top: 1px solid #edf2f7; padding: 18px 0 0; width: 100%; text-align: center; }
+          .grade-value { justify-content: center; }
+          .summary-bar { flex-direction: column; gap: 12px; padding: 18px; }
+          .table-responsive { display: none; }
+          .single-card-mobile { display: block; }
+          .btn-dashboard { width: 100%; justify-content: center; padding: 16px; }
         }
       `}</style>
     </div>
