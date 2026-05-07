@@ -682,6 +682,10 @@ export default function QuizPage() {
     ? "جاري التسليم..."
     : "إنهاء الاختبار";
 
+const currentDegree = currentBlock.type === "passage"
+  ? currentBlock.questions.reduce((sum, q) => sum + (q.degree || 1), 0)
+  : (currentQuestion?.degree || 1);
+
   return (
     <div
       className="quiz-page-wrapper"
@@ -756,8 +760,8 @@ export default function QuizPage() {
                   `${questionLabel} ${displayCurrent} ${ofLabel} ${displayTotal}`
                 )}
                 <span className="question-degree">
-                  ({formatDegree(questionDegree, isEnglishSubject)})
-                </span>
+  ({formatDegree(currentDegree, isEnglishSubject)})
+</span>
               </span>
             </div>
 
@@ -972,7 +976,7 @@ export default function QuizPage() {
         .single-question-wrapper:first-child { border-top: none; padding-top: 0; }
         .question-header { margin-bottom: 20px; }
         .question-number { background: #f1f5f9; color: #475569; padding: 6px 14px; border-radius: 100px; font-size: 0.85rem; font-weight: 700; display: inline-block; }
-        .question-text { color: #0f172a; line-height: 1.7; font-size: 1.45rem; font-weight: 700; margin-bottom: 32px; text-align: start; }
+        .question-text { color: #0f172a; line-height: 1.7; font-size: 1.45rem; font-weight: 600; margin-bottom: 32px; text-align: start; }
         .question-image-container { text-align: center; margin: 24px 0; }
         .question-image { max-width: 100%; max-height: 350px; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.08); border: 1px solid #f1f5f9; }
         .options-grid { display: flex; flex-direction: column; gap: 14px; }
