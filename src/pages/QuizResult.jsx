@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { 
-  FileText, Home, ListChecks, Check, X, Bookmark, MoveHorizontal
+  FileText, Home, ListChecks, Check, X, Bookmark
 } from "lucide-react";
 import Footer from './Footer';
 import Navbar from './Navbar';
@@ -29,6 +29,21 @@ export default function QuizResult() {
     const labels = ['أ', 'ب', 'ج', 'د', 'هـ'];
     return labels[index] || index;
   };
+
+  // دالة مساعدة لاستخلاص نص الإجابة من الخيارات
+  const getOptionText = (question, optionIndex) => {
+    if (optionIndex === undefined || optionIndex === null) return "-";
+    if (question?.options && Array.isArray(question.options)) {
+      return question.options[optionIndex] || getOptionLabel(optionIndex);
+    }
+    return getOptionLabel(optionIndex);
+  };
+
+  // تصفية الأسئلة الخاطئة فقط لعرض الجوال
+  const wrongQuestions = result.questions.filter(q => {
+    const userAnswerId = result.selectedAnswers?.[q.id];
+    return parseInt(userAnswerId) !== parseInt(q.correct_option);
+  });
 
   return (
     <div className="nokhba-institutional-v4">
@@ -73,24 +88,22 @@ export default function QuizResult() {
           </div>
         </div>
        
-        {/* جدول مراجعة الإجابات */}
+        {/* قسم تفاصيل الإجابات */}
         <section className="table-section">
           <div className="section-title">
             <ListChecks size={20} />
             <h2>تفاصيل ورقة الإجابة</h2>
           </div>
-<div className="mobile-scroll-hint">
-  <MoveHorizontal size={16} />
-  <span>مرر لليمين أو لليسار لمشاهدة جميع الأعمدة</span>
-</div>
+
+          {/* الجدول - للشاشات الكبيرة فقط */}
           <div className="table-responsive">
             <table className="modern-table">
               <thead>
                 <tr>
                   <th width="70">#</th>
                   <th>نص السؤال</th>
-                  <th width="120" className="text-center">إجابة الطالب</th>
-                  <th width="120" className="text-center">الإجابة النموذجية</th>
+                  <th className="text-center">إجابة الطالب</th>
+                  <th className="text-center">الإجابة النموذجية</th>
                   <th width="100" className="text-center">الدرجة القصوى</th>
                   <th width="100" className="text-center">النقاط</th>
                 </tr>
@@ -107,13 +120,13 @@ export default function QuizResult() {
                         {q.question_text}
                       </td>
                       <td className="text-center">
-                        <span className={`choice-pill ${isCorrect ? 'is-correct' : 'is-wrong'}`}>
-                          {getOptionLabel(userAnswerId)}
+                        <span className={`answer-badge ${isCorrect ? 'is-correct' : 'is-wrong'}`}>
+                          {getOptionText(q, userAnswerId)}
                         </span>
                       </td>
                       <td className="text-center">
-                        <span className="choice-pill is-actual">
-                          {getOptionLabel(q.correct_option)}
+                        <span className="answer-badge is-model">
+                          {getOptionText(q, q.correct_option)}
                         </span>
                       </td>
                       <td className="text-center">
@@ -130,11 +143,49 @@ export default function QuizResult() {
               </tbody>
             </table>
           </div>
+
+          {/* بطاقة واحدة مخصصة للموبايل – تظهر الأسئلة الخاطئة فقط */}
+          <div className="single-card-mobile">
+            {wrongQuestions.length > 0 ? (
+              <div className="mobile-card">
+                {wrongQuestions.map((q, index) => {
+                  const userAnswerId = result.selectedAnswers?.[q.id];
+                  return (
+                    <div key={index} className="question-row">
+                      <div className="row-header">
+                        <span className="row-number">#{result.questions.indexOf(q) + 1}</span>
+                        <span className="row-question-text">{q.question_text}</span>
+                        <X size={18} className="icon-wrong" />
+                      </div>
+                      <div className="row-meta">
+                        <span className="meta-item">
+                          إجابتك: <span className="badge-wrong">
+                            {getOptionText(q, userAnswerId)}
+                          </span>
+                        </span>
+                        <span className="meta-item">
+                          الصحيحة: <span className="badge-model">
+                            {getOptionText(q, q.correct_option)}
+                          </span>
+                        </span>
+                      </div>
+                      {index < wrongQuestions.length - 1 && <div className="row-divider" />}
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="mobile-card" style={{ textAlign: 'center', padding: '24px' }}>
+                <Check size={32} className="icon-correct" />
+                <p style={{ marginTop: 12, color: '#065f46', fontWeight: 600 }}>جميع الإجابات صحيحة!</p>
+              </div>
+            )}
+          </div>
         </section>
 
         <div className="footer-actions">
           <button className="btn-dashboard" onClick={() => navigate('/dashboard')}>
-            <Home size={18} /> العودة للوحة التحكم
+            <Home size={18} /> العودة للمواد الدراسية
           </button>
         </div>
       </main>
@@ -158,7 +209,6 @@ export default function QuizResult() {
           padding: 50px 20px 100px;
         }
 
-        /* Report Header */
         .report-header {
           display: flex;
           justify-content: space-between;
@@ -186,7 +236,6 @@ export default function QuizResult() {
         .grade-value .of { color: #cbd5e0; font-size: 1.2rem; }
         .grade-value .total { font-size: 1.2rem; font-weight: 700; color: #718096; }
 
-        /* Summary Bar */
         .summary-bar {
           display: flex; gap: 30px; padding: 15px 30px; 
           background: #f8fafc; border-radius: 10px; margin-bottom: 40px;
@@ -197,12 +246,10 @@ export default function QuizResult() {
         .dot.success { background: #10b981; }
         .dot.danger { background: #ef4444; }
 
-        /* Table Section */
         .table-section { margin-bottom: 30px; }
         .section-title { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; }
         .section-title h2 { font-size: 1.1rem; font-weight: 700; color: #2d3748; margin: 0; }
 
-        /* Table Styles (matching TeacherDashboard modern-table) */
         .table-responsive {
           width: 100%;
           overflow-x: auto;
@@ -264,30 +311,31 @@ export default function QuizResult() {
           color: #0f172a;
         }
 
-        .choice-pill {
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          width: 32px;
-          height: 32px;
-          border-radius: 6px;
-          font-weight: 700;
-          font-size: 0.9rem;
+        /* استبدال choice-pill بـ answer-badge للنصوص */
+        .answer-badge {
+          display: inline-block;
+          padding: 4px 12px;
+          border-radius: 20px;
+          font-weight: 600;
+          font-size: 0.85rem;
+          max-width: 220px;
+          word-break: break-word;
+          line-height: 1.4;
         }
 
-        .choice-pill.is-correct {
+        .answer-badge.is-correct {
           background: #ecfdf5;
           color: #065f46;
           border: 1px solid #a7f3d0;
         }
 
-        .choice-pill.is-wrong {
+        .answer-badge.is-wrong {
           background: #fef2f2;
           color: #991b1b;
           border: 1px solid #fecaca;
         }
 
-        .choice-pill.is-actual {
+        .answer-badge.is-model {
           background: #eff6ff;
           color: #1e40af;
           border: 1px solid #bfdbfe;
@@ -324,11 +372,116 @@ export default function QuizResult() {
         }
 
         .inactive-row td {
-          opacity: 0.99; /* slight dimming for wrong answers */
+          opacity: 0.99;
         }
         .text-center { text-align: center !important; }
 
-        /* Actions */
+        /* البطاقة الواحدة للموبايل */
+        .single-card-mobile {
+          display: none;
+          margin-top: 20px;
+        }
+
+        .mobile-card {
+          background: #ffffff;
+          border: 1px solid #e2e8f0;
+          border-radius: 16px;
+          padding: 20px 16px;
+          box-shadow: 0 4px 12px rgba(0,0,0,0.03);
+        }
+
+        .question-row {
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+        }
+
+        .row-header {
+          display: flex;
+          align-items: flex-start;
+          gap: 10px;
+        }
+
+        .row-number {
+          font-weight: 800;
+          color: #1e3a8a;
+          background: #f1f5f9;
+          border-radius: 8px;
+          padding: 2px 8px;
+          font-size: 0.85rem;
+          flex-shrink: 0;
+        }
+
+        .row-question-text {
+          font-weight: 600;
+          color: #0f172a;
+          flex: 1;
+          font-size: 0.9rem;
+          line-height: 1.5;
+          word-break: break-word;
+        }
+
+        .icon-correct {
+          color: #10b981;
+          flex-shrink: 0;
+        }
+
+        .icon-wrong {
+          color: #ef4444;
+          flex-shrink: 0;
+        }
+
+        .row-meta {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 10px;
+          align-items: center;
+          font-size: 0.8rem;
+          color: #475569;
+        }
+
+        .meta-item {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          background: #f8fafc;
+          padding: 4px 10px;
+          border-radius: 8px;
+          white-space: nowrap;
+        }
+
+        .badge-wrong {
+          background: #fef2f2;
+          color: #991b1b;
+          padding: 2px 10px;
+          border-radius: 6px;
+          font-weight: 700;
+          border: 1px solid #fecaca;
+          max-width: 140px;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+
+        .badge-model {
+          background: #eff6ff;
+          color: #1e40af;
+          padding: 2px 10px;
+          border-radius: 6px;
+          font-weight: 700;
+          border: 1px solid #bfdbfe;
+          max-width: 140px;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+
+        .row-divider {
+          height: 1px;
+          background: #edf2f7;
+          margin: 14px 0;
+        }
+
         .footer-actions { margin-top: 50px; text-align: center; }
         .btn-dashboard {
           background: #4776ff;
@@ -350,25 +503,7 @@ export default function QuizResult() {
           transform: translateY(-2px);
           box-shadow: 0 6px 16px rgba(30,58,138,0.3);
         }
-.mobile-scroll-hint {
-  display: none; /* مخفي افتراضيًا */
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 12px;
-  padding: 8px 16px;
-  background: #f0f9ff;
-  border: 1px solid #bae6fd;
-  border-radius: 8px;
-  color: #0369a1;
-  font-size: 0.8rem;
-  font-weight: 500;
-}
 
-@media (max-width: 768px) {
-  .mobile-scroll-hint {
-    display: flex; /* يظهر في الجوال فقط */
-  }
-        /* Mobile adjustments */
         @media (max-width: 768px) {
           .report-header { 
             flex-direction: column; 
@@ -387,9 +522,14 @@ export default function QuizResult() {
             justify-content: center;
           }
           .summary-bar { flex-direction: column; gap: 10px; }
-          /* Hide number column on mobile */
-          .modern-table th:nth-child(1),
-          .modern-table td:nth-child(1) { display: none; }
+
+          .table-responsive {
+            display: none;
+          }
+
+          .single-card-mobile {
+            display: block;
+          }
         }
       `}</style>
     </div>
