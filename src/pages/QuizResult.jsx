@@ -152,8 +152,6 @@ export default function QuizResult() {
           <div className="single-card-mobile">
             <div className="mobile-answers-card">
               <div className="card-inner-header">
-                <span className="card-title">📋 قائمة الأسئلة</span>
-                <span className="card-badge">{total} سؤال</span>
               </div>
               <div className="questions-list">
                 {result.questions.map((q, idx) => {
