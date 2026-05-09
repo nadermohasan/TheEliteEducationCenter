@@ -105,7 +105,7 @@ export default function QuizResult() {
                   <div className="q-meta">
                     <span className="q-number">السؤال {getQuestionOrdinal(idx)}</span>
                     <span className={`q-mark ${isCorrect ? 'pass' : 'fail'}`}>
-                      {isCorrect ? `+${degree}` : `${degree}/0`}
+                      {isCorrect ? `+${degree}` : `-${degree}`}
                     </span>
                   </div>
 
@@ -202,7 +202,7 @@ export default function QuizResult() {
         .q-number { color: #4a72ff; font-weight: 700; font-size: 0.95rem; }
         .q-mark { padding: 3px 12px; border-radius: 8px; font-size: 0.85rem; font-weight: 700; }
         .q-mark.pass { background: #f0fdf4; color: #16a34a; }
-        .q-mark.fail { color: #e11d48; }
+        .q-mark.fail { background-color: #fef2f2; color: #e11d48; }
 
         .q-text { font-size: 1.05rem; font-weight: 700; color: #334155; line-height: 1.6; margin-bottom: 15px; }
 
