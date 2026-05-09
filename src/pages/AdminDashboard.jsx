@@ -7,7 +7,7 @@ import Navbar from "./Navbar";
 import {
   Users, CheckCircle, Search, TrendingUp, RefreshCw,
   Award, ChevronDown, Download, Trash2, Filter, Play,
-  FlaskConical, BookOpen
+  FlaskConical, BookOpen, Pencil, Check, X
 } from "lucide-react";
 import * as XLSX from "xlsx";
 
@@ -37,6 +37,8 @@ const generateAttemptQuestions = async (attemptId, studentBranch) => {
       .eq("is_active", true);
 
     if (studentBranch) {
+      // فاصلة منقوطة منعزلة للتأكد من عدم تفسير القالب التالي كـ "tagged template"
+      ; 
       query = query.or(`branch.is.null,branch.eq.${studentBranch}`);
     }
     const { data: questions } = await query;
@@ -147,11 +149,10 @@ export default function AdminDashboard() {
   const [adminProfile, setAdminProfile] = useState(null);
   const [stats, setStats] = useState({ totalStudents: 0, activeAttempts: 0 });
   const [activeAttemptsMap, setActiveAttemptsMap] = useState({});
-  // حالة التحكم في مودال التأكيد
   const [confirmState, setConfirmState] = useState({
     isOpen: false,
     message: "",
-    students: [] // لتخزين الطلاب المراد تفعيلهم مؤقتاً
+    students: []
   });
   const [batches, setBatches] = useState([]);
   const [selectedBatch, setSelectedBatch] = useState(null);
@@ -162,7 +163,12 @@ export default function AdminDashboard() {
   const [studentFilter, setStudentFilter] = useState("");
   const [subjectFilter, setSubjectFilter] = useState("");
   const [deletingBatch, setDeletingBatch] = useState(null);
-  const [selectedBranchView, setSelectedBranchView] = useState(null); // 'scientific' | 'literary' | null
+  const [selectedBranchView, setSelectedBranchView] = useState(null);
+
+  // حالات تحرير رقم الجوال
+  const [editingPhoneId, setEditingPhoneId] = useState(null);
+  const [editPhoneValue, setEditPhoneValue] = useState("");
+  const [phoneSaveLoadingId, setPhoneSaveLoadingId] = useState(null);
 
   const navigate = useNavigate();
 
@@ -221,6 +227,40 @@ export default function AdminDashboard() {
     fetchActiveAttempts();
   }, [fetchUsers, fetchStats, fetchActiveAttempts]);
 
+  // دوال تحرير رقم الجوال
+  const handlePhoneEditClick = (user) => {
+    setEditingPhoneId(user.id);
+    setEditPhoneValue(user.phone || "");
+  };
+
+  const handlePhoneCancel = () => {
+    setEditingPhoneId(null);
+    setEditPhoneValue("");
+    setPhoneSaveLoadingId(null);
+  };
+
+  const handlePhoneSave = async (userId) => {
+    const newPhone = editPhoneValue.trim();
+    if (newPhone === "") {
+      toast.error("رقم الجوال لا يمكن أن يكون فارغاً");
+      return;
+    }
+    setPhoneSaveLoadingId(userId);
+    const { error } = await supabase
+      .from("profiles")
+      .update({ phone: newPhone })
+      .eq("id", userId);
+    if (error) {
+      toast.error("فشل حفظ رقم الجوال: " + error.message);
+    } else {
+      setUsers(prev => prev.map(u => u.id === userId ? { ...u, phone: newPhone } : u));
+      toast.success("تم تحديث رقم الجوال بنجاح");
+      setEditingPhoneId(null);
+      setEditPhoneValue("");
+    }
+    setPhoneSaveLoadingId(null);
+  };
+
   // جلب الحزم (تجميع حسب batch_id)
   const fetchBatches = useCallback(async () => {
     setResultsLoading(true);
@@ -261,7 +301,7 @@ export default function AdminDashboard() {
   // جلب نتائج حزمة محددة
   const fetchBatchResults = useCallback(async (batchId) => {
     setResultsLoading(true);
-    setSelectedBranchView(null); // إعادة تعيين اختيار الفرع
+    setSelectedBranchView(null);
     try {
       const { data: attempts } = await supabase
         .from("attempts")
@@ -612,16 +652,101 @@ export default function AdminDashboard() {
             ) : filteredUsers.length > 0 ? (
               <table className="modern-table">
                 <thead>
-                  <tr><th className="nameColumn">الاسم</th><th>الفرع</th><th>تاريخ التسجيل</th><th className="text-center">الإجراءات</th></tr>
+                  <tr>
+                    <th className="nameColumn">الاسم</th>
+                    <th>الفرع</th>
+                    <th>رقم الجوال</th>
+                    <th className="text-center">الإجراءات</th>
+                  </tr>
                 </thead>
                 <tbody>
                   {filteredUsers.map((user) => {
                     const hasActiveAttempt = activeAttemptsMap[user.id];
                     return (
                       <tr key={user.id}>
-                        <td><div className="user-cell"><div className="user-avatar-small">{user.name?.charAt(0) || "ط"}</div><span className="user-name-cell">{user.name || "غير محدد"}</span></div></td>
-                        <td><span className="subject-badge" style={{ color: "#475569" }}>{user.branch || "—"}</span></td>
-                        <td>{new Date(user.created_at).toLocaleDateString("ar-EG")}</td>
+                        <td>
+                          <div className="user-cell">
+                            <div className="user-avatar-small">{user.name?.charAt(0) || "ط"}</div>
+                            <span className="user-name-cell">{user.name || "غير محدد"}</span>
+                          </div>
+                        </td>
+                        <td>
+                          <span className="subject-badge" style={{ color: "#475569" }}>{user.branch || "—"}</span>
+                        </td>
+                        {/* عمود رقم الجوال القابل للتعديل */}
+                        <td>
+                          {editingPhoneId === user.id ? (
+                            <div style={{ display: "flex", alignItems: "center", gap: "6px", justifyContent: "center" }}>
+                              <input
+                                type="tel"
+                                value={editPhoneValue}
+                                onChange={(e) => setEditPhoneValue(e.target.value)}
+                                style={{
+                                  padding: "6px 8px",
+                                  borderRadius: "6px",
+                                  border: "1px solid #cbd5e1",
+                                  fontFamily: "inherit",
+                                  width: "140px",
+                                  textAlign: "center"
+                                }}
+                                autoFocus
+                              />
+                              <button
+                                onClick={() => handlePhoneSave(user.id)}
+                                disabled={phoneSaveLoadingId === user.id}
+                                style={{
+                                  background: "#10b981",
+                                  border: "none",
+                                  color: "white",
+                                  borderRadius: "6px",
+                                  cursor: "pointer",
+                                  padding: "4px",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                }}
+                                title="حفظ"
+                              >
+                                {phoneSaveLoadingId === user.id ? <span className="spinner-small"></span> : <Check size={16} />}
+                              </button>
+                              <button
+                                onClick={handlePhoneCancel}
+                                style={{
+                                  background: "#ef4444",
+                                  border: "none",
+                                  color: "white",
+                                  borderRadius: "6px",
+                                  cursor: "pointer",
+                                  padding: "4px",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                }}
+                                title="إلغاء"
+                              >
+                                <X size={16} />
+                              </button>
+                            </div>
+                          ) : (
+                            <div style={{ display: "flex", alignItems: "center", gap: "6px", justifyContent: "center" }}>
+                              <span>{user.phone || "—"}</span>
+                              <button
+                                onClick={() => handlePhoneEditClick(user)}
+                                style={{
+                                  background: "transparent",
+                                  border: "none",
+                                  color: "#3b82f6",
+                                  cursor: "pointer",
+                                  padding: "2px",
+                                  display: "flex",
+                                }}
+                                title="تعديل"
+                              >
+                                <Pencil size={14} />
+                              </button>
+                            </div>
+                          )}
+                        </td>
                         <td className="text-center">
                           {hasActiveAttempt ? (
                             <button className="activate-btn-table active-attempt" disabled style={{ background: "#10b981", cursor: "default" }}>✔ محاولة مفعلة</button>
@@ -663,12 +788,8 @@ export default function AdminDashboard() {
                 <div className="empty-state"><div className="loading-spinner"></div><p>جاري التحميل...</p></div>
               ) : selectedBatch ? (
                 <div style={{ padding: "20px" }}>
-                  {/* أزرار التحكم العامة */}
                   <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "20px", flexWrap: "wrap", gap: "10px" }}>
-                    <button className="btn-secondary" onClick={() => {
-                      setSelectedBatch(null);
-                      setSelectedBranchView(null);
-                    }}>↪ العودة للحزم</button>
+                    <button className="btn-secondary" onClick={() => { setSelectedBatch(null); setSelectedBranchView(null); }}>↪ العودة للحزم</button>
                     <div style={{ display: "flex", gap: "8px" }}>
                       <button className="btn-primary" onClick={() => handleDeleteBatch(selectedBatch)} disabled={deletingBatch === selectedBatch}
                         style={{ padding: "8px 16px", fontSize: "0.85rem", background: "#ef4444" }}>
@@ -677,110 +798,66 @@ export default function AdminDashboard() {
                     </div>
                   </div>
 
-                  {/* إذا لم يتم اختيار فرع بعد: عرض خيارين */}
-{!selectedBranchView ? (
-  <div style={{ textAlign: "center" }}>
-    <h3 style={{ marginBottom: "20px", color: "#1e293b", fontSize: "1.2rem" }}>اختر الفرع لعرض نتائج الطلاب</h3>
-    <div style={{ display: "flex", justifyContent: "center", gap: "16px", flexWrap: "wrap" }}>
-      {/* زر العلمي */}
-      <button
-        onClick={() => setSelectedBranchView('scientific')}
-        style={{
-          display: "inline-flex",
-          alignItems: "center",
-          gap: "10px",
-          padding: "12px 28px",
-          borderRadius: "12px",
-          background: "linear-gradient(135deg, #eff6ff, #dbeafe)",
-          border: "2px solid #bfdbfe",
-          cursor: "pointer",
-          fontWeight: 700,
-          color: "#1e3a8a",
-          fontFamily: "inherit",
-          fontSize: "1rem",
-          transition: "transform 0.2s, box-shadow 0.2s",
-        }}
-        onMouseEnter={(e) => e.currentTarget.style.transform = "scale(1.03)"}
-        onMouseLeave={(e) => e.currentTarget.style.transform = "scale(1)"}
-      >
-        <FlaskConical size={20} style={{ color: "#2563eb" }} />
-        العلمي
-      </button>
-
-      {/* زر الأدبي */}
-      <button
-        onClick={() => setSelectedBranchView('literary')}
-        style={{
-          display: "inline-flex",
-          alignItems: "center",
-          gap: "10px",
-          padding: "12px 28px",
-          borderRadius: "12px",
-          background: "linear-gradient(135deg, #fef2f2, #fee2e2)",
-          border: "2px solid #fecaca",
-          cursor: "pointer",
-          fontWeight: 700,
-          color: "#991b1b",
-          fontFamily: "inherit",
-          fontSize: "1rem",
-          transition: "transform 0.2s, box-shadow 0.2s",
-        }}
-        onMouseEnter={(e) => e.currentTarget.style.transform = "scale(1.03)"}
-        onMouseLeave={(e) => e.currentTarget.style.transform = "scale(1)"}
-      >
-        <BookOpen size={20} style={{ color: "#dc2626" }} />
-        الأدبي
-      </button>
-    </div>
-  </div>
+                  {!selectedBranchView ? (
+                    <div style={{ textAlign: "center" }}>
+                      <h3 style={{ marginBottom: "20px", color: "#1e293b", fontSize: "1.2rem" }}>اختر الفرع لعرض نتائج الطلاب</h3>
+                      <div style={{ display: "flex", justifyContent: "center", gap: "16px", flexWrap: "wrap" }}>
+                        <button
+                          onClick={() => setSelectedBranchView('scientific')}
+                          style={{
+                            display: "inline-flex", alignItems: "center", gap: "10px", padding: "12px 28px", borderRadius: "12px",
+                            background: "linear-gradient(135deg, #eff6ff, #dbeafe)", border: "2px solid #bfdbfe", cursor: "pointer",
+                            fontWeight: 700, color: "#1e3a8a", fontFamily: "inherit", fontSize: "1rem",
+                          }}
+                        >
+                          <FlaskConical size={20} style={{ color: "#2563eb" }} /> العلمي
+                        </button>
+                        <button
+                          onClick={() => setSelectedBranchView('literary')}
+                          style={{
+                            display: "inline-flex", alignItems: "center", gap: "10px", padding: "12px 28px", borderRadius: "12px",
+                            background: "linear-gradient(135deg, #fef2f2, #fee2e2)", border: "2px solid #fecaca", cursor: "pointer",
+                            fontWeight: 700, color: "#991b1b", fontFamily: "inherit", fontSize: "1rem",
+                          }}
+                        >
+                          <BookOpen size={20} style={{ color: "#dc2626" }} /> الأدبي
+                        </button>
+                      </div>
+                    </div>
                   ) : (
-                    /* عرض الفرع المختار */
                     <div>
                       <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "20px" }}>
-                        <button className="btn-secondary" onClick={() => setSelectedBranchView(null)}>
-                          ↪ العودة لاختيار الفرع
-                        </button>
-                        <span style={{ fontSize: "1.1rem", fontWeight: 700, color: "#1e293b" }}>
-                   
-                        </span>
+                        <button className="btn-secondary" onClick={() => setSelectedBranchView(null)}>↪ العودة لاختيار الفرع</button>
                       </div>
-
-                      {/* فلاتر */}
                       <div className="filters-container" style={{ background: "#f8fafc", padding: "16px", borderRadius: "12px", border: "1px solid #e2e8f0", marginBottom: "24px", display: "flex", gap: "16px", flexWrap: "wrap", alignItems: "center" }}>
                         <div style={{ display: "flex", alignItems: "center", gap: "8px", fontWeight: "600", color: "#475569", minWidth: "100px" }}>
                           <Filter size={18} /> الفرز والبحث:
                         </div>
                         <div className="filter-input-wrapper" style={{ flex: "1", minWidth: "200px", position: "relative" }}>
                           <Search size={16} style={{ position: "absolute", right: "12px", top: "50%", transform: "translateY(-50%)", color: "#94a3b8" }} />
-                          <input type="text" placeholder="اسم الطالب..." value={studentFilter}
-                            onChange={(e) => setStudentFilter(e.target.value)}
+                          <input type="text" placeholder="اسم الطالب..." value={studentFilter} onChange={(e) => setStudentFilter(e.target.value)}
                             style={{ width: "100%", padding: "10px 36px 10px 12px", borderRadius: "8px", border: "1px solid #cbd5e1", outline: "none", fontFamily: "inherit" }}
                           />
                         </div>
                         <div className="filter-input-wrapper" style={{ flex: "1", minWidth: "200px", position: "relative" }}>
-                          <select value={subjectFilter}
-                            onChange={(e) => setSubjectFilter(e.target.value)}
+                          <select value={subjectFilter} onChange={(e) => setSubjectFilter(e.target.value)}
                             style={{ width: "100%", padding: "10px 12px", borderRadius: "8px", border: "1px solid #cbd5e1", outline: "none", fontFamily: "inherit", appearance: "none", background: "white", color: "#1e293b", cursor: "pointer" }}>
                             <option value="">جميع المواد (تحديد مادة)</option>
-                            {currentDisplaySubjects.map(subj => (
-                              <option key={subj} value={subj}>{subj}</option>
-                            ))}
+                            {currentDisplaySubjects.map(subj => (<option key={subj} value={subj}>{subj}</option>))}
                           </select>
                           <ChevronDown size={16} style={{ position: "absolute", left: "12px", top: "50%", transform: "translateY(-50%)", color: "#94a3b8", pointerEvents: "none" }} />
                         </div>
                       </div>
-
-                      {/* زر تصدير للفرع الحالي */}
                       <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "16px" }}>
                         <button className="btn-primary" onClick={exportCurrentBranchToExcel} style={{ padding: "8px 16px", fontSize: "0.85rem" }}>
                           <Download size={16} /> تصدير Excel
                         </button>
                       </div>
-
-                      {/* جدول الفرع المختار */}
                       {filteredDisplaySubjects.length > 0 && filteredDisplayStudents.length > 0 ? (
                         <div style={{ overflowX: "auto" }}>
-                         <h3 style={{ textAlign: "center", marginBottom: "12px", color: "#1e293b" }}>كشف نتائج الطلاب – {selectedBranchView === 'scientific' ? 'الفرع العلمي' : 'الفرع الأدبي'}</h3>
+                          <h3 style={{ textAlign: "center", marginBottom: "12px", color: "#1e293b" }}>
+                            كشف نتائج الطلاب – {selectedBranchView === 'scientific' ? 'الفرع العلمي' : 'الفرع الأدبي'}
+                          </h3>
                           <table className="modern-table" style={{ textAlign: "center" }}>
                             <thead>
                               <tr>
@@ -877,24 +954,7 @@ export default function AdminDashboard() {
         .user-avatar-small { width: 34px; height: 34px; background: #e0f2fe; color: #0284c7; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.9rem; }
         .user-name-cell { font-weight: 600; color: #1e293b; }
         .subject-badge { padding: 4px 10px; border-radius: 6px; font-size: 0.85rem; font-weight: 600; }
-        .activate-btn-table {     display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-    padding: 22px 23px;
-    background: #3b82f6;
-    color: white;
-    border: none;
-    border-radius: 31px;
-    font-family: inherit;
-    font-size: 0.8rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition: 0.2s;
-    min-width: 120px;
-    height: 32px;
-    white-space: nowrap;
-}}
+        .activate-btn-table { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 22px 23px; background: #3b82f6; color: white; border: none; border-radius: 31px; font-family: inherit; font-size: 0.8rem; font-weight: 600; cursor: pointer; transition: 0.2s; min-width: 120px; height: 32px; white-space: nowrap; }
         .activate-btn-table:hover:not(:disabled) { background: #2563eb; }
         .activate-btn-table:disabled { opacity: 0.6; cursor: not-allowed; }
         .activate-btn-table.active-attempt { background: #10b981 !important; color: white; }
