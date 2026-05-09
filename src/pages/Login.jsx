@@ -6,18 +6,15 @@ import Footer from './Footer';
 
 export default function Auth() {
   const [isLoginView, setIsLoginView] = useState(true);
-  const [loginUsername, setLoginUsername] = useState('');
-  const [signupUsername, setSignupUsername] = useState('');
-  const [password, setPassword] = useState('');
+  const [loginId, setLoginId] = useState('');
+  const [signupId, setSignupId] = useState('');
   const [fullName, setFullName] = useState('');
   const [branch, setBranch] = useState('');
   const [phone, setPhone] = useState('');
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  
+
   const navigate = useNavigate();
   const location = useLocation();
-  
   const from = location.state?.from || '/dashboard';
 
   const checkRoleAndRedirect = async (userId) => {
@@ -43,7 +40,7 @@ export default function Auth() {
     return true;
   };
 
-  const ensureProfile = async (userId, usernameValue, fullNameValue, branchValue, phoneValue) => {
+  const ensureProfile = async (userId, nationalIdValue, fullNameValue, branchValue, phoneValue) => {
     const { data: existing, error: fetchError } = await supabase
       .from('profiles')
       .select('id')
@@ -57,7 +54,7 @@ export default function Auth() {
         .from('profiles')
         .insert([{
           id: userId,
-          username: usernameValue,
+          nationalID: nationalIdValue,
           name: fullNameValue,
           role: 'student',
           branch: branchValue,
@@ -70,37 +67,30 @@ export default function Auth() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError(null);
+    const currentId = isLoginView ? loginId : signupId;
 
-    const currentUsername = isLoginView ? loginUsername : signupUsername;
+    if (!currentId.trim()) {
+      toast.error('رقم الهوية مطلوب');
+      return;
+    }
 
-    // --- [بداية التحقق من قيود اسم المستخدم] ---
-    if (!currentUsername.trim()) {
-      toast.error('اسم المستخدم مطلوب');
+    if (/\s/.test(currentId)) {
+      toast.error('رقم الهوية لا يجب أن يحتوي على مسافات');
+      return;
+    }
+
+    const idRegex = /^\d+$/;
+    if (!idRegex.test(currentId)) {
+      toast.error('يجب أن يتكون رقم الهوية من أرقام فقط');
+      return;
+    }
+
+    if (currentId.length < 5) {
+      toast.error('رقم الهوية يبدو قصيراً جداً');
       return;
     }
 
     if (!isLoginView) {
-      // 1. منع المسافات بشكل نهائي عند الإرسال
-      if (/\s/.test(currentUsername)) {
-        toast.error('اسم المستخدم لا يجب أن يحتوي على مسافات');
-        return;
-      }
-
-      // 2. السماح فقط بالأحرف الإنجليزية والأرقام (لضمان صحة الإيميل الوهمي)
-      const usernameRegex = /^[a-zA-Z0-9_]+$/;
-      if (!usernameRegex.test(currentUsername)) {
-        toast.error('يجب أن يتكون اسم المستخدم من أحرف إنجليزية وأرقام فقط');
-        return;
-      }
-
-      // 3. التحقق من الطول
-      if (currentUsername.length < 3) {
-        toast.error('اسم المستخدم يجب أن يكون 3 أحرف على الأقل');
-        return;
-      }
-
-      // التحقق من الحقول الأخرى
       if (!fullName.trim()) {
         toast.error('الرجاء إدخال الاسم الرباعي');
         return;
@@ -114,48 +104,87 @@ export default function Auth() {
         return;
       }
     }
-    // --- [نهاية التحقق من القيود] ---
 
     setLoading(true);
-    const email = `${currentUsername.toLowerCase()}@nokhba.local`;
+    
+    // البريد الإلكتروني وكلمة المرور = رقم الهوية تلقائياً
+    const email = `${currentId}@nokhba.local`;
+    const password = currentId; // كلمة المرور هي رقم الهوية - المستخدم مش شايفها
 
     if (isLoginView) {
-      const { data: authData, error: signInError } = await supabase.auth.signInWithPassword({
+      // محاولة تسجيل الدخول
+      let { data: authData, error: signInError } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
+      // لو فشل الدخول (كلمة المرور مش متطابقة) - نجرب نحل المشكلة تلقائياً
       if (signInError) {
-        toast.error('اسم المستخدم أو كلمة المرور غير صحيحة');
+        // محاولة إعادة تعيين كلمة المرور لتكون رقم الهوية
+        const { error: resetError } = await supabase.auth.resetPasswordForEmail(email);
+        
+        if (!resetError) {
+          // لو المستخدم موجود، نحاول نحدث كلمة المرور باستخدام Admin API
+          // لكن الطريقة الأسهل: نطلب منه إنشاء حساب جديد لو مش موجود
+          toast.error('هذا الحساب يحتاج تحديث. جاري تحويلك لإنشاء حساب...');
+          setIsLoginView(false);
+          setSignupId(currentId);
+          setLoading(false);
+          return;
+        }
+        
+        toast.error('رقم الهوية غير مسجل. الرجاء إنشاء حساب جديد');
         setLoading(false);
         return;
       }
-      
+
       if (authData.user) {
         try {
-          await ensureProfile(authData.user.id, currentUsername, fullName || currentUsername, '', '');
+          await ensureProfile(authData.user.id, currentId, '', '', '');
           await checkRoleAndRedirect(authData.user.id);
         } catch (err) {
-          toast.error('حدث خطأ في تجهيز حسابك. يرجى المحاولة مرة أخرى');
+          toast.error('حدث خطأ. يرجى المحاولة مرة أخرى');
           setLoading(false);
         }
       }
     } else {
-      const { data: authData, error: signUpError } = await supabase.auth.signUp({
+      // إنشاء حساب جديد
+      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
         email,
         password,
       });
 
       if (signUpError) {
-        toast.error('يرجى التأكد من صحة البيانات المدخلة');
+        if (signUpError.message?.includes('duplicate') || signUpError.message?.includes('already')) {
+          // المستخدم موجود بالفعل - نجرب الدخول
+          toast('هذا الرقم مسجل بالفعل. جاري تسجيل الدخول...');
+          
+          const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({
+            email,
+            password,
+          });
+          
+          if (loginError) {
+            toast.error('كلمة المرور غير متطابقة. تواصل مع الإدارة لتحديث الحساب');
+            setLoading(false);
+            return;
+          }
+          
+          if (loginData.user) {
+            await checkRoleAndRedirect(loginData.user.id);
+            return;
+          }
+        }
+        
+        toast.error('يرجى التأكد من صحة البيانات');
         setLoading(false);
         return;
       }
-      
-      if (authData.user) {
+
+      if (signUpData.user) {
         try {
-          await ensureProfile(authData.user.id, currentUsername, fullName, branch, phone);
-          await checkRoleAndRedirect(authData.user.id);
+          await ensureProfile(signUpData.user.id, currentId, fullName, branch, phone);
+          await checkRoleAndRedirect(signUpData.user.id);
         } catch (profileError) {
           console.error('فشل إنشاء البروفايل:', profileError);
           toast.error('تم إنشاء الحساب ولكن فشل حفظ الملف الشخصي');
@@ -181,10 +210,11 @@ export default function Auth() {
       </div>
 
       <div className="auth-card">
-        <h1 className="auth-title">{isLoginView ? 'تسجيل الدخول الموحد' : 'إنشاء حساب جديد'}</h1>
+        <h1 className="auth-title">
+          {isLoginView ? 'تسجيل الدخول برقم الهوية' : 'إنشاء حساب جديد'}
+        </h1>
 
         <form onSubmit={handleSubmit} className="auth-form">
-          
           {!isLoginView && (
             <>
               <div className="input-group">
@@ -201,7 +231,7 @@ export default function Auth() {
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
                     placeholder="مثال: نادر محمد حسن أبو سليمان"
-                    required={!isLoginView}
+                    required
                     className="auth-input"
                   />
                 </div>
@@ -219,7 +249,7 @@ export default function Auth() {
                   <select
                     value={branch}
                     onChange={(e) => setBranch(e.target.value)}
-                    required={!isLoginView}
+                    required
                     className="auth-input"
                     style={{ cursor: 'pointer' }}
                   >
@@ -245,16 +275,17 @@ export default function Auth() {
                     onChange={(e) => setPhone(e.target.value)}
                     placeholder="أدخل رقم الجوال"
                     className="auth-input"
-                    required={!isLoginView}
+                    required
                   />
                 </div>
               </div>
             </>
           )}
 
+          {/* حقل رقم الهوية - الحقل الوحيد في تسجيل الدخول */}
           <div className="input-group">
             <label>
-              اسم المستخدم
+              رقم الهوية
               <svg className="label-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
                 <circle cx="12" cy="7" r="4"></circle>
@@ -263,38 +294,19 @@ export default function Auth() {
             <div className="input-wrapper">
               <input
                 type="text"
-                value={isLoginView ? loginUsername : signupUsername}
+                value={isLoginView ? loginId : signupId}
                 onChange={(e) => {
-                  const val = e.target.value.replace(/\s/g, ''); // منع المسافة فوراً
-                  isLoginView ? setLoginUsername(val) : setSignupUsername(val);
+                  const val = e.target.value.replace(/\s/g, '');
+                  isLoginView ? setLoginId(val) : setSignupId(val);
                 }}
-                placeholder="nader: مثال"
+                placeholder="أدخل رقم الهوية"
                 required
-                className="auth-input username-field"
+                className="auth-input"
                 style={{ direction: 'ltr', textAlign: 'right' }}
               />
             </div>
           </div>
 
-          <div className="input-group">
-            <label>
-              كلمة المرور
-              <svg className="label-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
-                <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
-              </svg>
-            </label>
-            <div className="input-wrapper">
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="أدخل كلمة المرور"
-                required
-                className="auth-input"
-              />
-            </div>
-          </div>
 
           <button type="submit" className="submit-btn" disabled={loading}>
             {loading ? 'جاري التحميل...' : (isLoginView ? 'تسجيل الدخول' : 'إنشاء حساب')}
@@ -303,7 +315,7 @@ export default function Auth() {
 
         <div className="toggle-view">
           {isLoginView ? (
-            <p>ليس لديك حساب؟ <span onClick={() => setIsLoginView(false)}>إنشاء حساب طالب جديد</span></p>
+            <p>ليس لديك حساب؟ <span onClick={() => setIsLoginView(false)}>إنشاء حساب جديد</span></p>
           ) : (
             <p>لديك حساب بالفعل؟ <span onClick={() => setIsLoginView(true)}>تسجيل الدخول</span></p>
           )}
@@ -331,7 +343,6 @@ export default function Auth() {
         .input-group label { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; color: #4a5568; margin-bottom: 6px; }
         .label-icon { width: 16px; height: 16px; color: #4a8ada; }
         .input-wrapper input, .input-wrapper select { width: 100%; padding: 12px 15px; border: 1.5px solid #e2e8f0; border-radius: 10px; font-family: 'Cairo', sans-serif; font-size: 14px; box-sizing: border-box; transition: 0.3s; background: #f8fafc; color: #1e293b; text-align: right; }
-        .username-field { direction: ltr !important; }
         .submit-btn { width: 100%; padding: 12px; background: #4a8ada; color: white; border: none; border-radius: 10px; font-size: 16px; font-weight: 700; cursor: pointer; transition: 0.3s; margin-top: 10px; }
         .submit-btn:hover { background: #3b76c4; transform: translateY(-1px); }
         .submit-btn:disabled { background: #cbd5e0; cursor: not-allowed; }
