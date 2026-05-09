@@ -211,7 +211,7 @@ export default function Auth() {
 
       <div className="auth-card">
         <h1 className="auth-title">
-          {isLoginView ? 'تسجيل الدخول برقم الهوية' : 'إنشاء حساب جديد'}
+          {isLoginView ? 'تسجيل الدخول' : 'إنشاء حساب جديد'}
         </h1>
 
         <form onSubmit={handleSubmit} className="auth-form">
