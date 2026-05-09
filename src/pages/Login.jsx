@@ -11,7 +11,7 @@ export default function Auth() {
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
   const [branch, setBranch] = useState('');
-  const [phone, setPhone] = useState(''); // حقل رقم الجوال
+  const [phone, setPhone] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   
@@ -61,7 +61,7 @@ export default function Auth() {
           name: fullNameValue,
           role: 'student',
           branch: branchValue,
-          phone: phoneValue // تخزين رقم الجوال
+          phone: phoneValue
         }]);
       if (insertError) throw insertError;
     }
@@ -74,13 +74,50 @@ export default function Auth() {
 
     const currentUsername = isLoginView ? loginUsername : signupUsername;
 
+    // --- [بداية التحقق من قيود اسم المستخدم] ---
     if (!currentUsername.trim()) {
       toast.error('اسم المستخدم مطلوب');
       return;
     }
 
+    if (!isLoginView) {
+      // 1. منع المسافات بشكل نهائي عند الإرسال
+      if (/\s/.test(currentUsername)) {
+        toast.error('اسم المستخدم لا يجب أن يحتوي على مسافات');
+        return;
+      }
+
+      // 2. السماح فقط بالأحرف الإنجليزية والأرقام (لضمان صحة الإيميل الوهمي)
+      const usernameRegex = /^[a-zA-Z0-9_]+$/;
+      if (!usernameRegex.test(currentUsername)) {
+        toast.error('يجب أن يتكون اسم المستخدم من أحرف إنجليزية وأرقام فقط');
+        return;
+      }
+
+      // 3. التحقق من الطول
+      if (currentUsername.length < 3) {
+        toast.error('اسم المستخدم يجب أن يكون 3 أحرف على الأقل');
+        return;
+      }
+
+      // التحقق من الحقول الأخرى
+      if (!fullName.trim()) {
+        toast.error('الرجاء إدخال الاسم الرباعي');
+        return;
+      }
+      if (!branch) {
+        toast.error('الرجاء اختيار الفرع الدراسي');
+        return;
+      }
+      if (!phone.trim()) {
+        toast.error('الرجاء إدخال رقم الجوال');
+        return;
+      }
+    }
+    // --- [نهاية التحقق من القيود] ---
+
     setLoading(true);
-    const email = `${currentUsername.toLowerCase().replace(/\s/g, '')}@nokhba.local`;
+    const email = `${currentUsername.toLowerCase()}@nokhba.local`;
 
     if (isLoginView) {
       const { data: authData, error: signInError } = await supabase.auth.signInWithPassword({
@@ -104,25 +141,6 @@ export default function Auth() {
         }
       }
     } else {
-      if (!fullName.trim()) {
-        toast.error('الرجاء إدخال الاسم الرباعي');
-        setLoading(false);
-        return;
-      }
-
-      if (!branch) {
-        toast.error('الرجاء اختيار الفرع الدراسي');
-        setLoading(false);
-        return;
-      }
-
-      // اختياري: التحقق من رقم الجوال إذا أردته إلزامياً
-      // if (!phone.trim()) {
-      //   toast.error('الرجاء إدخال رقم الجوال');
-      //   setLoading(false);
-      //   return;
-      // }
-
       const { data: authData, error: signUpError } = await supabase.auth.signUp({
         email,
         password,
@@ -140,7 +158,7 @@ export default function Auth() {
           await checkRoleAndRedirect(authData.user.id);
         } catch (profileError) {
           console.error('فشل إنشاء البروفايل:', profileError);
-          toast.error('تم إنشاء الحساب ولكن فشل حفظ الملف الشخصي. يرجى التواصل مع الدعم الفني');
+          toast.error('تم إنشاء الحساب ولكن فشل حفظ الملف الشخصي');
           await supabase.auth.signOut();
           setLoading(false);
         }
@@ -164,8 +182,6 @@ export default function Auth() {
 
       <div className="auth-card">
         <h1 className="auth-title">{isLoginView ? 'تسجيل الدخول الموحد' : 'إنشاء حساب جديد'}</h1>
-
-        {error && <div className="error-alert">{error}</div>}
 
         <form onSubmit={handleSubmit} className="auth-form">
           
@@ -214,7 +230,6 @@ export default function Auth() {
                 </div>
               </div>
 
-              {/* حقل رقم الجوال المضاف */}
               <div className="input-group">
                 <label>
                   رقم الجوال
@@ -230,8 +245,7 @@ export default function Auth() {
                     onChange={(e) => setPhone(e.target.value)}
                     placeholder="أدخل رقم الجوال"
                     className="auth-input"
-                    // حقل اختياري، أزل التعليق إن أردته إلزامياً
-                    // required
+                    required={!isLoginView}
                   />
                 </div>
               </div>
@@ -247,25 +261,18 @@ export default function Auth() {
               </svg>
             </label>
             <div className="input-wrapper">
-              {isLoginView ? (
-                <input
-                  type="text"
-                  value={loginUsername}
-                  onChange={(e) => setLoginUsername(e.target.value)}
-                  placeholder="مثال: nader"
-                  required
-                  className="auth-input"
-                />
-              ) : (
-                <input
-                  type="text"
-                  value={signupUsername}
-                  onChange={(e) => setSignupUsername(e.target.value)}
-                  placeholder="مثال: nader"
-                  required
-                  className="auth-input"
-                />
-              )}
+              <input
+                type="text"
+                value={isLoginView ? loginUsername : signupUsername}
+                onChange={(e) => {
+                  const val = e.target.value.replace(/\s/g, ''); // منع المسافة فوراً
+                  isLoginView ? setLoginUsername(val) : setSignupUsername(val);
+                }}
+                placeholder="nader: مثال"
+                required
+                className="auth-input username-field"
+                style={{ direction: 'ltr', textAlign: 'right' }}
+              />
             </div>
           </div>
 
@@ -285,7 +292,6 @@ export default function Auth() {
                 placeholder="أدخل كلمة المرور"
                 required
                 className="auth-input"
-                // لا يوجد حد أدنى للطول (minlength)، كلمة المرور غير مقيدة
               />
             </div>
           </div>
@@ -321,34 +327,17 @@ export default function Auth() {
         .logo-image { max-width: 90%; max-height: 90%; object-fit: contain; }
         .auth-card { background: white; width: 100%; max-width: 400px; margin-top: 130px; padding: 30px; border-radius: 20px; box-shadow: 0 15px 35px rgba(0,0,0,0.05); z-index: 10; color: #2c3e50; }
         .auth-title { text-align: center; color: #2c3e50; margin-bottom: 25px; font-size: 22px; }
-        .error-alert { background: #fff5f5; color: #e74c3c; padding: 10px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #fed7d7; font-size: 13px; text-align: center; }
         .auth-form { display: flex; flex-direction: column; gap: 18px; }
         .input-group label { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; color: #4a5568; margin-bottom: 6px; }
         .label-icon { width: 16px; height: 16px; color: #4a8ada; }
-        .input-wrapper select,
-.input-wrapper input {
-  width: 100%;
-  padding: 12px 15px;
-  border: 1.5px solid #e2e8f0;
-  border-radius: 10px;
-  font-family: 'Cairo', sans-serif;
-  font-size: 14px;
-  box-sizing: border-box;
-  transition: 0.3s;
-  background: #f8fafc;
-  color: #1e293b;
-  text-align: right; /* 🚀 أضف هذا السطر */
-}
-.input-wrapper select { cursor: pointer; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%234a5568' strokeWidth='2' strokeLinecap='round' strokeLinejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: left 12px center; background-size: 14px; }
-        .input-wrapper input::placeholder { color: #94a3b8; opacity: 1; }
-        .input-wrapper input:focus, .input-wrapper select:focus { outline: none; border-color: #4a8ada; background: white; box-shadow: 0 0 0 3px rgba(74, 138, 218, 0.1); }
+        .input-wrapper input, .input-wrapper select { width: 100%; padding: 12px 15px; border: 1.5px solid #e2e8f0; border-radius: 10px; font-family: 'Cairo', sans-serif; font-size: 14px; box-sizing: border-box; transition: 0.3s; background: #f8fafc; color: #1e293b; text-align: right; }
+        .username-field { direction: ltr !important; }
         .submit-btn { width: 100%; padding: 12px; background: #4a8ada; color: white; border: none; border-radius: 10px; font-size: 16px; font-weight: 700; cursor: pointer; transition: 0.3s; margin-top: 10px; }
         .submit-btn:hover { background: #3b76c4; transform: translateY(-1px); }
         .submit-btn:disabled { background: #cbd5e0; cursor: not-allowed; }
         .toggle-view { text-align: center; margin-top: 20px; font-size: 14px; color: #4a5568; }
         .toggle-view span { color: #4a8ada; cursor: pointer; font-weight: 700; margin-right: 5px; }
-        .toggle-view span:hover { text-decoration: underline; }
-        @media (max-width: 480px) { .auth-card { padding: 25px 20px; } .logo-text { font-size: 20px; } .logo-slogan { font-size: 12px; } .logo-image-wrapper { width: 60px; height: 60px; } .top-logo-content { gap: 10px; } }
+        @media (max-width: 480px) { .auth-card { padding: 25px 20px; } .logo-text { font-size: 20px; } }
       `}</style>
     </div>
   );
