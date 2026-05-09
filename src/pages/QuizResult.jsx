@@ -212,8 +212,8 @@ export default function QuizResult() {
         .answer-val { flex: 1; }
         
         .is-correct { background-color: #f0fdf4; color: #16a34a; }
-        .is-wrong { color: #e11d48; }
-        .is-correct-hint { color: #0F8C08; }
+        .is-wrong { background-color: #fef2f2; color: #e11d48; }
+        .is-correct-hint { background-color: #f0fdf4; color: #0F8C08; }
 
         .item-spacer { height: 1px; background: #f1f5f9; margin-top: 25px; }
 
