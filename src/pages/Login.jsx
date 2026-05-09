@@ -108,7 +108,7 @@ export default function Auth() {
       // التقييد الجديد: رقم الجوال يجب أن يبدأ بـ 059 أو 056 ويتكون من 10 أرقام
       const phoneRegex = /^(059|056)\d{7}$/;
       if (!phoneRegex.test(phone.trim())) {
-        toast.error('رقم الجوال يجب أن يبدأ بـ 059 أو 056 ويتكون من 10 أرقام');
+        toast.error('يرجى إدخال رقم جوال صحيح');
         return;
       }
     }
