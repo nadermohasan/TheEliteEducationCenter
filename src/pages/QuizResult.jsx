@@ -1,4 +1,3 @@
-// QuizResult.jsx
 import { useEffect } from 'react';
 import { useLocation, useNavigate } from "react-router-dom";
 import Footer from "./Footer";
@@ -24,10 +23,7 @@ export default function QuizResult() {
     studentName,
   } = state;
 
-  // دالة لاكتشاف اللغة الإنجليزية في النصوص لضبط المحاذاة
-  const isEnglish = (text) => {
-    return /[a-zA-Z]/.test(text);
-  };
+  const isEnglish = (text) => /[a-zA-Z]/.test(text);
 
   const getQuestionOrdinal = (index) => {
     const ordinals = ["الأول", "الثاني", "الثالث", "الرابع", "الخامس", "السادس", "السابع", "الثامن", "التاسع", "العاشر"];
@@ -38,64 +34,65 @@ export default function QuizResult() {
     <div className="quiz-result-wrapper">
       <div className="main-content-container">
         
-        {/* زر العودة العلوي */}
         <div className="top-nav-area">
           <button className="back-btn-pill" onClick={() => navigate("/dashboard")}>
             العودة للمواد الدراسية
           </button>
         </div>
 
- {/* العنوان الرئيسي */}
         <div className="page-header">
           <h1 className="main-heading">ملخص محاولة الاختبار</h1>
-          <p className="sub-heading">قم بمراجعة أجاباتك وتصحيح الأخطاء</p>
+          <p className="sub-heading">قم بمراجعة إجاباتك وتصحيح الأخطاء</p>
         </div>
 
-
-        {/* بطاقة الطالب والدرجة */}
-        <div className="custom-card summary-card shadow-lg">
+        {/* بطاقة النتيجة - تم تحسين التباين والاحترافية */}
+        <div className="custom-card summary-card shadow-sm">
           <div className="doc-illustration">
-            {/* الأيقونة المخصصة من الرابط الذي أرفقته */}
             <img 
               src="https://i.imgur.com/N9qktIS.png" 
               alt="Score Logo" 
-              width="92" 
-              height="90" 
-              style={{ objectFit: 'contain' }}
+              width="90" 
+              height="88" 
+              style={{ objectFit: 'contain', filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.05))' }}
             />
           </div>
 
-          <div className="info-row">
-            <span className="info-label">إسم الطالـــــــب</span>
-            <span className="info-value student-name-text">{studentName}</span>
+          <div className="student-info">
+            <span className="label-text">إسم الطالـــــــب</span>
+            <h2 className="student-name-text">{studentName}</h2>
           </div>
 
-          <div className="horizontal-separator"></div>
+          <div className="divider-line"></div>
 
-          <div className="info-row">
-            <span className="info-label">الدرجة النهائية</span>
-            <div className="score-box">
-<span className="total-val">{totalPossible}</span>
-<span className="score-slash">/</span>
-              <span className="score-val-blue">{score}</span>
-	
+          <div className="score-section">
+            <span className="label-text">الدرجة النهائية</span>
+            <div className="score-display">
+               <span className="score-achieved">{score}</span>
+<span className="score-separator">/</span>
+<span className="score-total">{totalPossible}</span>
+
+
               
+               
             </div>
           </div>
         </div>
 
-        {/* بطاقة تفاصيل الإجابات */}
-        <div className="custom-card details-card shadow-lg">
-          <div className="details-header-row">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M8 6H21M8 12H21M8 18H21M3 6H3.01M3 12H3.01M3 18H3.01" stroke="#3b82f6" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+        {/* بطاقة التفاصيل - جعلتها أكثر ترتيباً وهدوءاً */}
+        <div className="custom-card details-card shadow-sm">
+          <div className="details-header">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="8" y1="6" x2="21" y2="6"></line>
+              <line x1="8" y1="12" x2="21" y2="12"></line>
+              <line x1="8" y1="18" x2="21" y2="18"></line>
+              <line x1="3" y1="6" x2="3.01" y2="6"></line>
+              <line x1="3" y1="12" x2="3.01" y2="12"></line>
+              <line x1="3" y1="18" x2="3.01" y2="18"></line>
             </svg>
-            <h2 className="details-card-title">تفاصيل الإجابات</h2>
+            <h2 className="details-title">تفاصيل الإجابات</h2>
           </div>
 
-          <div className="horizontal-separator no-margin"></div>
-
-          <div className="questions-feed">
+          <div className="questions-list">
             {questions.map((q, idx) => {
               const userAnswerIndex = selectedAnswers[q.id];
               const isCorrect = userAnswerIndex !== undefined && parseInt(userAnswerIndex) === parseInt(q.correct_option);
@@ -104,41 +101,34 @@ export default function QuizResult() {
               const degree = q.degree || 1;
 
               return (
-                <div key={q.id} className="q-wrapper">
-                  <div className="q-top-info">
-                    <span className="q-ordinal-text">السؤال {getQuestionOrdinal(idx)}</span>
-                    <span className={`q-points ${isCorrect ? 'positive' : 'negative'}`}>
-                      {isCorrect ? `+${degree}` : `-${degree}`}
+                <div key={q.id} className="question-item">
+                  <div className="q-meta">
+                    <span className="q-number">السؤال {getQuestionOrdinal(idx)}</span>
+                    <span className={`q-mark ${isCorrect ? 'pass' : 'fail'}`}>
+                      {isCorrect ? `+${degree}` : `${degree}/0`}
                     </span>
                   </div>
 
-                  <p className={`q-body-text ${isEnglish(q.question_text) ? 'align-left ltr' : ''}`}>
+                  <p className={`q-text ${isEnglish(q.question_text) ? 'ltr' : ''}`}>
                     {q.question_text}
                   </p>
 
-                  <div className="answer-status-container">
-                    {/* سطر الإجابة الخاصة بالطالب */}
-                    <div className={`status-line ${isCorrect ? 'correct-clr' : 'incorrect-clr'}`}>
-                      {/* الأيقونة على يمين الكلمة */}
-                      <span className="status-icon-right">{isCorrect ? '✔' : '✘'}</span>
-                      <span className="label-static">إجابتك:</span>
-                      <span className={`value-dynamic ${isEnglish(userAnswer) ? 'align-left ltr' : ''}`}>
-                        {userAnswer}
-                      </span>
+                  <div className="answers-review">
+                    <div className={`answer-row ${isCorrect ? 'is-correct' : 'is-wrong'}`}>
+                      <span className="indicator">{isCorrect ? '✔' : '✘'}</span>
+                      <span className="answer-label">إجابتك:</span>
+                      <span className={`answer-val ${isEnglish(userAnswer) ? 'ltr' : ''}`}>{userAnswer}</span>
                     </div>
 
-                    {/* سطر الإجابة الصحيحة (يظهر عند الخطأ فقط) */}
                     {!isCorrect && (
-                      <div className="status-line correct-clr">
-                        <span className="status-icon-right">✔</span>
-                        <span className="label-static">الإجابة الصحيحة:</span>
-                        <span className={`value-dynamic ${isEnglish(correctAnswer) ? 'align-left ltr' : ''}`}>
-                          {correctAnswer}
-                        </span>
+                      <div className="answer-row is-correct-hint">
+                        <span className="indicator">✔</span>
+                        <span className="answer-label">الصحيحة:</span>
+                        <span className={`answer-val ${isEnglish(correctAnswer) ? 'ltr' : ''}`}>{correctAnswer}</span>
                       </div>
                     )}
                   </div>
-                  {idx < questions.length - 1 && <div className="inner-divider"></div>}
+                  {idx < questions.length - 1 && <div className="item-spacer"></div>}
                 </div>
               );
             })}
@@ -149,13 +139,14 @@ export default function QuizResult() {
       </div>
 
       <style jsx>{`
-        @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap');
+
         .quiz-result-wrapper {
-          background-color: #f4f8ff;
+          background-color: #f9fbff;
           min-height: 100vh;
           direction: rtl;
           font-family: 'Cairo', sans-serif;
-          padding: 0px 15px;
+          padding: 20px 15px;
         }
 
         .main-content-container {
@@ -163,230 +154,75 @@ export default function QuizResult() {
           margin: 0 auto;
         }
 
-        .top-nav-area {
-          text-align: center;
-          margin-bottom: 25px;
-        }
-
+        .top-nav-area { text-align: center; margin: 40px 0 30px; }
         .back-btn-pill {
           background-color: #4a72ff;
-          color: white;
+          color: #fff;
           border: none;
-          padding: 13px 25px;
+          padding: 12px 24px;
           border-radius: 12px;
-          font-weight: 800;
-          font-size: 0.85rem;
-          cursor: pointer;
-          box-shadow: -4px 0 39px #7795F8;   /* x: -4, y: 0, blur: 39, color: #7795F8 */
-          font-family: 'Cairo', sans-serif;
-          margin-top: 15%;
-          transition: all 0.3s ease;
-        }
-.back-btn-pill:hover {
-  background-color: #3a5ce5;         /* slightly darker hover state */
-  /* Optional: add a scale or a different shadow, e.g.:
-     transform: scale(1.05);
-     box-shadow: -4px 0 45px #7795F8; */
-}
-        .page-header {
-          text-align: center;
-          margin-bottom: 35px;
-        }
-
-        .main-heading {
-          font-size: 1.9rem;
           font-weight: 700;
-          color: #111;
-          margin: 0;
+          font-size: 0.9rem;
+          cursor: pointer;
+          transition: 0.3s ease;
+          box-shadow: 0 8px 20px rgba(74, 114, 255, 0.2);
         }
+        .back-btn-pill:hover { transform: translateY(-2px); opacity: 0.9; }
 
-        .sub-heading {
-          color: #888;
-          font-size: 1rem;
-          font-weight: 600;
-          margin-top: 10px;
-        }
+        .page-header { text-align: center; margin-bottom: 30px; }
+        .main-heading { font-size: 1.7rem; font-weight: 800; color: #1e293b; margin: 0; }
+        .sub-heading { color: #64748b; font-size: 0.95rem; margin-top: 5px; }
 
         .custom-card {
-          background: white;
-          border-radius: 16px;
-          overflow: hidden;
-          margin-bottom: 25px;
+          background: #fff;
+          border-radius: 20px;
+          margin-bottom: 20px;
+          border: 1px solid #edf2f7;
         }
+        .shadow-sm { box-shadow: 0 4px 15px rgba(0, 0, 0, 0.03); }
 
-        .shadow-lg {
-          box-shadow: 0 15px 45px rgba(0, 0, 0, 0.04);
-        }
+        /* تنسيق بطاقة الدرجة */
+        .summary-card { padding: 40px 20px; text-align: center; }
+        .label-text { color: #94a3b8; font-size: 0.85rem; font-weight: 700; display: block; margin-bottom: 5px; }
+        .student-name-text { font-size: 1.5rem; font-weight: 800; color: #1e293b; margin: 0; }
+        .divider-line { height: 1px; background: #f1f5f9; margin: 25px 50px; }
+        
+        .score-display { display: flex; align-items: center; justify-content: center; gap: 3px; }
+        .score-achieved { font-size: 35px; font-weight: 700; color: #3b82f6; line-height: 1; }
+        .score-separator { font-size: 2rem; color: #00000; }
+        .score-total { font-size: 35px; font-weight: 400; color: #475569; }
 
-        .summary-card {
-          padding: 40px 0px;
-          text-align: center;
-        }
+        /* تنسيق مراجعة الأسئلة */
+        .details-header { display: flex; align-items: center; gap: 10px; padding: 20px 25px; border-bottom: 1px solid #f1f5f9; }
+        .details-title { font-size: 1.1rem; font-weight: 800; color: #3b82f6; margin: 0; }
+        
+        .questions-list { padding: 20px; }
+        .question-item { margin-bottom: 25px; }
+        .q-meta { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+        .q-number { color: #4a72ff; font-weight: 700; font-size: 0.95rem; }
+        .q-mark { padding: 3px 12px; border-radius: 8px; font-size: 0.85rem; font-weight: 700; }
+        .q-mark.pass { background: #f0fdf4; color: #16a34a; }
+        .q-mark.fail { color: #e11d48; }
 
-        .doc-illustration {
-          margin-bottom: 15px;
-          display: flex;
-          justify-content: center;
-        }
+        .q-text { font-size: 1.05rem; font-weight: 700; color: #334155; line-height: 1.6; margin-bottom: 15px; }
 
-        .info-row {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          gap: 4px;
-        }
+        .answers-review { display: flex; flex-direction: column; gap: 8px; }
+        .answer-row { display: flex; align-items: center; gap: 8px; padding: 12px; border-radius: 12px; font-weight: 600; font-size: 0.9rem; }
+        .answer-label { color: inherit; opacity: 0.8; white-space: nowrap; }
+        .answer-val { flex: 1; }
+        
+        .is-correct { background-color: #f0fdf4; color: #16a34a; }
+        .is-wrong { color: #e11d48; }
+        .is-correct-hint { color: #0F8C08; }
 
-        .info-label {
-          color: #bbb;
-          font-size: 0.9rem;
-          font-weight: 700;
-        }
+        .item-spacer { height: 1px; background: #f1f5f9; margin-top: 25px; }
 
-        .student-name-text {
-          font-size: 1.55rem;
-          font-weight: 700;
-          color: #1a1a1a;
-        }
-
-        .horizontal-separator {
-          height: 3px;
-          background-color: #f1f1f1;
-          margin: 25px 0;
-        }
-
-        .horizontal-separator.no-margin {
-          margin: 0;
-        }
-
-        .score-box {
-          display: flex;
-          justify-content: center;
-          align-items: center;
-          gap: 1px;
-        }
-
-        .total-val {
-          font-size: 35px;
-          font-weight: 400;
-          color: #222;
-        }
-
-        .score-slash {
-          font-size: 35px;
-          color: #000000;
-          font-weight: 400;
-        }
-
-        .score-val-blue {
-          font-size: 35px;
-          font-weight: 800;
-          color: #3b82f6;
-        }
-
-        .details-card-title {
-          font-size: 1.2rem;
-          color: #3b82f6;
-          font-weight: 800;
-          margin: 0;
-        }
-
-        .details-header-row {
-          display: flex;
-          align-items: center;
-          padding: 24px 31px;
-          gap: 12px;
-        }
-
-        .questions-feed {
-          padding: 25px;
-        }
-
-        .q-wrapper {
-          margin-bottom: 25px;
-          padding: 7px;
-        }
-
-        .q-top-info {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          margin-bottom: 10px;
-        }
-
-        .q-ordinal-text {
-          color: #4a72ff;
-          font-weight: 600;
-          font-size: 1.15rem;
-        }
-
-        .q-points {
-          font-weight: 600;
-          font-size: 1.2rem;
-        }
-
-        .positive { color: #0F8C08; }
-        .negative { color: #BF0303; }
-
-        .q-body-text {
-          color: #4a72ff;
-          font-size: 16px;
-          font-weight: 600;
-          line-height: 1.6;
-          margin: 0 0 15px 0;
-        }
-
-        .answer-status-container {
-          display: flex;
-          flex-direction: column;
-          gap: 8px;
-        }
-
-        .status-line {
-          display: flex;
-          align-items: center;
-          gap: 6px;
-          font-weight: 600;
-          font-size: 1.05rem;
-        }
-
-        .status-icon-right {
-          font-size: 1.1rem;
-          margin-left: 4px; /* لضمان وجود مسافة بين الأيقونة والكلمة */
-        }
-
-        .label-static {
-          white-space: nowrap;
-          margin-left: 4px;
-        }
-
-        .value-dynamic {
-          flex-grow: 1;
-        }
-
-        .correct-clr { color: #0F8C08; }
-        .incorrect-clr { color: #BF0303; }
-
-        .inner-divider {
-          height: 3px;
-          background-color: #f1f1f1;
-          margin-top: 25px;
-          margin-left: -32px;   /* لتعويض padding الأسئلة + padding الغلاف */
-  margin-right: -32px
-        }
-
-        /* تنسيقات اللغة الإنجليزية والمحاذاة */
-        .ltr {
-          direction: ltr !important;
-        }
-
-        .align-left {
-          text-align: left !important;
-        }
+        .ltr { direction: ltr; text-align: left; }
 
         @media (max-width: 480px) {
-          .score-val-blue { font-size: px; }
-          .total-val { font-size: 35px; }
-          .student-name-text { font-size: 1.4rem; }
+          .score-achieved { font-size: 35px; }
+          .score-total { font-size: 35px; }
+          .main-heading { font-size: 1.5rem; }
         }
       `}</style>
     </div>
