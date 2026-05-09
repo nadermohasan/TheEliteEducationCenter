@@ -709,8 +709,11 @@ export default function TeacherDashboard() {
     }
   };
 
-  // تفعيل / تعطيل سؤال داخل دفعة
-  const toggleBatchQuestionActive = async (questionId, currentlyActive, batchId) => {
+  // تفعيل / تعطيل سؤال داخل دفعة (تم تعديلها)
+  const toggleBatchQuestionActive = async (questionId, currentlyActive, batchId, e) => {
+    // منع انتشار الحدث (حماية إضافية إذا استُدعيت مع الحدث)
+    if (e) e.stopPropagation();
+
     try {
       const { error } = await supabase
         .from("questions")
@@ -718,10 +721,17 @@ export default function TeacherDashboard() {
         .eq("id", questionId);
 
       if (error) throw error;
-      fetchBatchQuestions(batchId);
+
+      // تحديث حالة السؤال محلياً فوراً لتجربة أفضل
+      setBatchQuestions(prev =>
+        prev.map(q => (q.id === questionId ? { ...q, is_active: !currentlyActive } : q))
+      );
+
       toast.success(`تم ${!currentlyActive ? "تفعيل" : "تعطيل"} السؤال`);
     } catch (error) {
       toast.error("فشل تحديث السؤال: " + error.message);
+      // إعادة التحميل في حالة الفشل لضمان تناسق الواجهة
+      fetchBatchQuestions(batchId);
     }
   };
 
@@ -954,8 +964,9 @@ export default function TeacherDashboard() {
 
   {isSharedSubject() && (
   <div className="form-group">
-    <label>الفرع الدراسي</label>
+    <label>الفرع الدراسي <span className="required">*</span></label>
     <select
+      required
       className="modern-input"
       value={formData.branch}
       onChange={(e) => setFormData({ ...formData, branch: e.target.value })}
@@ -1231,7 +1242,11 @@ export default function TeacherDashboard() {
                                           const hasImage = q.image_url ? true : false;
                                           const imagesCount = [q.image_option_a, q.image_option_b, q.image_option_c, q.image_option_d].filter(Boolean).length;
                                           return (
-                                            <tr key={q.id} className={q.is_active ? '' : 'inactive-row'}>
+                                            <tr
+                                              key={q.id}
+                                              className={q.is_active ? '' : 'inactive-row'}
+                                              onClick={(e) => e.stopPropagation()} // منع انتشار الحدث للصف الأب
+                                            >
                                               <td className="q-text-cell" title={q.question_text}>
                                                 {q.question_text}
                                                 {hasImage && <ImageIcon size={12} style={{ marginRight: '6px', color: '#3b82f6', verticalAlign: 'middle' }} />}
@@ -1274,7 +1289,10 @@ export default function TeacherDashboard() {
                                                 <button
                                                   className="btn-icon"
                                                   style={{ color: q.is_active ? '#f59e0b' : '#10b981', width: '32px', height: '32px' }}
-                                                  onClick={() => toggleBatchQuestionActive(q.id, q.is_active, batch.id)}
+                                                  onClick={(e) => {
+                                                    e.stopPropagation(); // ⬅️ منع انتشار الحدث
+                                                    toggleBatchQuestionActive(q.id, q.is_active, batch.id, e);
+                                                  }}
                                                   title={q.is_active ? "تعطيل السؤال" : "تفعيل السؤال"}
                                                 >
                                                   {q.is_active ? <PowerOff size={15} /> : <Power size={15} />}
