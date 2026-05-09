@@ -85,8 +85,9 @@ export default function Auth() {
       return;
     }
 
-    if (currentId.length < 5) {
-      toast.error('رقم الهوية يبدو قصيراً جداً');
+    // تعديل: رقم الهوية يجب أن يكون 9 أرقام بالضبط
+    if (currentId.length !== 9) {
+      toast.error('رقم الهوية يجب أن يكون 9 أرقام');
       return;
     }
 
@@ -103,10 +104,17 @@ export default function Auth() {
         toast.error('الرجاء إدخال رقم الجوال');
         return;
       }
+
+      // التقييد الجديد: رقم الجوال يجب أن يبدأ بـ 059 أو 056 ويتكون من 10 أرقام
+      const phoneRegex = /^(059|056)\d{7}$/;
+      if (!phoneRegex.test(phone.trim())) {
+        toast.error('رقم الجوال يجب أن يبدأ بـ 059 أو 056 ويتكون من 10 أرقام');
+        return;
+      }
     }
 
     setLoading(true);
-    
+
     // البريد الإلكتروني وكلمة المرور = رقم الهوية تلقائياً
     const email = `${currentId}@nokhba.local`;
     const password = currentId; // كلمة المرور هي رقم الهوية - المستخدم مش شايفها
@@ -122,7 +130,7 @@ export default function Auth() {
       if (signInError) {
         // محاولة إعادة تعيين كلمة المرور لتكون رقم الهوية
         const { error: resetError } = await supabase.auth.resetPasswordForEmail(email);
-        
+
         if (!resetError) {
           // لو المستخدم موجود، نحاول نحدث كلمة المرور باستخدام Admin API
           // لكن الطريقة الأسهل: نطلب منه إنشاء حساب جديد لو مش موجود
@@ -132,7 +140,7 @@ export default function Auth() {
           setLoading(false);
           return;
         }
-        
+
         toast.error('رقم الهوية غير مسجل. الرجاء إنشاء حساب جديد');
         setLoading(false);
         return;
@@ -158,24 +166,24 @@ export default function Auth() {
         if (signUpError.message?.includes('duplicate') || signUpError.message?.includes('already')) {
           // المستخدم موجود بالفعل - نجرب الدخول
           toast('هذا الرقم مسجل بالفعل. جاري تسجيل الدخول...');
-          
+
           const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({
             email,
             password,
           });
-          
+
           if (loginError) {
             toast.error('كلمة المرور غير متطابقة. تواصل مع الإدارة لتحديث الحساب');
             setLoading(false);
             return;
           }
-          
+
           if (loginData.user) {
             await checkRoleAndRedirect(loginData.user.id);
             return;
           }
         }
-        
+
         toast.error('يرجى التأكد من صحة البيانات');
         setLoading(false);
         return;
@@ -219,11 +227,12 @@ export default function Auth() {
             <>
               <div className="input-group">
                 <label>
-                  الاسم الرباعي
+                  {/* الأيقونة على يمين النص */}
                   <svg className="label-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
                     <circle cx="12" cy="7" r="4"></circle>
                   </svg>
+                  الاسم الرباعي
                 </label>
                 <div className="input-wrapper">
                   <input
@@ -239,11 +248,12 @@ export default function Auth() {
 
               <div className="input-group">
                 <label>
-                  الفرع الدراسي
+                  {/* الأيقونة على يمين النص */}
                   <svg className="label-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M22 10v6M2 10l10-5 10 5-10 5z"></path>
                     <path d="M6 12v5c0 2 2 3 6 3s6-1 6-3v-5"></path>
                   </svg>
+                  الفرع الدراسي
                 </label>
                 <div className="input-wrapper">
                   <select
@@ -262,18 +272,19 @@ export default function Auth() {
 
               <div className="input-group">
                 <label>
-                  رقم الجوال
+                  {/* الأيقونة على يمين النص */}
                   <svg className="label-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect>
                     <line x1="12" y1="18" x2="12.01" y2="18"></line>
                   </svg>
+                  رقم الجوال
                 </label>
                 <div className="input-wrapper">
                   <input
                     type="tel"
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
-                    placeholder="أدخل رقم الجوال"
+                    placeholder="مثال: 0591234567"
                     className="auth-input"
                     required
                   />
@@ -285,11 +296,12 @@ export default function Auth() {
           {/* حقل رقم الهوية - الحقل الوحيد في تسجيل الدخول */}
           <div className="input-group">
             <label>
-              رقم الهوية
+              {/* الأيقونة على يمين النص */}
               <svg className="label-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
                 <circle cx="12" cy="7" r="4"></circle>
               </svg>
+              رقم الهوية
             </label>
             <div className="input-wrapper">
               <input
@@ -306,7 +318,6 @@ export default function Auth() {
               />
             </div>
           </div>
-
 
           <button type="submit" className="submit-btn" disabled={loading}>
             {loading ? 'جاري التحميل...' : (isLoginView ? 'تسجيل الدخول' : 'إنشاء حساب')}
