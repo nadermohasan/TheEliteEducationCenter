@@ -254,6 +254,7 @@ export default function QuizPage() {
             questions: allQuestions,
             selectedAnswers: currentAnswers,
             studentName,
+            subjectName,
           },
           replace: true,
         });
@@ -518,19 +519,15 @@ export default function QuizPage() {
     );
     const answeredCount = Object.keys(selectedAnswers).length;
     const unanswered = totalQuestions - answeredCount;
-    let msg = isEnglishSubject
-      ? "Are you sure you want to submit your quiz?"
-      : "هل أنت متأكد من إنهاء وتسليم الاختبار؟";
+    let msg = "هل أنت متأكد من إنهاء وتسليم الاختبار؟";
     if (unanswered > 0)
-      msg = isEnglishSubject
-        ? `You have ${unanswered} unanswered question(s).\n\n${msg}`
-        : `لديك ${unanswered} سؤال بدون إجابة.\n\n${msg}`;
+      msg = `لديك ${unanswered} سؤال بدون إجابة.\n\n${msg}`;
 
     const confirmed = await showConfirm({
-      title: isEnglishSubject ? "Submit Quiz" : "تسليم الاختبار",
+      title: "تسليم الاختبار",
       message: msg,
-      confirmText: isEnglishSubject ? "Submit" : "تسليم",
-      cancelText: isEnglishSubject ? "Review" : "مراجعة",
+      confirmText: "تسليم",
+      cancelText:  "مراجعة",
     });
     if (!confirmed) return;
     performSubmit(false);
@@ -672,14 +669,10 @@ export default function QuizPage() {
   const questionLabel = isEnglishSubject ? "Question" : "السؤال";
   const ofLabel = isEnglishSubject ? "of" : "من";
   const passageLabel = isEnglishSubject ? "Passage" : "القطعة";
-  const prevLabel = isEnglishSubject ? "Previous" : "السابق";
-  const nextLabel = isEnglishSubject ? "Next" : "التالي";
-  const submitLabel = isEnglishSubject
-    ? submitting
-      ? "Submitting..."
-      : "Submit Quiz"
-    : submitting
-    ? "جاري التسليم..."
+  const prevLabel = "السابق";
+  const nextLabel = "التالي";
+  const submitLabel = submitting
+    ? "...جاري التسليم"
     : "إنهاء الاختبار";
 
 const currentDegree = currentBlock.type === "passage"
