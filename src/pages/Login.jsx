@@ -204,7 +204,7 @@ export default function Auth() {
           </div>
           <div className="logo-text-group">
             <span className="logo-text">مركز النخبة التعليمي</span>
-            <span className="logo-slogan">The Elite Education Center</span>
+            <span className="logo-slogan">Elite Education Center</span>
           </div>
         </div>
       </div>
