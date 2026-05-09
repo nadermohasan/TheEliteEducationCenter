@@ -284,7 +284,7 @@ export default function Auth() {
                     type="tel"
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
-                    placeholder="مثال: 0591234567"
+                placeholder="059xxxxxxx :مثال"
                     className="auth-input"
                     required
                   />
