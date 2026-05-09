@@ -51,8 +51,8 @@ export default function QuizResult() {
             <img 
               src="https://i.imgur.com/N9qktIS.png" 
               alt="Score Logo" 
-              width="90" 
-              height="88" 
+              width="150" 
+              height="148" 
               style={{ objectFit: 'contain', filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.05))' }}
             />
           </div>
@@ -185,7 +185,7 @@ export default function QuizResult() {
         .summary-card { padding: 40px 20px; text-align: center; }
         .label-text { color: #94a3b8; font-size: 0.85rem; font-weight: 700; display: block; margin-bottom: 5px; }
         .student-name-text { font-size: 1.5rem; font-weight: 800; color: #1e293b; margin: 0; }
-        .divider-line { height: 1px; background: #f1f5f9; margin: 25px 50px; }
+        .divider-line { height: 3px; background: #f1f5f9; margin: 25px -20px; }
         
         .score-display { display: flex; align-items: center; justify-content: center; gap: 3px; }
         .score-achieved { font-size: 35px; font-weight: 700; color: #3b82f6; line-height: 1; }
@@ -193,7 +193,7 @@ export default function QuizResult() {
         .score-total { font-size: 35px; font-weight: 400; color: #475569; }
 
         /* تنسيق مراجعة الأسئلة */
-        .details-header { display: flex; align-items: center; gap: 10px; padding: 20px 25px; border-bottom: 1px solid #f1f5f9; }
+        .details-header { display: flex; align-items: center; gap: 10px; padding: 20px 25px; border-bottom: 3px solid #f1f5f9; }
         .details-title { font-size: 1.1rem; font-weight: 800; color: #3b82f6; margin: 0; }
         
         .questions-list { padding: 20px; }
@@ -215,7 +215,7 @@ export default function QuizResult() {
         .is-wrong { background-color: #fef2f2; color: #e11d48; }
         .is-correct-hint { background-color: #f0fdf4; color: #0F8C08; }
 
-        .item-spacer { height: 1px; background: #f1f5f9; margin-top: 25px; }
+        .item-spacer { height: 3px; background: #f1f5f9; margin-top: 25px; margin-left: -20px; margin-right: -20px}
 
         .ltr { direction: ltr; text-align: left; }
 
