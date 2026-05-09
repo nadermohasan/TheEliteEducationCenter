@@ -30,6 +30,24 @@ export default function QuizResult() {
     return ordinals[index] || (index + 1);
   };
 
+  // دالة مساعدة لاستخراج عرض الخيار (نص أو صورة)
+  const renderOptionContent = (q, optionIndex) => {
+    const englishLetter = ['a', 'b', 'c', 'd'][optionIndex];
+    const imageKey = `image_option_${englishLetter}`;
+    const imageUrl = q[imageKey];
+    
+    if (imageUrl) {
+      return (
+        <img
+          src={imageUrl}
+          alt={`الخيار ${optionIndex + 1}`}
+          className="option-img"
+        />
+      );
+    }
+    return <span>{q.options[optionIndex]}</span>;
+  };
+
   return (
     <div className="quiz-result-wrapper">
       <div className="main-content-container">
@@ -45,7 +63,7 @@ export default function QuizResult() {
           <p className="sub-heading">قم بمراجعة إجاباتك وتصحيح الأخطاء</p>
         </div>
 
-        {/* بطاقة النتيجة - تم تحسين التباين والاحترافية */}
+        {/* بطاقة النتيجة */}
         <div className="custom-card summary-card shadow-sm">
           <div className="doc-illustration">
             <img 
@@ -68,17 +86,13 @@ export default function QuizResult() {
             <span className="label-text">الدرجة النهائية</span>
             <div className="score-display">
                <span className="score-achieved">{score}</span>
-<span className="score-separator">/</span>
-<span className="score-total">{totalPossible}</span>
-
-
-              
-               
+               <span className="score-separator">/</span>
+               <span className="score-total">{totalPossible}</span>
             </div>
           </div>
         </div>
 
-        {/* بطاقة التفاصيل - جعلتها أكثر ترتيباً وهدوءاً */}
+        {/* بطاقة تفاصيل الإجابات */}
         <div className="custom-card details-card shadow-sm">
           <div className="details-header">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -96,9 +110,11 @@ export default function QuizResult() {
             {questions.map((q, idx) => {
               const userAnswerIndex = selectedAnswers[q.id];
               const isCorrect = userAnswerIndex !== undefined && parseInt(userAnswerIndex) === parseInt(q.correct_option);
-              const userAnswer = userAnswerIndex !== undefined ? q.options[userAnswerIndex] : "لم تتم الإجابة";
-              const correctAnswer = q.options[parseInt(q.correct_option)];
+              const correctAnswerIndex = parseInt(q.correct_option);
               const degree = q.degree || 1;
+
+              // الحصول على محتوى الإجابة الصحيحة (نص أو صورة)
+              const correctAnswerContent = renderOptionContent(q, correctAnswerIndex);
 
               return (
                 <div key={q.id} className="question-item">
@@ -109,22 +125,41 @@ export default function QuizResult() {
                     </span>
                   </div>
 
-                  <p className={`q-text ${isEnglish(q.question_text) ? 'ltr' : ''}`}>
-                    {q.question_text}
-                  </p>
+                  {/* عرض صورة السؤال إن وجدت */}
+                  {q.image_url ? (
+                    <div className="question-image-container">
+                      <img
+                        src={q.image_url}
+                        alt="صورة السؤال"
+                        className="question-image"
+                      />
+                    </div>
+                  ) : (
+                    <p className={`q-text ${isEnglish(q.question_text) ? 'ltr' : ''}`}>
+                      {q.question_text}
+                    </p>
+                  )}
 
                   <div className="answers-review">
                     <div className={`answer-row ${isCorrect ? 'is-correct' : 'is-wrong'}`}>
                       <span className="indicator">{isCorrect ? '✔' : '✘'}</span>
                       <span className="answer-label">إجابتك:</span>
-                      <span className={`answer-val ${isEnglish(userAnswer) ? 'ltr' : ''}`}>{userAnswer}</span>
+                      {userAnswerIndex !== undefined ? (
+                        <span className={`answer-val ${isEnglish(q.options[userAnswerIndex] || '') ? 'ltr' : ''}`}>
+                          {renderOptionContent(q, userAnswerIndex)}
+                        </span>
+                      ) : (
+                        <span className="answer-val">لم تتم الإجابة</span>
+                      )}
                     </div>
 
                     {!isCorrect && (
                       <div className="answer-row is-correct-hint">
                         <span className="indicator">✔</span>
                         <span className="answer-label">الصحيحة:</span>
-                        <span className={`answer-val ${isEnglish(correctAnswer) ? 'ltr' : ''}`}>{correctAnswer}</span>
+                        <span className="answer-val">
+                          {correctAnswerContent}
+                        </span>
                       </div>
                     )}
                   </div>
@@ -181,7 +216,7 @@ export default function QuizResult() {
         }
         .shadow-sm { box-shadow: 0 4px 15px rgba(0, 0, 0, 0.03); }
 
-        /* تنسيق بطاقة الدرجة */
+        /* بطاقة الدرجة */
         .summary-card { padding: 40px 20px; text-align: center; }
         .label-text { color: #94a3b8; font-size: 0.85rem; font-weight: 700; display: block; margin-bottom: 5px; }
         .student-name-text { font-size: 1.5rem; font-weight: 800; color: #1e293b; margin: 0; }
@@ -189,10 +224,10 @@ export default function QuizResult() {
         
         .score-display { display: flex; align-items: center; justify-content: center; gap: 3px; }
         .score-achieved { font-size: 35px; font-weight: 700; color: #3b82f6; line-height: 1; }
-        .score-separator { font-size: 2rem; color: #00000; }
+        .score-separator { font-size: 2rem; color: #000; }
         .score-total { font-size: 35px; font-weight: 400; color: #475569; }
 
-        /* تنسيق مراجعة الأسئلة */
+        /* مراجعة الأسئلة */
         .details-header { display: flex; align-items: center; gap: 10px; padding: 20px 25px; border-bottom: 3px solid #f1f5f9; }
         .details-title { font-size: 1.1rem; font-weight: 800; color: #3b82f6; margin: 0; }
         
@@ -204,18 +239,42 @@ export default function QuizResult() {
         .q-mark.pass { background: #f0fdf4; color: #16a34a; }
         .q-mark.fail { background-color: #fef2f2; color: #e11d48; }
 
+        /* صورة السؤال */
+        .question-image-container {
+          text-align: center;
+          margin-bottom: 15px;
+        }
+        .question-image {
+          max-width: 100%;
+          max-height: 300px;
+          border-radius: 12px;
+          box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+          border: 1px solid #e2e8f0;
+        }
+
+        /* نص السؤال */
         .q-text { font-size: 1.05rem; font-weight: 700; color: #334155; line-height: 1.6; margin-bottom: 15px; }
 
         .answers-review { display: flex; flex-direction: column; gap: 8px; }
         .answer-row { display: flex; align-items: center; gap: 8px; padding: 12px; border-radius: 12px; font-weight: 600; font-size: 0.9rem; }
         .answer-label { color: inherit; opacity: 0.8; white-space: nowrap; }
-        .answer-val { flex: 1; }
+        .answer-val { flex: 1; display: flex; align-items: center; gap: 8px; }
         
         .is-correct { background-color: #f0fdf4; color: #16a34a; }
         .is-wrong { background-color: #fef2f2; color: #e11d48; }
         .is-correct-hint { background-color: #f0fdf4; color: #0F8C08; }
 
-        .item-spacer { height: 3px; background: #f1f5f9; margin-top: 25px; margin-left: -20px; margin-right: -20px}
+        /* صورة الخيار */
+        .option-img {
+          max-width: 130px;
+          max-height: 90px;
+          border-radius: 10px;
+          border: 1px solid #e2e8f0;
+          padding: 2px;
+          background: #fff;
+        }
+
+        .item-spacer { height: 3px; background: #f1f5f9; margin-top: 25px; margin-left: -20px; margin-right: -20px }
 
         .ltr { direction: ltr; text-align: left; }
 
@@ -223,6 +282,7 @@ export default function QuizResult() {
           .score-achieved { font-size: 35px; }
           .score-total { font-size: 35px; }
           .main-heading { font-size: 1.5rem; }
+          .option-img { max-width: 100px; }
         }
       `}</style>
     </div>
