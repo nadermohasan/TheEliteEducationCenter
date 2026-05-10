@@ -6,6 +6,9 @@ import Footer from './Footer';
 
 export default function Auth() {
   const [isLoginView, setIsLoginView] = useState(true);
+  const [isAdminVerify, setIsAdminVerify] = useState(false); // حالة جديدة للتحقق من الإدارة
+  const [adminPassword, setAdminPassword] = useState(''); // حالة لحفظ كود تأكيد الإدارة
+
   const [loginId, setLoginId] = useState('');
   const [signupId, setSignupId] = useState('');
   const [fullName, setFullName] = useState('');
@@ -85,13 +88,13 @@ export default function Auth() {
       return;
     }
 
-    // تعديل: رقم الهوية يجب أن يكون 9 أرقام بالضبط
     if (currentId.length !== 9) {
       toast.error('رقم الهوية يجب أن يكون 9 أرقام');
       return;
     }
 
-    if (!isLoginView) {
+    // التحقق من بيانات إنشاء الحساب الجديد
+    if (!isLoginView && !isAdminVerify) {
       if (!fullName.trim()) {
         toast.error('الرجاء إدخال الاسم الرباعي');
         return;
@@ -105,7 +108,6 @@ export default function Auth() {
         return;
       }
 
-      // التقييد الجديد: رقم الجوال يجب أن يبدأ بـ 059 أو 056 ويتكون من 10 أرقام
       const phoneRegex = /^(059|056)\d{7}$/;
       if (!phoneRegex.test(phone.trim())) {
         toast.error('يرجى إدخال رقم جوال صحيح');
@@ -113,27 +115,60 @@ export default function Auth() {
       }
     }
 
+    const email = `${currentId}@nokhba.local`;
+
+    // 1. مسار تسجيل دخول الإدارة (إدخال كود التأكيد)
+    if (isAdminVerify) {
+      if (!adminPassword.trim()) {
+        toast.error('الرجاء إدخال كود التأكيد');
+        return;
+      }
+      setLoading(true);
+      const { data: authData, error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password: adminPassword, // كود التأكيد هو الباسورد الفعلي في Auth
+      });
+
+      if (signInError) {
+        toast.error('كود التأكيد غير صحيح');
+        setLoading(false);
+        return;
+      }
+
+      if (authData.user) {
+        navigate('/admin');
+      }
+      return;
+    }
+
     setLoading(true);
 
-    // البريد الإلكتروني وكلمة المرور = رقم الهوية تلقائياً
-    const email = `${currentId}@nokhba.local`;
-    const password = currentId; // كلمة المرور هي رقم الهوية - المستخدم مش شايفها
-
     if (isLoginView) {
-      // محاولة تسجيل الدخول
+      // قبل تسجيل الدخول، نتحقق مما إذا كان المستخدم أدمن
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('nationalID', currentId)
+        .maybeSingle();
+
+      if (profile && profile.role === 'admin') {
+        // إذا كان أدمن، نعرض له شاشة كود التأكيد
+        setIsAdminVerify(true);
+        setLoading(false);
+        return;
+      }
+
+      // مسار تسجيل الدخول العادي (طالب / معلم)
+      const password = currentId; 
       let { data: authData, error: signInError } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
-      // لو فشل الدخول (كلمة المرور مش متطابقة) - نجرب نحل المشكلة تلقائياً
       if (signInError) {
-        // محاولة إعادة تعيين كلمة المرور لتكون رقم الهوية
         const { error: resetError } = await supabase.auth.resetPasswordForEmail(email);
 
         if (!resetError) {
-          // لو المستخدم موجود، نحاول نحدث كلمة المرور باستخدام Admin API
-          // لكن الطريقة الأسهل: نطلب منه إنشاء حساب جديد لو مش موجود
           toast.error('هذا الحساب يحتاج تحديث. جاري تحويلك لإنشاء حساب...');
           setIsLoginView(false);
           setSignupId(currentId);
@@ -156,7 +191,8 @@ export default function Auth() {
         }
       }
     } else {
-      // إنشاء حساب جديد
+      // 3. إنشاء حساب جديد
+      const password = currentId;
       const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
         email,
         password,
@@ -164,7 +200,6 @@ export default function Auth() {
 
       if (signUpError) {
         if (signUpError.message?.includes('duplicate') || signUpError.message?.includes('already')) {
-          // المستخدم موجود بالفعل - نجرب الدخول
           toast('هذا الرقم مسجل بالفعل. جاري تسجيل الدخول...');
 
           const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({
@@ -219,113 +254,140 @@ export default function Auth() {
 
       <div className="auth-card">
         <h1 className="auth-title">
-          {isLoginView ? 'تسجيل الدخول' : 'إنشاء حساب جديد'}
+          {isAdminVerify ? 'تأكيد هوية الإدارة' : isLoginView ? 'تسجيل الدخول' : 'إنشاء حساب جديد'}
         </h1>
 
         <form onSubmit={handleSubmit} className="auth-form">
-          {!isLoginView && (
+          
+          {/* واجهة تأكيد الإدارة */}
+          {isAdminVerify ? (
             <>
               <div className="input-group">
                 <label>
-                  {/* الأيقونة على يمين النص */}
+                  <svg className="label-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                  </svg>
+                  كلمة المرور
+                </label>
+                <div className="input-wrapper">
+                  <input
+                    type="password"
+                    value={adminPassword}
+                    onChange={(e) => setAdminPassword(e.target.value)}
+                    placeholder="•••••••"
+                    required
+                    className="auth-input"
+                    style={{ direction: 'ltr', textAlign: 'right' }}
+                  />
+                </div>
+              </div>
+            </>
+          ) : (
+            /* واجهة تسجيل الدخول أو إنشاء الحساب العادية */
+            <>
+              {!isLoginView && (
+                <>
+                  <div className="input-group">
+                    <label>
+                      <svg className="label-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                        <circle cx="12" cy="7" r="4"></circle>
+                      </svg>
+                      الاسم الرباعي
+                    </label>
+                    <div className="input-wrapper">
+                      <input
+                        type="text"
+                        value={fullName}
+                        onChange={(e) => setFullName(e.target.value)}
+                        placeholder="مثال: نادر محمد حسن أبو سليمان"
+                        required
+                        className="auth-input"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="input-group">
+                    <label>
+                      <svg className="label-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M22 10v6M2 10l10-5 10 5-10 5z"></path>
+                        <path d="M6 12v5c0 2 2 3 6 3s6-1 6-3v-5"></path>
+                      </svg>
+                      الفرع الدراسي
+                    </label>
+                    <div className="input-wrapper">
+                      <select
+                        value={branch}
+                        onChange={(e) => setBranch(e.target.value)}
+                        required
+                        className="auth-input"
+                        style={{ cursor: 'pointer' }}
+                      >
+                        <option value="" disabled>اختر الفرع</option>
+                        <option value="العلمي">العلمي</option>
+                        <option value="الأدبي">الأدبي</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="input-group">
+                    <label>
+                      <svg className="label-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect>
+                        <line x1="12" y1="18" x2="12.01" y2="18"></line>
+                      </svg>
+                      رقم الجوال
+                    </label>
+                    <div className="input-wrapper">
+                      <input
+                        type="tel"
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value)}
+                        placeholder="059xxxxxxx :مثال"
+                        className="auth-input"
+                        required
+                      />
+                    </div>
+                  </div>
+                </>
+              )}
+
+              <div className="input-group">
+                <label>
                   <svg className="label-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
                     <circle cx="12" cy="7" r="4"></circle>
                   </svg>
-                  الاسم الرباعي
+                  رقم الهوية
                 </label>
                 <div className="input-wrapper">
                   <input
                     type="text"
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    placeholder="مثال: نادر محمد حسن أبو سليمان"
+                    value={isLoginView ? loginId : signupId}
+                    onChange={(e) => {
+                      const val = e.target.value.replace(/\s/g, '');
+                      isLoginView ? setLoginId(val) : setSignupId(val);
+                    }}
+                    placeholder="أدخل رقم الهوية"
                     required
                     className="auth-input"
-                  />
-                </div>
-              </div>
-
-              <div className="input-group">
-                <label>
-                  {/* الأيقونة على يمين النص */}
-                  <svg className="label-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M22 10v6M2 10l10-5 10 5-10 5z"></path>
-                    <path d="M6 12v5c0 2 2 3 6 3s6-1 6-3v-5"></path>
-                  </svg>
-                  الفرع الدراسي
-                </label>
-                <div className="input-wrapper">
-                  <select
-                    value={branch}
-                    onChange={(e) => setBranch(e.target.value)}
-                    required
-                    className="auth-input"
-                    style={{ cursor: 'pointer' }}
-                  >
-                    <option value="" disabled>اختر الفرع</option>
-                    <option value="العلمي">العلمي</option>
-                    <option value="الأدبي">الأدبي</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="input-group">
-                <label>
-                  {/* الأيقونة على يمين النص */}
-                  <svg className="label-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect>
-                    <line x1="12" y1="18" x2="12.01" y2="18"></line>
-                  </svg>
-                  رقم الجوال
-                </label>
-                <div className="input-wrapper">
-                  <input
-                    type="tel"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                placeholder="059xxxxxxx :مثال"
-                    className="auth-input"
-                    required
+                    style={{ direction: 'ltr', textAlign: 'right' }}
                   />
                 </div>
               </div>
             </>
           )}
 
-          {/* حقل رقم الهوية - الحقل الوحيد في تسجيل الدخول */}
-          <div className="input-group">
-            <label>
-              {/* الأيقونة على يمين النص */}
-              <svg className="label-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-                <circle cx="12" cy="7" r="4"></circle>
-              </svg>
-              رقم الهوية
-            </label>
-            <div className="input-wrapper">
-              <input
-                type="text"
-                value={isLoginView ? loginId : signupId}
-                onChange={(e) => {
-                  const val = e.target.value.replace(/\s/g, '');
-                  isLoginView ? setLoginId(val) : setSignupId(val);
-                }}
-                placeholder="أدخل رقم الهوية"
-                required
-                className="auth-input"
-                style={{ direction: 'ltr', textAlign: 'right' }}
-              />
-            </div>
-          </div>
-
           <button type="submit" className="submit-btn" disabled={loading}>
-            {loading ? 'جاري التحميل...' : (isLoginView ? 'تسجيل الدخول' : 'إنشاء حساب')}
+            {loading ? 'جاري التحميل...' : isAdminVerify ? 'تأكيد الدخول' : isLoginView ? 'تسجيل الدخول' : 'إنشاء حساب'}
           </button>
         </form>
 
         <div className="toggle-view">
-          {isLoginView ? (
+          {isAdminVerify ? (
+            <p>ليس لديك صلاحيات مدير ؟<span onClick={() => { setIsAdminVerify(false); setAdminPassword(''); }}>تسجيل الدخول</span></p>
+          ) : isLoginView ? (
             <p>ليس لديك حساب؟ <span onClick={() => setIsLoginView(false)}>إنشاء حساب جديد</span></p>
           ) : (
             <p>لديك حساب بالفعل؟ <span onClick={() => setIsLoginView(true)}>تسجيل الدخول</span></p>
