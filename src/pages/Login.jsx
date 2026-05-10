@@ -120,7 +120,7 @@ export default function Auth() {
     // 1. مسار تسجيل دخول الإدارة (إدخال كود التأكيد)
     if (isAdminVerify) {
       if (!adminPassword.trim()) {
-        toast.error('الرجاء إدخال كود التأكيد');
+        toast.error('الرجاء إدخال كلمة المرور');
         return;
       }
       setLoading(true);
@@ -130,7 +130,7 @@ export default function Auth() {
       });
 
       if (signInError) {
-        toast.error('كود التأكيد غير صحيح');
+        toast.error('كلمة المرور غير صحيحة');
         setLoading(false);
         return;
       }
