@@ -85,9 +85,10 @@ export default function QuizResult() {
           <div className="score-section">
             <span className="label-text">الدرجة النهائية</span>
             <div className="score-display">
-               <span className="score-achieved">{score}</span>
+              
+              <span className="score-total">{totalPossible}</span>
                <span className="score-separator">/</span>
-               <span className="score-total">{totalPossible}</span>
+              <span className="score-achieved">{score}</span>
             </div>
           </div>
         </div>
