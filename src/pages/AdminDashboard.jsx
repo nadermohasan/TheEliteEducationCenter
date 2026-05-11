@@ -160,6 +160,7 @@ export default function AdminDashboard() {
   const [showResults, setShowResults] = useState(false);
   const [studentFilter, setStudentFilter] = useState("");
   const [subjectFilter, setSubjectFilter] = useState("");
+  const [areaFilter, setAreaFilter] = useState("");
   const [deletingBatch, setDeletingBatch] = useState(null);
   const [selectedBranchView, setSelectedBranchView] = useState(null);
 
@@ -369,7 +370,7 @@ export default function AdminDashboard() {
         .from("results")
         .select(`
           id, score, created_at, student_id, subject_id, attempt_id,
-          profiles!inner ( name, branch ),
+          profiles!inner ( name, branch, area_code ),
           subjects ( name, questions_count )
         `)
         .in("attempt_id", attemptIds)
@@ -384,11 +385,12 @@ export default function AdminDashboard() {
         const studentId = result.student_id;
         const studentName = result.profiles?.name || "غير معروف";
         const branch = result.profiles?.branch || "";
+        const areaCode = result.profiles?.area_code || "";
         const subjectName = result.subjects?.name || "غير معروف";
         allSubjects.add(subjectName);
 
         if (!studentMap.has(studentId)) {
-          studentMap.set(studentId, { studentId, studentName, branch, subjects: {} });
+          studentMap.set(studentId, { studentId, studentName, branch, areaCode, subjects: {} });
         }
         const studentRecord = studentMap.get(studentId);
 
@@ -405,7 +407,7 @@ export default function AdminDashboard() {
       const scientific = [], literary = [];
       
       studentMap.forEach((student) => {
-        const row = { studentName: student.studentName, subjects: student.subjects };
+        const row = { studentName: student.studentName, areaCode: student.areaCode, subjects: student.subjects };
         if (student.branch === "العلمي") scientific.push(row);
         else if (student.branch === "الأدبي") literary.push(row);
       });
@@ -424,6 +426,7 @@ export default function AdminDashboard() {
       
       setStudentFilter("");
       setSubjectFilter("");
+      setAreaFilter(""); // reset area filter on new batch load
       setSelectedBatch(batchId);
       
       // إذا تم تحديد فرع معين، قم بتعيينه للعرض المباشر
@@ -471,7 +474,9 @@ export default function AdminDashboard() {
 
     const filteredSubjects = subjectFilter ? currentSubjects.filter(s => s === subjectFilter) : currentSubjects;
     const filteredStudents = currentStudents.filter(s =>
-      s.studentName.includes(studentFilter) && (!subjectFilter || s.subjects[subjectFilter])
+      s.studentName.includes(studentFilter) &&
+      (!subjectFilter || s.subjects[subjectFilter]) &&
+      (!areaFilter || s.areaCode === areaFilter)
     );
 
     if (filteredStudents.length === 0) {
@@ -643,7 +648,9 @@ export default function AdminDashboard() {
     ? currentDisplaySubjects.filter(s => s === subjectFilter) 
     : currentDisplaySubjects;
   const filteredDisplayStudents = currentDisplayStudents.filter(s =>
-    s.studentName.includes(studentFilter) && (!subjectFilter || s.subjects[subjectFilter])
+    s.studentName.includes(studentFilter) && 
+    (!subjectFilter || s.subjects[subjectFilter]) &&
+    (!areaFilter || s.areaCode === areaFilter)
   );
 
   useEffect(() => {
@@ -870,6 +877,17 @@ export default function AdminDashboard() {
                           <select value={subjectFilter} onChange={(e) => setSubjectFilter(e.target.value)}>
                             <option value="">جميع المواد (تحديد مادة)</option>
                             {currentDisplaySubjects.map(subj => (<option key={subj} value={subj}>{subj}</option>))}
+                          </select>
+                          <ChevronDown size={16} className="filter-select-icon" />
+                        </div>
+                        <div className="filter-input-wrapper">
+                          <select value={areaFilter} onChange={(e) => setAreaFilter(e.target.value)}>
+                            <option value="">جميع المناطق</option>
+                            <option value="tlh">تل الهوى</option>
+                            <option value="drb">دير البلح</option>
+                            <option value="max">ماكس</option>
+                            <option value="nsr">النصر</option>
+                            <option value="nth">الشمال</option>
                           </select>
                           <ChevronDown size={16} className="filter-select-icon" />
                         </div>
