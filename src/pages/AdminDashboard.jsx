@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "react-hot-toast";
 import Footer from "./Footer";
 import Navbar from "./Navbar";
+import ConfirmDialog from "./ConfirmDialog";
 import {
   Users, CheckCircle, Search, TrendingUp, RefreshCw,
   Award, ChevronDown, Download, Trash2, Filter, Play,
@@ -147,10 +148,10 @@ export default function AdminDashboard() {
   const [adminProfile, setAdminProfile] = useState(null);
   const [stats, setStats] = useState({ totalStudents: 0, activeAttempts: 0 });
   const [activeAttemptsMap, setActiveAttemptsMap] = useState({});
-  const [confirmState, setConfirmState] = useState({
+  const [confirmDialog, setConfirmDialog] = useState({
     isOpen: false,
-    message: "",
-    students: []
+    batchId: null,
+    message: ""
   });
   const [batches, setBatches] = useState([]);
   const [selectedBatch, setSelectedBatch] = useState(null);
@@ -169,7 +170,25 @@ export default function AdminDashboard() {
   const [editPhoneValue, setEditPhoneValue] = useState("");
   const [phoneSaveLoadingId, setPhoneSaveLoadingId] = useState(null);
 
+  // حالة التحقق من صلاحية المدير
+  const [authChecked, setAuthChecked] = useState(false);
+
   const navigate = useNavigate();
+
+  // دالة جلب بيانات المدير مع دوره
+  const fetchAdminProfile = useCallback(async () => {
+    const { data: { user: currentUser } } = await supabase.auth.getUser();
+    if (currentUser) {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("name, role")
+        .eq("id", currentUser.id)
+        .single();
+      setAdminProfile(profile);
+      return profile; // نعيد البروفايل لفحص الصلاحية
+    }
+    return null;
+  }, []);
 
   const fetchStats = useCallback(async () => {
     try {
@@ -188,14 +207,6 @@ export default function AdminDashboard() {
       setStats({ totalStudents: totalStudents || 0, activeAttempts: activeAttempts || 0 });
     } catch (error) {
       console.error("Error fetching stats:", error);
-    }
-  }, []);
-
-  const fetchAdminProfile = useCallback(async () => {
-    const { data: { user: currentUser } } = await supabase.auth.getUser();
-    if (currentUser) {
-      const { data: profile } = await supabase.from("profiles").select("name").eq("id", currentUser.id).single();
-      setAdminProfile(profile);
     }
   }, []);
 
@@ -264,7 +275,6 @@ export default function AdminDashboard() {
   const fetchBatches = useCallback(async () => {
     setResultsLoading(true);
     try {
-      // جلب جميع المحاولات مع بيانات الطالب للحصول على الفرع
       const { data: attemptsWithStudents } = await supabase
         .from("attempts")
         .select(`
@@ -283,7 +293,6 @@ export default function AdminDashboard() {
         return;
       }
 
-      // تجميع الحزم
       const batchMap = new Map();
       
       for (const attempt of attemptsWithStudents) {
@@ -294,19 +303,17 @@ export default function AdminDashboard() {
           batchMap.set(batchId, {
             id: batchId,
             createdAt: attempt.created_at,
-            students: new Map(), // لتخزين الطلاب وأفرعهم
+            students: new Map(),
             subjects: new Set()
           });
         }
         
         const batch = batchMap.get(batchId);
-        // تخزين الطالب وفرعه
         if (!batch.students.has(attempt.id)) {
           batch.students.set(attempt.id, studentBranch);
         }
       }
       
-      // جلب المواد لكل حزمة
       for (const [batchId, batch] of batchMap.entries()) {
         const attemptIds = Array.from(batch.students.keys());
         const { data: results } = await supabase
@@ -317,7 +324,6 @@ export default function AdminDashboard() {
         const uniqueSubjects = new Set(results?.map(r => r.subject_id) || []);
         batch.subjectCount = uniqueSubjects.size;
         
-        // تحديد الفرع الأكثر تكراراً في الحزمة
         const branchCounts = new Map();
         for (const branch of batch.students.values()) {
           branchCounts.set(branch, (branchCounts.get(branch) || 0) + 1);
@@ -347,10 +353,9 @@ export default function AdminDashboard() {
     }
   }, []);
 
-  // جلب نتائج حزمة محددة مع تحديد الفرع
   const fetchBatchResults = useCallback(async (batchId, selectedBranch = null) => {
     setResultsLoading(true);
-    setSelectedBranchView(selectedBranch); // تخزين الفرع المختار لعرضه مباشرة
+    setSelectedBranchView(selectedBranch);
     try {
       const { data: attempts } = await supabase
         .from("attempts")
@@ -394,7 +399,6 @@ export default function AdminDashboard() {
         }
         const studentRecord = studentMap.get(studentId);
 
-        // تسجيل أول نتيجة فقط لكل مادة
         if (!studentRecord.subjects[subjectName]) {
           studentRecord.subjects[subjectName] = {
             score: result.score,
@@ -426,10 +430,9 @@ export default function AdminDashboard() {
       
       setStudentFilter("");
       setSubjectFilter("");
-      setAreaFilter(""); // reset area filter on new batch load
+      setAreaFilter("");
       setSelectedBatch(batchId);
       
-      // إذا تم تحديد فرع معين، قم بتعيينه للعرض المباشر
       if (selectedBranch === 'scientific' || selectedBranch === 'literary') {
         setSelectedBranchView(selectedBranch);
       }
@@ -441,8 +444,18 @@ export default function AdminDashboard() {
     }
   }, []);
 
-  const handleDeleteBatch = async (batchId) => {
-    if (!window.confirm("هل أنت متأكد من حذف هذه الحزمة وجميع نتائجها؟ لا يمكن التراجع.")) return;
+  const handleDeleteBatch = (batchId) => {
+    setConfirmDialog({
+      isOpen: true,
+      batchId,
+      message: "هل أنت متأكد من حذف هذه الحزمة وجميع نتائجها؟ لا يمكن التراجع."
+    });
+  };
+
+  const handleConfirmDelete = async () => {
+    const batchId = confirmDialog.batchId;
+    setConfirmDialog({ isOpen: false, batchId: null, message: "" });
+    
     setDeletingBatch(batchId);
     try {
       const { data: attempts } = await supabase.from("attempts").select("id").eq("batch_id", batchId);
@@ -465,7 +478,10 @@ export default function AdminDashboard() {
     }
   };
 
-  // تصدير الفرع الحالي فقط (بناءً على الفلاتر)
+  const handleCancelDelete = () => {
+    setConfirmDialog({ isOpen: false, batchId: null, message: "" });
+  };
+
   const exportCurrentBranchToExcel = () => {
     if (!selectedBranchView || !selectedBatch) return;
     const isScientific = selectedBranchView === 'scientific';
@@ -497,7 +513,6 @@ export default function AdminDashboard() {
     XLSX.writeFile(wb, `نتائج_${branchName}_${new Date().toISOString().slice(0, 10)}.xlsx`);
   };
 
-  // تفعيل محاولة لطالب واحد
   const handleActivateAttempt = async (studentId) => {
     setProcessingId(studentId);
     try {
@@ -556,7 +571,6 @@ export default function AdminDashboard() {
     }
   };
 
-  // تفعيل جميع الطلاب
   const handleActivateAll = async () => {
     const studentsToActivate = users.filter(u => !activeAttemptsMap[u.id]);
     if (studentsToActivate.length === 0) {
@@ -632,7 +646,6 @@ export default function AdminDashboard() {
     return createdDate.toDateString() === today.toDateString();
   }).length;
 
-  // حساب البيانات للعرض حسب الفرع المختار
   const currentDisplaySubjects = selectedBranchView === 'scientific' 
     ? scientificResults.subjects 
     : selectedBranchView === 'literary' 
@@ -653,13 +666,29 @@ export default function AdminDashboard() {
     (!areaFilter || s.areaCode === areaFilter)
   );
 
+  // التحقق من صلاحية المدير عند تحميل الصفحة
   useEffect(() => {
-    fetchUsers();
-    fetchAdminProfile();
-    fetchStats();
-    fetchActiveAttempts();
-    fetchBatches();
-  }, [fetchUsers, fetchAdminProfile, fetchStats, fetchActiveAttempts, fetchBatches]);
+    const checkAdmin = async () => {
+      const profile = await fetchAdminProfile();
+      if (!profile || profile.role !== 'admin') {
+        toast.error("غير مصرح لك بالدخول");
+        navigate("/login");
+      } else {
+        setAuthChecked(true);
+      }
+    };
+    checkAdmin();
+  }, [fetchAdminProfile, navigate]);
+
+  // جلب البيانات بعد التأكد من الصلاحية
+  useEffect(() => {
+    if (authChecked) {
+      fetchUsers();
+      fetchStats();
+      fetchActiveAttempts();
+      fetchBatches();
+    }
+  }, [authChecked, fetchUsers, fetchStats, fetchActiveAttempts, fetchBatches]);
 
   return (
     <div className="dashboard-container">
@@ -993,6 +1022,17 @@ export default function AdminDashboard() {
           )}
         </div>
       </main>
+
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        title="تأكيد حذف الحزمة"
+        message={confirmDialog.message}
+        confirmText="نعم، احذف"
+        cancelText="إلغاء"
+        onConfirm={handleConfirmDelete}
+        onCancel={handleCancelDelete}
+      />
+
       <Footer />
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap');
