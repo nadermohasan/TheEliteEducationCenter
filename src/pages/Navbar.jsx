@@ -42,7 +42,6 @@ export default function Navbar({ userName = 'مستخدم', role = 'student' }) 
     navigate('/');
   };
 
-  // --- منطق استخراج الاسم الأول والأخير (مع دعم الأسماء المركبة مثل أبو قمر) ---
   const nameParts = userName.trim().split(/\s+/);
   let displayName = nameParts[0];
 
@@ -68,9 +67,13 @@ export default function Navbar({ userName = 'مستخدم', role = 'student' }) 
 
         <div className="logo-section">
           <div className="logo-wrapper-dash">
-            <img src="https://i.imgur.com/p1hg12H.png" alt="شعار المركز" className="logo-img-dash" />
+            <div className="logo-glow"></div>
+            <img
+              src="https://i.imgur.com/WaAVV7H.png"
+              alt="شعار المركز"
+              className="logo-img-dash"
+            />
           </div>
-          <span className="logo-text-dash">مركز النخبة التعليمي</span>
         </div>
 
         <div className="user-section">
@@ -87,54 +90,112 @@ export default function Navbar({ userName = 'مستخدم', role = 'student' }) 
 
       <style>{`
         .dashboard-header {
-          background-color: #ffffff;
-          padding: 12px 30px;
+          background: rgba(255, 255, 255, 0.78);
+          backdrop-filter: blur(20px);
+          -webkit-backdrop-filter: blur(20px);
+          
+          padding: 12px 32px;
           display: grid;
           grid-template-columns: 1fr auto 1fr;
           align-items: center;
-          border-radius: 0 0 24px 24px;
-          box-shadow: 0 6px 18px rgba(0,0,0,0.04);
+          
+          border-radius: 0 0 32px 32px;
+          border: 1px solid rgba(255, 255, 255, 0.5);
+          
+          box-shadow: 
+            0 8px 32px rgba(15, 23, 42, 0.08),
+            0 2px 8px rgba(15, 23, 42, 0.04),
+            inset 0 1px 0 rgba(255, 255, 255, 0.6);
+          
           position: sticky;
           top: 0;
           z-index: 1000;
-          backdrop-filter: blur(10px);
-          background: rgba(255,255,255,0.95);
           direction: rtl;
         }
 
+        /* ========== Logo Section ========== */
         .logo-section {
           justify-self: center;
           display: flex;
           align-items: center;
-          gap: 12px;
+          justify-content: center;
         }
 
         .logo-wrapper-dash {
-          background-color: white;
-          width: 48px;
-          height: 48px;
-          border-radius: 50%;
+          position: relative;
           display: flex;
           align-items: center;
           justify-content: center;
-          overflow: hidden;
-          box-shadow: 0 4px 10px rgba(0,0,0,0.08);
-          border: 1px solid #e2e8f0;
+          
+          padding: 10px 24px;
+          margin: -8px 0;
+          
+          transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        /* تأثير التوهج خلف اللوجو */
+        .logo-glow {
+          position: absolute;
+          width: 100px;
+          height: 100px;
+      
+          
+          border-radius: 50%;
+          filter: blur(20px);
+          z-index: 0;
+          
+          animation: logoPulse 3s ease-in-out infinite;
+        }
+
+        @keyframes logoPulse {
+          0%, 100% {
+            transform: scale(1);
+            opacity: 0.7;
+          }
+          50% {
+            transform: scale(1.15);
+            opacity: 1;
+          }
         }
 
         .logo-img-dash {
-          max-width: 90%;
-          max-height: 90%;
+          height: 64px;
+          width: auto;
           object-fit: contain;
+          
+          position: relative;
+          z-index: 2;
+          
+          transition: 
+            transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1),
+            filter 0.3s ease;
         }
 
-        .logo-text-dash {
-          font-weight: 800;
-          font-size: 1.2rem;
-          color: #1e3a8a;
-          letter-spacing: -0.3px;
+        .logo-wrapper-dash:hover {
+          transform: translateY(-3px);
         }
 
+        .logo-wrapper-dash:hover .logo-img-dash {
+          transform: scale(1.08);
+          filter: drop-shadow(0 6px 20px rgba(37, 99, 235, 0.35));
+        }
+
+        .logo-wrapper-dash:hover .logo-glow {
+          animation: logoPulseHover 1.5s ease-in-out infinite;
+        }
+
+        @keyframes logoPulseHover {
+          0%, 100% {
+            transform: scale(1.1);
+            opacity: 0.8;
+          }
+          50% {
+            transform: scale(1.3);
+            opacity: 1;
+          }
+        }
+
+        /* ========== User Section ========== */
         .user-section {
           justify-self: end;
           display: flex;
@@ -156,28 +217,28 @@ export default function Navbar({ userName = 'مستخدم', role = 'student' }) 
         }
 
         .user-name {
-          font-weight: 600;
-          color: #334155;
+          font-weight: 700;
+          color: #1e293b;
           font-size: 1rem;
           font-family: 'Cairo', sans-serif;
-        }
-
-        .user-branch {
-          font-size: 0.8rem;
-          color: #64748b;
-          font-weight: 400;
         }
 
         .user-avatar {
           width: 44px;
           height: 44px;
           border-radius: 50%;
-          background-color: #f1f5f9;
+          background: linear-gradient(135deg, #f8fafc, #f1f5f9);
           border: 2px solid #e2e8f0;
           display: flex;
           align-items: center;
           justify-content: center;
           color: #64748b;
+          transition: all 0.25s ease;
+        }
+
+        .user-avatar:hover {
+          border-color: #2563eb;
+          box-shadow: 0 0 16px rgba(37, 99, 235, 0.15);
         }
 
         .user-avatar svg {
@@ -185,6 +246,7 @@ export default function Navbar({ userName = 'مستخدم', role = 'student' }) 
           height: 20px;
         }
 
+        /* ========== Logout Button ========== */
         .logout-button {
           display: flex;
           align-items: center;
@@ -192,21 +254,28 @@ export default function Navbar({ userName = 'مستخدم', role = 'student' }) 
           background-color: #ffffff;
           border: 1px solid #e2e8f0;
           color: #475569;
-          padding: 8px 18px;
+          padding: 10px 22px;
           border-radius: 30px;
           font-family: 'Cairo', sans-serif;
           font-size: 0.95rem;
           font-weight: 600;
           cursor: pointer;
-          transition: all 0.25s;
+          transition: all 0.3s ease;
           justify-self: start;
           width: fit-content;
+          box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
         }
 
         .logout-button:hover {
           background-color: #fef2f2;
           color: #dc2626;
           border-color: #fecaca;
+          box-shadow: 0 4px 16px rgba(220, 38, 38, 0.12);
+          transform: translateY(-1px);
+        }
+
+        .logout-button:active {
+          transform: translateY(0);
         }
 
         .logout-icon {
@@ -215,12 +284,49 @@ export default function Navbar({ userName = 'مستخدم', role = 'student' }) 
           display: flex;
         }
 
+        /* ========== Responsive - Mobile ========== */
         @media (max-width: 768px) {
           .dashboard-header {
             padding: 10px 16px;
+            border-radius: 0 0 24px 24px;
           }
-          .logo-text-dash {
+
+          .logo-wrapper-dash {
+            padding: 6px 16px;
+          }
+
+          .logo-img-dash {
+            height: 48px;
+          }
+
+          .logo-glow {
+            width: 70px;
+            height: 70px;
+          }
+
+          .logout-button span:first-child {
             display: none;
+          }
+
+          .logout-button {
+            padding: 10px;
+            border-radius: 50%;
+            aspect-ratio: 1;
+          }
+        }
+
+        @media (max-width: 480px) {
+          .dashboard-header {
+            padding: 8px 12px;
+          }
+
+          .logo-img-dash {
+            height: 56px;
+          }
+
+          .logo-glow {
+            width: 56px;
+            height: 56px;
           }
         }
       `}</style>
