@@ -385,111 +385,171 @@ export default function Auth() {
       <Footer />
 
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700&display=swap');
-        
-        :root { color-scheme: light only; }
-        button { font-family: 'Cairo', sans-serif; }
-        body, html { margin: 0; padding: 0; font-family: 'Cairo', sans-serif; background: #eef5ff; color: #1e293b; }
-        .auth-page-container { 
-          min-height: 100vh; 
-          display: flex; 
-          flex-direction: column; 
-          align-items: center; 
-          justify-content: flex-start; 
-          direction: rtl; 
-          background: linear-gradient(135deg, #eef5ff 0%, #d8e8fc 100%); 
-          position: relative; 
-          padding: 20px; 
-          box-sizing: border-box; 
-        }
+  @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700&display=swap');
+  
+  :root { color-scheme: light only; }
+  button { font-family: 'Cairo', sans-serif; }
+  body, html { margin: 0; padding: 0; font-family: 'Cairo', sans-serif; background: #eef5ff; color: #1e293b; }
+  
+  .auth-page-container { 
+    min-height: 100vh; 
+    display: flex; 
+    flex-direction: column; 
+    align-items: center; 
+    justify-content: flex-start; 
+    direction: rtl; 
+    background: linear-gradient(135deg, #eef5ff 0%, #d8e8fc 100%); 
+    position: relative; 
+    padding: 20px; 
+    box-sizing: border-box; 
+  }
 
-        /* ----- تعديل منطقة اللوجو فقط ----- */
-        .top-logo-container {
-          position: relative;
-          margin-top: 30px;
-          margin-bottom: -40px; 
-          z-index: 20;
-          display: flex;
-          justify-content: center;
-          width: 100%;
-        }
+  /* ----- قسم اللوجو المتحرك المحسّن ----- */
+  .top-logo-container {
+    position: relative;
+    margin-top: 30px;
+    margin-bottom: -40px; 
+    z-index: 20;
+    display: flex;
+    justify-content: center;
+    width: 100%;
+    /* أنيميشن الدخول للمنطقة بالكامل */
+    animation: logoEntrance 1.2s cubic-bezier(0.23, 1, 0.32, 1) both;
+  }
 
-        .premium-logo-wrapper {
-          display: flex;
-          justify-content: center;
-          align-items: center;
-          filter: drop-shadow(0 15px 25px rgba(0, 0, 0, 0.1));
-          transition: transform 0.3s ease;
-        }
+  .premium-logo-wrapper {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    position: relative;
+    filter: drop-shadow(0 15px 35px rgba(74, 138, 218, 0.2));
+    transition: all 0.5s ease;
+    /* أنيميشن الطفو المستمر */
+    animation: floating 4s ease-in-out infinite;
+  }
 
-        .premium-logo-wrapper:hover {
-          transform: scale(1.03);
-        }
+  .premium-logo-img {
+    width: 260px;
+    height: auto;
+    display: block;
+    position: relative;
+    z-index: 2;
+  }
 
-        .premium-logo-img {
-          width: 260px; /* اللوجو الآن بحجم ضخم واحترافي */
-          height: auto;
-          display: block;
-        }
+  /* تأثير اللمعان الذي يمر فوق الشعار */
+  .premium-logo-wrapper::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 50%;
+    height: 100%;
+    background: linear-gradient(
+      to right,
+      transparent,
+      rgba(255, 255, 255, 0.4),
+      transparent
+    );
+    transform: skewX(-25deg);
+    animation: shimmer 6s infinite;
+  }
 
-        /* ----- الحفاظ على باقي التصميم الأصلي كما هو ----- */
-        .auth-card { 
-          background: white; 
-          width: 100%; 
-          max-width: 400px; 
-          margin-top: 5px; 
-          padding: 30px; 
-          border-radius: 20px; 
-          box-shadow: 0 15px 35px rgba(0,0,0,0.05); 
-          z-index: 10; 
-          color: #2c3e50; 
-        }
-        .auth-title { text-align: center; color: #2c3e50; margin-bottom: 25px; font-size: 22px; }
-        .auth-form { display: flex; flex-direction: column; gap: 18px; }
-        .input-group label { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; color: #4a5568; margin-bottom: 6px; }
-        .label-icon { width: 16px; height: 16px; color: #4a8ada; }
-        .input-wrapper input, .input-wrapper select { 
-          width: 100%; 
-          padding: 12px 15px; 
-          border: 1.5px solid #e2e8f0; 
-          border-radius: 10px; 
-          font-family: 'Cairo', sans-serif; 
-          font-size: 14px; 
-          box-sizing: border-box; 
-          transition: 0.3s; 
-          background: #f8fafc; 
-          color: #1e293b; 
-          text-align: right; 
-        }
-        .input-wrapper input:focus, .input-wrapper select:focus {
-          outline: none;
-          border-color: #4a8ada;
-          box-shadow: 0 0 0 3px rgba(74, 138, 218, 0.1);
-        }
-        .submit-btn { 
-          width: 100%; 
-          padding: 12px; 
-          background: #4a8ada; 
-          color: white; 
-          border: none; 
-          border-radius: 10px; 
-          font-size: 16px; 
-          font-weight: 700; 
-          cursor: pointer; 
-          transition: 0.3s; 
-          margin-top: 10px; 
-        }
-        .submit-btn:hover { background: #3b76c4; transform: translateY(-1px); }
-        .submit-btn:disabled { background: #cbd5e0; cursor: not-allowed; }
-        .toggle-view { text-align: center; margin-top: 20px; font-size: 14px; color: #4a5568; }
-        .toggle-view span { color: #4a8ada; cursor: pointer; font-weight: 700; margin-right: 5px; }
+  .premium-logo-wrapper:hover {
+    transform: scale(1.05) translateY(-5px);
+    filter: drop-shadow(0 20px 45px rgba(74, 138, 218, 0.3));
+  }
 
-        @media (max-width: 480px) { 
-          .premium-logo-img { width: 200px; }
-          .auth-card { padding: 25px 20px; } 
-          .top-logo-container { margin-bottom: -30px; }
-        }
-      `}</style>
+  /* تعريف الأنيميشنز */
+  @keyframes logoEntrance {
+    0% {
+      opacity: 0;
+      transform: translateY(-40px) scale(0.8);
+      filter: blur(10px);
+    }
+    100% {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+      filter: blur(0);
+    }
+  }
+
+  @keyframes floating {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-15px); }
+  }
+
+  @keyframes shimmer {
+    0% { left: -150%; }
+    20%, 100% { left: 250%; }
+  }
+
+  /* ----- الحفاظ على باقي التصميم الأصلي ----- */
+  .auth-card { 
+    background: white; 
+    width: 100%; 
+    max-width: 400px; 
+    margin-top: 5px; 
+    padding: 30px; 
+    border-radius: 20px; 
+    box-shadow: 0 15px 35px rgba(0,0,0,0.05); 
+    z-index: 10; 
+    color: #2c3e50; 
+    /* دخول هادئ للكارد أيضاً */
+    animation: cardFadeIn 1s ease-out 0.3s both;
+  }
+
+  @keyframes cardFadeIn {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .auth-title { text-align: center; color: #2c3e50; margin-bottom: 25px; font-size: 22px; }
+  .auth-form { display: flex; flex-direction: column; gap: 18px; }
+  .input-group label { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; color: #4a5568; margin-bottom: 6px; }
+  .label-icon { width: 16px; height: 16px; color: #4a8ada; }
+  .input-wrapper input, .input-wrapper select { 
+    width: 100%; 
+    padding: 12px 15px; 
+    border: 1.5px solid #e2e8f0; 
+    border-radius: 10px; 
+    font-family: 'Cairo', sans-serif; 
+    font-size: 14px; 
+    box-sizing: border-box; 
+    transition: 0.3s; 
+    background: #f8fafc; 
+    color: #1e293b; 
+    text-align: right; 
+  }
+  .input-wrapper input:focus, .input-wrapper select:focus {
+    outline: none;
+    border-color: #4a8ada;
+    box-shadow: 0 0 0 3px rgba(74, 138, 218, 0.1);
+  }
+  .submit-btn { 
+    width: 100%; 
+    padding: 12px; 
+    background: #4a8ada; 
+    color: white; 
+    border: none; 
+    border-radius: 10px; 
+    font-size: 16px; 
+    font-weight: 700; 
+    cursor: pointer; 
+    transition: 0.3s; 
+    margin-top: 10px; 
+  }
+  .submit-btn:hover { background: #3b76c4; transform: translateY(-1px); }
+  .submit-btn:disabled { background: #cbd5e0; cursor: not-allowed; }
+  .toggle-view { text-align: center; margin-top: 20px; font-size: 14px; color: #4a5568; }
+  .toggle-view span { color: #4a8ada; cursor: pointer; font-weight: 700; margin-right: 5px; }
+
+  @media (max-width: 480px) { 
+    .premium-logo-img { width: 200px; }
+    .auth-card { padding: 25px 20px; } 
+    .top-logo-container { margin-bottom: -30px; }
+  }
+`}</style>
+
     </div>
   );
 }
