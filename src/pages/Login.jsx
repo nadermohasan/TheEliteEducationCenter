@@ -387,33 +387,33 @@ export default function Auth() {
       <style>{`
   @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700&display=swap');
 
-  :root { 
-    color-scheme: light only; 
+  :root {
+    color-scheme: light only;
   }
 
-  button { 
-    font-family: 'Cairo', sans-serif; 
+  button {
+    font-family: 'Cairo', sans-serif;
   }
 
-  body, html { 
-    margin: 0; 
-    padding: 0; 
-    font-family: 'Cairo', sans-serif; 
-    background: #eef5ff; 
-    color: #1e293b; 
+  body, html {
+    margin: 0;
+    padding: 0;
+    font-family: 'Cairo', sans-serif;
+    background: #eef5ff;
+    color: #1e293b;
   }
 
-  .auth-page-container { 
-    min-height: 100vh; 
-    display: flex; 
-    flex-direction: column; 
-    align-items: center; 
-    justify-content: flex-start; 
-    direction: rtl; 
-    background: linear-gradient(135deg, #eef5ff 0%, #d8e8fc 100%); 
-    position: relative; 
-    padding: 20px; 
-    box-sizing: border-box; 
+  .auth-page-container {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    direction: rtl;
+    background: linear-gradient(135deg, #eef5ff 0%, #d8e8fc 100%);
+    position: relative;
+    padding: 20px;
+    box-sizing: border-box;
   }
 
   /* ---------- قسم اللوجو ---------- */
@@ -430,12 +430,10 @@ export default function Auth() {
   }
 
   .premium-logo-wrapper {
-    display: inline-flex;
+    display: flex;
     justify-content: center;
     align-items: center;
     position: relative;
-    overflow: hidden; /* يمنع اللمعان من الخروج خارج حدود الشعار */
-    border-radius: 12px;
     filter: drop-shadow(0 15px 35px rgba(74, 138, 218, 0.2));
     transition: all 0.5s ease;
     animation: floating 4s ease-in-out infinite;
@@ -447,31 +445,37 @@ export default function Auth() {
     display: block;
     position: relative;
     z-index: 2;
+    /* اللمعان الناعم على الشعار نفسه */
+    -webkit-mask-image: -webkit-radial-gradient(white, black);
   }
 
-  /* اللمعان داخل الشعار فقط */
+  /* لمعان ناعم فوق اللوجو فقط */
   .premium-logo-wrapper::after {
     content: "";
     position: absolute;
-    top: 0;
-    left: -120%;
-    width: 40%;
-    height: 100%;
+    top: 8%;
+    left: -35%;
+    width: 30%;
+    height: 84%;
     background: linear-gradient(
-      120deg,
-      transparent,
-      rgba(255, 255, 255, 0.45),
-      transparent
+      115deg,
+      transparent 0%,
+      rgba(255, 255, 255, 0.08) 20%,
+      rgba(255, 255, 255, 0.45) 50%,
+      rgba(255, 255, 255, 0.08) 80%,
+      transparent 100%
     );
-    transform: skewX(-20deg);
+    filter: blur(10px);
+    transform: skewX(-18deg);
     z-index: 3;
     pointer-events: none;
-    animation: shimmer 5s infinite;
+    animation: shimmer 4.8s ease-in-out infinite;
+    mix-blend-mode: screen;
   }
 
   .premium-logo-wrapper:hover {
-    transform: scale(1.05) translateY(-5px);
-    filter: drop-shadow(0 20px 45px rgba(74, 138, 218, 0.3));
+    transform: scale(1.04) translateY(-4px);
+    filter: drop-shadow(0 20px 45px rgba(74, 138, 218, 0.28));
   }
 
   /* ---------- الأنيميشن ---------- */
@@ -479,7 +483,7 @@ export default function Auth() {
   @keyframes logoEntrance {
     0% {
       opacity: 0;
-      transform: translateY(-40px) scale(0.8);
+      transform: translateY(-40px) scale(0.85);
       filter: blur(10px);
     }
     100% {
@@ -490,91 +494,100 @@ export default function Auth() {
   }
 
   @keyframes floating {
-    0%, 100% { 
-      transform: translateY(0); 
+    0%, 100% {
+      transform: translateY(0);
     }
-    50% { 
-      transform: translateY(-15px); 
+    50% {
+      transform: translateY(-14px);
     }
   }
 
   @keyframes shimmer {
     0% {
-      left: -120%;
+      left: -35%;
+      opacity: 0;
+    }
+    15% {
+      opacity: 1;
+    }
+    50% {
+      left: 105%;
+      opacity: 1;
     }
     100% {
-      left: 140%;
+      left: 105%;
+      opacity: 0;
     }
   }
 
   @keyframes cardFadeIn {
-    from { 
-      opacity: 0; 
-      transform: translateY(20px); 
+    from {
+      opacity: 0;
+      transform: translateY(20px);
     }
-    to { 
-      opacity: 1; 
-      transform: translateY(0); 
+    to {
+      opacity: 1;
+      transform: translateY(0);
     }
   }
 
   /* ---------- الكارد ---------- */
 
-  .auth-card { 
-    background: white; 
-    width: 100%; 
-    max-width: 400px; 
-    margin-top: 5px; 
-    padding: 30px; 
-    border-radius: 20px; 
-    box-shadow: 0 15px 35px rgba(0,0,0,0.05); 
-    z-index: 10; 
-    color: #2c3e50; 
+  .auth-card {
+    background: white;
+    width: 100%;
+    max-width: 400px;
+    margin-top: 5px;
+    padding: 30px;
+    border-radius: 20px;
+    box-shadow: 0 15px 35px rgba(0,0,0,0.05);
+    z-index: 10;
+    color: #2c3e50;
     animation: cardFadeIn 1s ease-out 0.3s both;
   }
 
-  .auth-title { 
-    text-align: center; 
-    color: #2c3e50; 
-    margin-bottom: 25px; 
-    font-size: 22px; 
+  .auth-title {
+    text-align: center;
+    color: #2c3e50;
+    margin-bottom: 25px;
+    font-size: 22px;
   }
 
-  .auth-form { 
-    display: flex; 
-    flex-direction: column; 
-    gap: 18px; 
+  .auth-form {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
   }
 
-  .input-group label { 
-    display: flex; 
-    align-items: center; 
-    gap: 8px; 
-    font-size: 14px; 
-    font-weight: 600; 
-    color: #4a5568; 
-    margin-bottom: 6px; 
+  .input-group label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    color: #4a5568;
+    margin-bottom: 6px;
   }
 
-  .label-icon { 
-    width: 16px; 
-    height: 16px; 
-    color: #4a8ada; 
+  .label-icon {
+    width: 16px;
+    height: 16px;
+    color: #4a8ada;
   }
 
   .input-wrapper input,
-  .input-wrapper select { 
-    width: 100%; 
-    padding: 12px 15px; 
-    border: 1.5px solid #e2e8f0; 
-    border-radius: 10px; 
-    font-family: 'Cairo', sans-serif; 
-    font-size: 14px; 
-    box-sizing: border-box; 
-    transition: 0.3s; 
-    background: #f8fafc; 
-    color: #1e293b; 
-    text-align: right; 
+  .input-wrapper select {
+    width: 100%;
+    padding: 12px 15px;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 10px;
+    font-family: 'Cairo', sans-serif;
+    font-size: 14px;
+    box-sizing: border-box;
+    transition: 0.3s;
+    background: #f8fafc;
+    color: #1e293b;
+    text-align: right;
   }
 
   .input-wrapper input:focus,
@@ -584,57 +597,57 @@ export default function Auth() {
     box-shadow: 0 0 0 3px rgba(74, 138, 218, 0.1);
   }
 
-  .submit-btn { 
-    width: 100%; 
-    padding: 12px; 
-    background: #4a8ada; 
-    color: white; 
-    border: none; 
-    border-radius: 10px; 
-    font-size: 16px; 
-    font-weight: 700; 
-    cursor: pointer; 
-    transition: 0.3s; 
-    margin-top: 10px; 
+  .submit-btn {
+    width: 100%;
+    padding: 12px;
+    background: #4a8ada;
+    color: white;
+    border: none;
+    border-radius: 10px;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: 0.3s;
+    margin-top: 10px;
   }
 
-  .submit-btn:hover { 
-    background: #3b76c4; 
-    transform: translateY(-1px); 
+  .submit-btn:hover {
+    background: #3b76c4;
+    transform: translateY(-1px);
   }
 
-  .submit-btn:disabled { 
-    background: #cbd5e0; 
-    cursor: not-allowed; 
+  .submit-btn:disabled {
+    background: #cbd5e0;
+    cursor: not-allowed;
   }
 
-  .toggle-view { 
-    text-align: center; 
-    margin-top: 20px; 
-    font-size: 14px; 
-    color: #4a5568; 
+  .toggle-view {
+    text-align: center;
+    margin-top: 20px;
+    font-size: 14px;
+    color: #4a5568;
   }
 
-  .toggle-view span { 
-    color: #4a8ada; 
-    cursor: pointer; 
-    font-weight: 700; 
-    margin-right: 5px; 
+  .toggle-view span {
+    color: #4a8ada;
+    cursor: pointer;
+    font-weight: 700;
+    margin-right: 5px;
   }
 
   /* ---------- الموبايل ---------- */
 
-  @media (max-width: 480px) { 
-    .premium-logo-img { 
-      width: 200px; 
+  @media (max-width: 480px) {
+    .premium-logo-img {
+      width: 200px;
     }
 
-    .auth-card { 
-      padding: 25px 20px; 
+    .auth-card {
+      padding: 25px 20px;
     }
 
-    .top-logo-container { 
-      margin-bottom: -30px; 
+    .top-logo-container {
+      margin-bottom: -30px;
     }
   }
 `}</style>
