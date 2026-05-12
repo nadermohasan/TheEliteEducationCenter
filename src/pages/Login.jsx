@@ -6,8 +6,8 @@ import Footer from './Footer';
 
 export default function Auth() {
   const [isLoginView, setIsLoginView] = useState(true);
-  const [isAdminVerify, setIsAdminVerify] = useState(false); // حالة جديدة للتحقق من الإدارة
-  const [adminPassword, setAdminPassword] = useState(''); // حالة لحفظ كود تأكيد الإدارة
+  const [isAdminVerify, setIsAdminVerify] = useState(false);
+  const [adminPassword, setAdminPassword] = useState('');
 
   const [loginId, setLoginId] = useState('');
   const [signupId, setSignupId] = useState('');
@@ -93,7 +93,6 @@ export default function Auth() {
       return;
     }
 
-    // التحقق من بيانات إنشاء الحساب الجديد
     if (!isLoginView && !isAdminVerify) {
       if (!fullName.trim()) {
         toast.error('الرجاء إدخال الاسم الرباعي');
@@ -117,20 +116,19 @@ export default function Auth() {
 
     const email = `${currentId}@nokhba.local`;
 
-    // 1. مسار تسجيل دخول الإدارة (إدخال كود التأكيد)
     if (isAdminVerify) {
       if (!adminPassword.trim()) {
-        toast.error('الرجاء إدخال كلمة المرور');
+        toast.error('الرجاء إدخال كود التأكيد');
         return;
       }
       setLoading(true);
       const { data: authData, error: signInError } = await supabase.auth.signInWithPassword({
         email,
-        password: adminPassword, // كود التأكيد هو الباسورد الفعلي في Auth
+        password: adminPassword,
       });
 
       if (signInError) {
-        toast.error('كلمة المرور غير صحيحة');
+        toast.error('كود التأكيد غير صحيح');
         setLoading(false);
         return;
       }
@@ -144,7 +142,6 @@ export default function Auth() {
     setLoading(true);
 
     if (isLoginView) {
-      // قبل تسجيل الدخول، نتحقق مما إذا كان المستخدم أدمن
       const { data: profile } = await supabase
         .from('profiles')
         .select('role')
@@ -152,14 +149,12 @@ export default function Auth() {
         .maybeSingle();
 
       if (profile && profile.role === 'admin') {
-        // إذا كان أدمن، نعرض له شاشة كود التأكيد
         setIsAdminVerify(true);
         setLoading(false);
         return;
       }
 
-      // مسار تسجيل الدخول العادي (طالب / معلم)
-      const password = currentId; 
+      const password = currentId;
       let { data: authData, error: signInError } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -191,7 +186,6 @@ export default function Auth() {
         }
       }
     } else {
-      // 3. إنشاء حساب جديد
       const password = currentId;
       const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
         email,
@@ -240,15 +234,14 @@ export default function Auth() {
 
   return (
     <div className="auth-page-container">
+      {/* ----- قسم اللوجو الاحترافي المحسّن ----- */}
       <div className="top-logo-container">
-        <div className="top-logo-content">
-          <div className="logo-image-wrapper">
-            <img src="https://i.imgur.com/p1hg12H.png" alt="شعار مركز النخبة" className="logo-image" />
-          </div>
-          <div className="logo-text-group">
-            <span className="logo-text">مركز النخبة التعليمي</span>
-            <span className="logo-slogan">Elite Education Center</span>
-          </div>
+        <div className="premium-logo-wrapper">
+          <img
+            src="https://i.imgur.com/dHEoE7L.png"
+            alt="النخبة"
+            className="premium-logo-img"
+          />
         </div>
       </div>
 
@@ -258,33 +251,28 @@ export default function Auth() {
         </h1>
 
         <form onSubmit={handleSubmit} className="auth-form">
-          
-          {/* واجهة تأكيد الإدارة */}
           {isAdminVerify ? (
-            <>
-              <div className="input-group">
-                <label>
-                  <svg className="label-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
-                    <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
-                  </svg>
-                  كلمة المرور
-                </label>
-                <div className="input-wrapper">
-                  <input
-                    type="password"
-                    value={adminPassword}
-                    onChange={(e) => setAdminPassword(e.target.value)}
-                    placeholder="•••••••"
-                    required
-                    className="auth-input"
-                    style={{ direction: 'ltr', textAlign: 'right' }}
-                  />
-                </div>
+            <div className="input-group">
+              <label>
+                <svg className="label-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                  <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                </svg>
+                كلمة المرور
+              </label>
+              <div className="input-wrapper">
+                <input
+                  type="password"
+                  value={adminPassword}
+                  onChange={(e) => setAdminPassword(e.target.value)}
+                  placeholder="•••••••"
+                  required
+                  className="auth-input"
+                  style={{ direction: 'ltr', textAlign: 'right' }}
+                />
               </div>
-            </>
+            </div>
           ) : (
-            /* واجهة تسجيل الدخول أو إنشاء الحساب العادية */
             <>
               {!isLoginView && (
                 <>
@@ -402,26 +390,105 @@ export default function Auth() {
         :root { color-scheme: light only; }
         button { font-family: 'Cairo', sans-serif; }
         body, html { margin: 0; padding: 0; font-family: 'Cairo', sans-serif; background: #eef5ff; color: #1e293b; }
-        .auth-page-container { min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; direction: rtl; background: linear-gradient(135deg, #eef5ff 0%, #d8e8fc 100%); position: relative; padding: 20px; box-sizing: border-box; }
-        .top-logo-container { position: absolute; top: 30px; display: flex; justify-content: center; width: 100%; z-index: 5; }
-        .top-logo-content { display: flex; align-items: center; gap: 15px; color: #1a4f8b; }
-        .logo-text-group { display: flex; flex-direction: column; align-items: flex-start; }
-        .logo-text { font-size: 24px; font-weight: 700; color: #1a4f8b; line-height: 1.3; }
-        .logo-slogan { font-size: 15px; font-weight: 500; color: #3a6ea5; letter-spacing: 0.5px; margin-top: 2px; margin-right: 9%; }
-        .logo-image-wrapper { background: white; width: 70px; height: 70px; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(0,0,0,0.1); overflow: hidden; }
-        .logo-image { max-width: 90%; max-height: 90%; object-fit: contain; }
-        .auth-card { background: white; width: 100%; max-width: 400px; margin-top: 130px; padding: 30px; border-radius: 20px; box-shadow: 0 15px 35px rgba(0,0,0,0.05); z-index: 10; color: #2c3e50; }
+        .auth-page-container { 
+          min-height: 100vh; 
+          display: flex; 
+          flex-direction: column; 
+          align-items: center; 
+          justify-content: flex-start; 
+          direction: rtl; 
+          background: linear-gradient(135deg, #eef5ff 0%, #d8e8fc 100%); 
+          position: relative; 
+          padding: 20px; 
+          box-sizing: border-box; 
+        }
+
+        /* ----- تعديل منطقة اللوجو فقط ----- */
+        .top-logo-container {
+          position: relative;
+          margin-top: 30px;
+          margin-bottom: -40px; 
+          z-index: 20;
+          display: flex;
+          justify-content: center;
+          width: 100%;
+        }
+
+        .premium-logo-wrapper {
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          filter: drop-shadow(0 15px 25px rgba(0, 0, 0, 0.1));
+          transition: transform 0.3s ease;
+        }
+
+        .premium-logo-wrapper:hover {
+          transform: scale(1.03);
+        }
+
+        .premium-logo-img {
+          width: 260px; /* اللوجو الآن بحجم ضخم واحترافي */
+          height: auto;
+          display: block;
+        }
+
+        /* ----- الحفاظ على باقي التصميم الأصلي كما هو ----- */
+        .auth-card { 
+          background: white; 
+          width: 100%; 
+          max-width: 400px; 
+          margin-top: 5px; 
+          padding: 30px; 
+          border-radius: 20px; 
+          box-shadow: 0 15px 35px rgba(0,0,0,0.05); 
+          z-index: 10; 
+          color: #2c3e50; 
+        }
         .auth-title { text-align: center; color: #2c3e50; margin-bottom: 25px; font-size: 22px; }
         .auth-form { display: flex; flex-direction: column; gap: 18px; }
         .input-group label { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; color: #4a5568; margin-bottom: 6px; }
         .label-icon { width: 16px; height: 16px; color: #4a8ada; }
-        .input-wrapper input, .input-wrapper select { width: 100%; padding: 12px 15px; border: 1.5px solid #e2e8f0; border-radius: 10px; font-family: 'Cairo', sans-serif; font-size: 14px; box-sizing: border-box; transition: 0.3s; background: #f8fafc; color: #1e293b; text-align: right; }
-        .submit-btn { width: 100%; padding: 12px; background: #4a8ada; color: white; border: none; border-radius: 10px; font-size: 16px; font-weight: 700; cursor: pointer; transition: 0.3s; margin-top: 10px; }
+        .input-wrapper input, .input-wrapper select { 
+          width: 100%; 
+          padding: 12px 15px; 
+          border: 1.5px solid #e2e8f0; 
+          border-radius: 10px; 
+          font-family: 'Cairo', sans-serif; 
+          font-size: 14px; 
+          box-sizing: border-box; 
+          transition: 0.3s; 
+          background: #f8fafc; 
+          color: #1e293b; 
+          text-align: right; 
+        }
+        .input-wrapper input:focus, .input-wrapper select:focus {
+          outline: none;
+          border-color: #4a8ada;
+          box-shadow: 0 0 0 3px rgba(74, 138, 218, 0.1);
+        }
+        .submit-btn { 
+          width: 100%; 
+          padding: 12px; 
+          background: #4a8ada; 
+          color: white; 
+          border: none; 
+          border-radius: 10px; 
+          font-size: 16px; 
+          font-weight: 700; 
+          cursor: pointer; 
+          transition: 0.3s; 
+          margin-top: 10px; 
+        }
         .submit-btn:hover { background: #3b76c4; transform: translateY(-1px); }
         .submit-btn:disabled { background: #cbd5e0; cursor: not-allowed; }
         .toggle-view { text-align: center; margin-top: 20px; font-size: 14px; color: #4a5568; }
         .toggle-view span { color: #4a8ada; cursor: pointer; font-weight: 700; margin-right: 5px; }
-        @media (max-width: 480px) { .auth-card { padding: 25px 20px; } .logo-text { font-size: 20px; } }
+
+        @media (max-width: 480px) { 
+          .premium-logo-img { width: 200px; }
+          .auth-card { padding: 25px 20px; } 
+          .top-logo-container { margin-bottom: -30px; }
+        }
       `}</style>
     </div>
   );
