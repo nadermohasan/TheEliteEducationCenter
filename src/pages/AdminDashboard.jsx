@@ -21,6 +21,14 @@ const getBranchSubjects = (allSubjects, branch) => {
   return branchList.filter(subj => allSubjects.includes(subj));
 };
 
+// خريطة رموز المناطق إلى أسمائها العربية
+const AREA_MAP = {
+  tlh: "تل الهوى",
+  drb: "دير البلح",
+  nsr: "النصر",
+  nth: "الشمال",
+};
+
 // توليد أسئلة محاولة جديدة بناءً على الفرع
 const generateAttemptQuestions = async (attemptId, studentBranch) => {
   const { data: subjects } = await supabase
@@ -170,6 +178,14 @@ export default function AdminDashboard() {
   const [editPhoneValue, setEditPhoneValue] = useState("");
   const [phoneSaveLoadingId, setPhoneSaveLoadingId] = useState(null);
 
+  // حالات تحرير المنطقة
+  const [editingAreaId, setEditingAreaId] = useState(null);
+  const [editAreaValue, setEditAreaValue] = useState("");
+  const [areaSaveLoadingId, setAreaSaveLoadingId] = useState(null);
+
+  // فلتر المنطقة في جدول الطلاب
+  const [studentAreaFilter, setStudentAreaFilter] = useState("");
+
   // حالة التحقق من صلاحية المدير
   const [authChecked, setAuthChecked] = useState(false);
 
@@ -269,6 +285,40 @@ export default function AdminDashboard() {
       setEditPhoneValue("");
     }
     setPhoneSaveLoadingId(null);
+  };
+
+  // دوال تحرير المنطقة
+  const handleAreaEditClick = (user) => {
+    setEditingAreaId(user.id);
+    setEditAreaValue(user.area_code || "");
+  };
+
+  const handleAreaCancel = () => {
+    setEditingAreaId(null);
+    setEditAreaValue("");
+    setAreaSaveLoadingId(null);
+  };
+
+  const handleAreaSave = async (userId) => {
+    const newArea = editAreaValue;
+    if (!newArea) {
+      toast.error("الرجاء اختيار منطقة");
+      return;
+    }
+    setAreaSaveLoadingId(userId);
+    const { error } = await supabase
+      .from("profiles")
+      .update({ area_code: newArea })
+      .eq("id", userId);
+    if (error) {
+      toast.error("فشل حفظ المنطقة: " + error.message);
+    } else {
+      setUsers(prev => prev.map(u => u.id === userId ? { ...u, area_code: newArea } : u));
+      toast.success("تم تحديث المنطقة بنجاح");
+      setEditingAreaId(null);
+      setEditAreaValue("");
+    }
+    setAreaSaveLoadingId(null);
   };
 
   // جلب الحزم (تجميع حسب batch_id) مع إضافة الفرع لكل حزمة
@@ -572,74 +622,83 @@ export default function AdminDashboard() {
   };
 
   const handleActivateAll = async () => {
-    const studentsToActivate = users.filter(u => !activeAttemptsMap[u.id]);
-    if (studentsToActivate.length === 0) {
-      toast("لا يوجد طلاب بحاجة إلى تفعيل", { icon: "ℹ️" });
-      return;
-    }
-    setActivatingAll(true);
-    let success = 0;
-    let failed = 0;
-    for (const student of studentsToActivate) {
-      try {
-        const { data: studentProfile } = await supabase
-          .from("profiles")
-          .select("branch")
-          .eq("id", student.id)
+  const studentsToActivate = filteredUsers.filter(u => !activeAttemptsMap[u.id]);
+  
+  if (studentsToActivate.length === 0) {
+    toast("لا يوجد طلاب بحاجة إلى تفعيل (وفقاً للفلاتر الحالية)", { icon: "ℹ️" });
+    return;
+  }
+  
+  setActivatingAll(true);
+  let success = 0;
+  let failed = 0;
+  
+  for (const student of studentsToActivate) {
+    try {
+      const { data: studentProfile } = await supabase
+        .from("profiles")
+        .select("branch")
+        .eq("id", student.id)
+        .single();
+      const studentBranch = studentProfile?.branch?.trim() || null;
+
+      await supabase
+        .from("attempts")
+        .update({ status: "completed" })
+        .eq("student_id", student.id)
+        .eq("status", "active");
+
+      const { data: activeBatchAttempt } = await supabase
+        .from("attempts")
+        .select("id, batch_id")
+        .eq("status", "active")
+        .not("batch_id", "is", null)
+        .maybeSingle();
+
+      let batchId;
+      let newAttempt;
+      
+      if (activeBatchAttempt?.batch_id) {
+        batchId = activeBatchAttempt.batch_id;
+        const { data: attempt, error } = await supabase
+          .from("attempts")
+          .insert([{ student_id: student.id, status: "active", batch_id: batchId }])
+          .select()
           .single();
-        const studentBranch = studentProfile?.branch?.trim() || null;
-
-        await supabase
+        if (error) throw error;
+        newAttempt = attempt;
+        await generateAttemptQuestions(newAttempt.id, studentBranch);
+      } else {
+        batchId = crypto.randomUUID();
+        const { data: attempt, error } = await supabase
           .from("attempts")
-          .update({ status: "completed" })
-          .eq("student_id", student.id)
-          .eq("status", "active");
-
-        const { data: activeBatchAttempt } = await supabase
-          .from("attempts")
-          .select("id, batch_id")
-          .eq("status", "active")
-          .not("batch_id", "is", null)
-          .maybeSingle();
-
-        let batchId;
-        let newAttempt;
-        if (activeBatchAttempt?.batch_id) {
-          batchId = activeBatchAttempt.batch_id;
-          const { data: attempt, error } = await supabase
-            .from("attempts")
-            .insert([{ student_id: student.id, status: "active", batch_id: batchId }])
-            .select()
-            .single();
-          if (error) throw error;
-          newAttempt = attempt;
-          await generateAttemptQuestions(newAttempt.id, studentBranch);
-        } else {
-          batchId = crypto.randomUUID();
-          const { data: attempt, error } = await supabase
-            .from("attempts")
-            .insert([{ student_id: student.id, status: "active", batch_id: batchId }])
-            .select()
-            .single();
-          if (error) throw error;
-          newAttempt = attempt;
-          await generateAttemptQuestions(newAttempt.id, studentBranch);
-        }
-        success++;
-      } catch (e) {
-        failed++;
-        console.error("فشل تفعيل الطالب", student.name, e);
+          .insert([{ student_id: student.id, status: "active", batch_id: batchId }])
+          .select()
+          .single();
+        if (error) throw error;
+        newAttempt = attempt;
+        await generateAttemptQuestions(newAttempt.id, studentBranch);
       }
+      success++;
+    } catch (e) {
+      failed++;
+      console.error("فشل تفعيل الطالب", student.name, e);
     }
-    await fetchStats();
-    await fetchActiveAttempts();
-    setActivatingAll(false);
-    toast.success(`تم تفعيل ${success} طالب بنجاح${failed > 0 ? `، فشل ${failed}` : ""}`);
-  };
+  }
+  
+  await fetchStats();
+  await fetchActiveAttempts();
+  setActivatingAll(false);
+  toast.success(`تم تفعيل ${success} طالب بنجاح${failed > 0 ? `، فشل ${failed}` : ""}`);
+};
 
-  const filteredUsers = users.filter(
-    (u) => u.name?.includes(searchTerm) || u.username?.includes(searchTerm)
-  );
+  // فلترة الطلاب مع الأخذ بعين الاعتبار فلتر المنطقة الجديد
+  const filteredUsers = users.filter((u) => {
+    const matchesSearch = u.name?.includes(searchTerm) || u.username?.includes(searchTerm);
+    const matchesArea = !studentAreaFilter || u.area_code === studentAreaFilter;
+    return matchesSearch && matchesArea;
+  });
+
   const todayNewStudents = users.filter((u) => {
     const createdDate = new Date(u.created_at);
     const today = new Date();
@@ -726,6 +785,21 @@ export default function AdminDashboard() {
               className="search-input"
             />
           </div>
+
+          {/* فلتر المنطقة الجديد */}
+          <div className="filter-input-wrapper" style={{ maxWidth: "200px" }}>
+            <select
+              value={studentAreaFilter}
+              onChange={(e) => setStudentAreaFilter(e.target.value)}
+            >
+              <option value="">جميع المناطق</option>
+              {Object.entries(AREA_MAP).map(([code, name]) => (
+                <option key={code} value={code}>{name}</option>
+              ))}
+            </select>
+            <ChevronDown size={16} className="filter-select-icon" />
+          </div>
+
           <button
             className="btn-primary btn-activate-all"
             onClick={handleActivateAll}
@@ -755,6 +829,7 @@ export default function AdminDashboard() {
                   <tr>
                     <th>الاسم</th>
                     <th>الفرع</th>
+                    <th>المنطقة</th>
                     <th>رقم الجوال</th>
                     <th className="text-center">الإجراءات</th>
                   </tr>
@@ -766,12 +841,54 @@ export default function AdminDashboard() {
                       <tr key={user.id}>
                         <td>
                           <div className="user-cell">
-                            
                             <span className="user-name-cell">{user.name || "غير محدد"}</span>
                           </div>
                         </td>
                         <td>
                           <span className="subject-badge" style={{ color: "#475569" }}>{user.branch || "—"}</span>
+                        </td>
+                        {/* خلية المنطقة – قابلة للتعديل */}
+                        <td>
+                          {editingAreaId === user.id ? (
+                            <div className="phone-edit-row">
+                              <select
+                                value={editAreaValue}
+                                onChange={(e) => setEditAreaValue(e.target.value)}
+                                className="phone-input"
+                              >
+                                <option value="">اختر المنطقة</option>
+                                {Object.entries(AREA_MAP).map(([code, name]) => (
+                                  <option key={code} value={code}>{name}</option>
+                                ))}
+                              </select>
+                              <button
+                                onClick={() => handleAreaSave(user.id)}
+                                disabled={areaSaveLoadingId === user.id}
+                                className="icon-btn save"
+                                title="حفظ"
+                              >
+                                {areaSaveLoadingId === user.id ? <span className="spinner-small"></span> : <Check size={16} />}
+                              </button>
+                              <button
+                                onClick={handleAreaCancel}
+                                className="icon-btn cancel"
+                                title="إلغاء"
+                              >
+                                <X size={16} />
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="phone-display-row">
+                              <span>{AREA_MAP[user.area_code] || user.area_code || "—"}</span>
+                              <button
+                                onClick={() => handleAreaEditClick(user)}
+                                className="icon-btn edit"
+                                title="تعديل"
+                              >
+                                <Pencil size={14} />
+                              </button>
+                            </div>
+                          )}
                         </td>
                         <td>
                           {editingPhoneId === user.id ? (
@@ -890,8 +1007,6 @@ export default function AdminDashboard() {
                     </div>
                   ) : (
                     <div className="branch-results-container">
-
-
                       <div className="filters-bar">
                         <div className="filter-input-wrapper">
                           <Search size={16} className="filter-search-icon" />
@@ -914,7 +1029,6 @@ export default function AdminDashboard() {
                             <option value="">جميع المناطق</option>
                             <option value="tlh">تل الهوى</option>
                             <option value="drb">دير البلح</option>
-                            <option value="max">ماكس</option>
                             <option value="nsr">النصر</option>
                             <option value="nth">الشمال</option>
                           </select>
@@ -1004,6 +1118,15 @@ export default function AdminDashboard() {
                                 title="عرض النتائج - الفرع الأدبي"
                               >
                                 <BookOpen size={16} /> أدبي
+                              </button>
+                              {/* زر حذف الحزمة */}
+                              <button
+                                className="btn-view-branch delete-batch-btn"
+                                onClick={() => handleDeleteBatch(batch.id)}
+                                disabled={deletingBatch === batch.id}
+                                title="حذف الحزمة"
+                              >
+                                <Trash2 size={16} />
                               </button>
                             </div>
                           </td>
@@ -1155,6 +1278,19 @@ export default function AdminDashboard() {
         .btn-view-branch:hover { background: #e2e8f0; }
         .btn-view-branch.literary:hover { background: #fee2e2; color: #991b1b; }
         .btn-view-branch:first-child:hover { background: #dbeafe; color: #1e3a8a; }
+        /* زر حذف الحزمة */
+        .btn-view-branch.delete-batch-btn {
+          background: #fee2e2;
+          color: #dc2626;
+        }
+        .btn-view-branch.delete-batch-btn:hover:not(:disabled) {
+          background: #fecaca;
+          color: #b91c1c;
+        }
+        .btn-view-branch.delete-batch-btn:disabled {
+          opacity: 0.5;
+          cursor: not-allowed;
+        }
         
         .spinner { border: 3px solid #f3f3f3; border-top: 3px solid #3b82f6; border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; margin: 0 auto 10px; }
         .spinner-small { border: 2px solid rgba(255,255,255,0.3); border-top: 2px solid white; border-radius: 50%; width: 14px; height: 14px; animation: spin 1s linear infinite; display: inline-block; }
