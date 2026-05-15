@@ -20,7 +20,6 @@ export default function Auth() {
   const location = useLocation();
   const from = location.state?.from || '/dashboard';
 
-  // دالة التحقق من الرتبة والتوجيه
   const checkRoleAndRedirect = async (userId) => {
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
@@ -44,7 +43,6 @@ export default function Auth() {
     return true;
   };
 
-  // دالة التأكد من وجود بروفايل للمستخدم
   const ensureProfile = async (userId, nationalIdValue, fullNameValue, branchValue, phoneValue) => {
     const { data: existing, error: fetchError } = await supabase
       .from('profiles')
@@ -70,7 +68,6 @@ export default function Auth() {
     return true;
   };
 
-  // معالجة إرسال النموذج
   const handleSubmit = async (e) => {
     e.preventDefault();
     const currentId = isLoginView ? loginId : signupId;
@@ -237,12 +234,12 @@ export default function Auth() {
 
   return (
     <div className="auth-page-container">
-      {/* ----- قسم اللوجو المحسن: بسيط، بدون خلفيات، وحجم متناسق ----- */}
-      <div className="auth-logo-header">
+      {/* ----- قسم اللوجو المحسن: نظيف وبدون خلفيات ----- */}
+      <div className="clean-logo-container">
         <img
           src="https://i.imgur.com/hP8TbH5.png"
           alt="النخبة"
-          className="auth-logo-img"
+          className="clean-logo-img"
         />
       </div>
 
@@ -375,7 +372,7 @@ export default function Auth() {
 
         <div className="toggle-view">
           {isAdminVerify ? (
-            <p>ليس لديك صلاحيات مدير ؟ <span onClick={() => { setIsAdminVerify(false); setAdminPassword(''); }}>تسجيل الدخول</span></p>
+            <p>ليس لديك صلاحيات مدير ؟<span onClick={() => { setIsAdminVerify(false); setAdminPassword(''); }}>تسجيل الدخول</span></p>
           ) : isLoginView ? (
             <p>ليس لديك حساب؟ <span onClick={() => setIsLoginView(false)}>إنشاء حساب جديد</span></p>
           ) : (
@@ -389,150 +386,91 @@ export default function Auth() {
         @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700&display=swap');
 
         :root { color-scheme: light only; }
+        body, html { margin: 0; padding: 0; font-family: 'Cairo', sans-serif; background: #eef5ff; color: #1e293b; }
 
         .auth-page-container {
           min-height: 100vh;
           display: flex;
           flex-direction: column;
           align-items: center;
-          justify-content: center;
+          justify-content: flex-start;
           direction: rtl;
-          background: linear-gradient(135deg, #f0f7ff 0%, #e2eeff 100%);
+          background: linear-gradient(135deg, #eef5ff 0%, #d8e8fc 100%);
+          position: relative;
           padding: 20px;
           box-sizing: border-box;
-          font-family: 'Cairo', sans-serif;
         }
 
-        /* تحسين الشعار */
-        .auth-logo-header {
-          margin-bottom: 25px;
-          animation: fadeInDown 0.8s ease-out;
+        /* ----- تعديل اللوجو المحسن ----- */
+        .clean-logo-container {
+          margin-top: 40px;
+          margin-bottom: 20px;
+          z-index: 20;
+          display: flex;
+          justify-content: center;
+          width: 100%;
+          animation: logoEntrance 1s ease-out;
         }
 
-        .auth-logo-img {
-          width: 200px; /* حجم منطقي متوازن */
+        .clean-logo-img {
+          width: 220px; /* حجم منطقي وأنيق */
           height: auto;
-          display: block;
-          filter: drop-shadow(0 8px 15px rgba(0,0,0,0.05)); /* ظل ناعم جداً */
+          filter: drop-shadow(0 10px 20px rgba(74, 138, 218, 0.15));
           transition: transform 0.3s ease;
         }
 
-        .auth-logo-img:hover {
-          transform: scale(1.03);
+        .clean-logo-img:hover {
+          transform: translateY(-5px);
         }
 
-        /* تصميم الكارت */
-        .auth-card {
-          background: white;
-          width: 100%;
-          max-width: 400px;
-          padding: 35px;
-          border-radius: 24px;
-          box-shadow: 0 20px 40px rgba(0,0,0,0.06);
-          z-index: 10;
-          animation: fadeInUp 0.8s ease-out;
-        }
-
-        .auth-title {
-          text-align: center;
-          color: #1e293b;
-          margin-bottom: 30px;
-          font-size: 24px;
-          font-weight: 700;
-        }
-
-        .auth-form {
-          display: flex;
-          flex-direction: column;
-          gap: 18px;
-        }
-
-        .input-group label {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          font-size: 14px;
-          font-weight: 600;
-          color: #475569;
-          margin-bottom: 8px;
-        }
-
-        .label-icon { width: 16px; height: 16px; color: #3b82f6; }
-
-        .auth-input {
-          width: 100%;
-          padding: 12px 16px;
-          border: 1.5px solid #e2e8f0;
-          border-radius: 12px;
-          font-family: 'Cairo', sans-serif;
-          font-size: 14px;
-          transition: 0.3s;
-          background: #f8fafc;
-          box-sizing: border-box;
-        }
-
-        .auth-input:focus {
-          outline: none;
-          border-color: #3b82f6;
-          background: white;
-          box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
-        }
-
-        .submit-btn {
-          width: 100%;
-          padding: 14px;
-          background: #2563eb;
-          color: white;
-          border: none;
-          border-radius: 12px;
-          font-size: 16px;
-          font-weight: 700;
-          cursor: pointer;
-          transition: 0.3s;
-          margin-top: 10px;
-        }
-
-        .submit-btn:hover {
-          background: #1d4ed8;
-          transform: translateY(-2px);
-          box-shadow: 0 10px 15px rgba(37, 99, 235, 0.2);
-        }
-
-        .submit-btn:disabled {
-          background: #94a3b8;
-          cursor: not-allowed;
-          transform: none;
-        }
-
-        .toggle-view {
-          text-align: center;
-          margin-top: 25px;
-          font-size: 14px;
-          color: #64748b;
-        }
-
-        .toggle-view span {
-          color: #2563eb;
-          cursor: pointer;
-          font-weight: 700;
-          margin-right: 5px;
-          text-decoration: underline;
-        }
-
-        @keyframes fadeInDown {
+        @keyframes logoEntrance {
           from { opacity: 0; transform: translateY(-20px); }
           to { opacity: 1; transform: translateY(0); }
         }
 
-        @keyframes fadeInUp {
+        /* ----- باقي التصميم القديم كما هو ----- */
+        .auth-card {
+          background: white;
+          width: 100%;
+          max-width: 400px;
+          padding: 30px;
+          border-radius: 20px;
+          box-shadow: 0 15px 35px rgba(0,0,0,0.05);
+          z-index: 10;
+          color: #2c3e50;
+          animation: cardFadeIn 0.8s ease-out 0.2s both;
+        }
+
+        @keyframes cardFadeIn {
           from { opacity: 0; transform: translateY(20px); }
           to { opacity: 1; transform: translateY(0); }
         }
 
+        .auth-title { text-align: center; color: #2c3e50; margin-bottom: 25px; font-size: 22px; font-weight: 700; }
+        .auth-form { display: flex; flex-direction: column; gap: 18px; }
+        .input-group label { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; color: #4a5568; margin-bottom: 6px; }
+        .label-icon { width: 16px; height: 16px; color: #4a8ada; }
+        .input-wrapper input, .input-wrapper select {
+          width: 100%; padding: 12px 15px; border: 1.5px solid #e2e8f0; border-radius: 10px;
+          font-family: 'Cairo', sans-serif; font-size: 14px; box-sizing: border-box; transition: 0.3s;
+          background: #f8fafc; color: #1e293b; text-align: right;
+        }
+        .input-wrapper input:focus { outline: none; border-color: #4a8ada; box-shadow: 0 0 0 3px rgba(74, 138, 218, 0.1); }
+        
+        .submit-btn {
+          width: 100%; padding: 12px; background: #4a8ada; color: white; border: none;
+          border-radius: 10px; font-size: 16px; font-weight: 700; cursor: pointer;
+          transition: 0.3s; margin-top: 10px; font-family: 'Cairo', sans-serif;
+        }
+        .submit-btn:hover { background: #3b76c4; transform: translateY(-1px); }
+        .submit-btn:disabled { background: #cbd5e0; cursor: not-allowed; }
+
+        .toggle-view { text-align: center; margin-top: 20px; font-size: 14px; color: #4a5568; }
+        .toggle-view span { color: #4a8ada; cursor: pointer; font-weight: 700; margin-right: 5px; }
+
         @media (max-width: 480px) {
-          .auth-logo-img { width: 160px; }
-          .auth-card { padding: 25px 20px; border-radius: 20px; }
-          .auth-page-container { padding: 15px; }
+          .clean-logo-img { width: 180px; }
+          .auth-card { padding: 25px 20px; }
         }
       `}</style>
     </div>
