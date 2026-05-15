@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 
 const LogoutIcon = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
     <polyline points="16 17 21 12 16 7" />
     <line x1="21" y1="12" x2="9" y2="12" />
@@ -12,7 +12,7 @@ const LogoutIcon = () => (
 );
 
 const UserIcon = () => (
-  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
     <circle cx="12" cy="7" r="4" />
   </svg>
@@ -43,7 +43,7 @@ export default function Navbar({ userName = 'مستخدم', role = 'student' }) 
     <>
       <header className="dashboard-header">
         <button onClick={handleLogout} className="logout-button">
-          <span>خروج</span>
+          <span className="logout-text">خروج</span>
           <span className="logout-icon"><LogoutIcon /></span>
         </button>
 
@@ -84,101 +84,101 @@ export default function Navbar({ userName = 'مستخدم', role = 'student' }) 
           direction: rtl;
         }
 
-        /* ========== Logo Section ========== */
         .logo-section { justify-self: center; display: flex; align-items: center; justify-content: center; }
-        
-        .logo-img-dash { height: 64px; width: auto; object-fit: contain; position: relative; z-index: 2; }
+        .logo-img-dash { height: 60px; width: auto; object-fit: contain; position: relative; z-index: 2; }
 
-        /* ========== User Section ========== */
         .user-section { justify-self: end; display: flex; align-items: center; gap: 20px; }
         .user-info { display: flex; align-items: center; gap: 12px; }
-        
+
         .user-name {
-          font-weight: 700; color: #1e293b; font-size: 1rem; font-family: 'Cairo', sans-serif;
-          white-space: nowrap; /* ضمان ظهور الاسم في سطر واحد */
-          overflow: hidden; text-overflow: ellipsis; max-width: 150px;
+          font-weight: 700;
+          color: #1e293b;
+          font-size: 0.95rem;
+          font-family: 'Cairo', sans-serif;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          max-width: 150px;
         }
 
         .user-avatar {
-          width: 44px; height: 44px; border-radius: 50%; background: linear-gradient(135deg, #f8fafc, #f1f5f9);
-          border: 2px solid #e2e8f0; display: flex; align-items: center; justify-content: center;
-          color: #64748b; flex-shrink: 0; /* ضمان عدم انضغاط الصورة */
+          width: 44px;
+          height: 44px;
+          border-radius: 50%;
+          background: linear-gradient(135deg, #f8fafc, #f1f5f9);
+          border: 2px solid #e2e8f0;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: #64748b;
+          flex-shrink: 0;
         }
 
-        /* ========== Logout Button (التصميم الأصلي) ========== */
         .logout-button {
-          display: flex; align-items: center; gap: 8px; background-color: #ffffff;
-          border: 1px solid #e2e8f0; color: #475569; padding: 10px 22px;
-          border-radius: 30px; font-family: 'Cairo', sans-serif;
-          font-size: 0.95rem; font-weight: 600; cursor: pointer;
-          transition: all 0.3s ease; justify-self: start; width: fit-content;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          background-color: #ffffff;
+          border: 1px solid #e2e8f0;
+          color: #475569;
+          padding: 10px 22px;
+          border-radius: 30px;
+          font-family: 'Cairo', sans-serif;
+          font-size: 0.95rem;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.3s ease;
+          justify-self: start;
+          width: fit-content;
           box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
         }
+
         .logout-button:hover {
-          background-color: #fef2f2; color: #dc2626; border-color: #fecaca;
-          box-shadow: 0 4px 16px rgba(220, 38, 38, 0.12); transform: translateY(-1px);
+          background-color: #fef2f2;
+          color: #dc2626;
+          border-color: #fecaca;
+          box-shadow: 0 4px 16px rgba(220, 38, 38, 0.12);
+          transform: translateY(-1px);
         }
 
-   /* ========== Responsive - Mobile ========== */
-@media (max-width: 768px) {
-  .dashboard-header {
-    padding: 10px 16px;
-    border-radius: 0 0 24px 24px;
-  }
+        .logout-icon { display: flex; align-items: center; justify-content: center; }
 
-  .logo-img-dash {
-    height: 48px;
-  }
+        /* ========== Responsive - Mobile ========== */
+        @media (max-width: 768px) {
+          .dashboard-header {
+            padding: 10px 12px;
+            border-radius: 0 0 24px 24px;
+          }
 
-  /* زر الخروج أيقونة فقط */
-  .logout-button {
-    width: 42px;
-    height: 42px;
-    padding: 0;
+          .logo-img-dash { height: 42px; }
 
-    display: flex;
-    align-items: center;
-    justify-content: center;
+          /* إخفاء نص "خروج" في الموبايل */
+          .logout-text { display: none; }
 
-    border-radius: 50%;
-    flex-shrink: 0;
-  }
+          /* تحويل الزر لشكل أيقونة دائري */
+          .logout-button {
+            padding: 10px;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            justify-content: center;
+            gap: 0;
+          }
 
-  .logout-button span:first-child {
-    display: none;
-  }
+          /* تقليل مساحة الاسم لتوفير مساحة أكبر للشعار */
+          .user-name {
+            font-size: 0.8rem;
+            max-width: 70px;
+          }
+          
+          .user-avatar {
+            width: 38px;
+            height: 38px;
+          }
 
-  .logout-icon {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-
-  /* الاسم */
-  .user-name {
-    font-size: 0.85rem;
-    max-width: 78px;
-
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  /* الصورة */
-  .user-avatar {
-    width: 40px;
-    height: 40px;
-
-    min-width: 40px;
-    min-height: 40px;
-
-    flex-shrink: 0;
-  }
-
-  .user-info {
-    gap: 8px;
-  }
-}
+          .user-section { gap: 10px; }
+          .user-info { gap: 8px; }
+        }
       `}</style>
     </>
   );
