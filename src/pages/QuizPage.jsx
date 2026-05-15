@@ -701,7 +701,7 @@ const currentDegree = currentBlock.type === "passage"
         </div>
         <div className="center-brand">
           <img
-            src="https://i.imgur.com/p1hg12H.png"
+            src="https://i.imgur.com/hP8TbH5.png"
             alt="Logo"
             className="quiz-logo"
           />
