@@ -728,7 +728,7 @@ const currentDegree = currentBlock.type === "passage"
             className="submit-quiz-btn"
             style={{ background: "#3b82f6" }}
           >
-            {isEnglishSubject ? "Back to Dashboard" : "العودة للرئيسية"}
+            {isEnglishSubject ? "العودة للرئيسية" : "العودة للرئيسية"}
           </button>
         )}
       </header>
