@@ -1,4 +1,3 @@
-// QuizPage.jsx
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "../supabaseClient";
@@ -41,8 +40,10 @@ const formatDegree = (degree, isEnglish = false) => {
   if (isEnglish) {
     return degree === 1 ? "1 Point" : `${degree} Points`;
   }
+  // ابدأ بالقيم الخاصة أولاً
   if (degree === 1) return "درجة واحدة";
   if (degree === 2) return "درجتان";
+  if (degree === 2.5) return "درجتان ونصف";
   if (degree >= 3 && degree <= 10) return `${degree} درجات`;
   return `${degree} درجة`;
 };
@@ -558,19 +559,11 @@ export default function QuizPage() {
           </div>
           <div className="center-brand">
             <img
-              src="https://i.imgur.com/p1hg12H.png"
+              src="https://i.imgur.com/ETr3K2d.png"
               alt="Logo"
               className="quiz-logo"
             />
-            <span className="quiz-brand-name">مركز النخبة التعليمي</span>
           </div>
-          <button
-            onClick={() => navigate("/dashboard")}
-            className="submit-quiz-btn"
-            style={{ background: "#3b82f6" }}
-          >
-            {isEnglishSubject ? "Back to Dashboard" : "العودة للرئيسية"}
-          </button>
         </header>
         <div className="progress-container">
           <div className="progress-bar" style={{ width: "0%" }}></div>
@@ -614,10 +607,25 @@ export default function QuizPage() {
           * { box-sizing: border-box; margin: 0; }
           body { margin: 0; background-color: #f4f7fb; font-family: 'Cairo', sans-serif; direction: rtl; }
           .quiz-page-wrapper { min-height: 100vh; display: flex; flex-direction: column; background: #f4f7fb; }
-          .quiz-header { background: rgba(255,255,255,0.85); backdrop-filter: blur(12px); padding: 16px 40px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 4px 20px rgba(0,0,0,0.03); position: sticky; top: 0; z-index: 100; border-bottom: 1px solid rgba(255,255,255,0.5); }
+          .quiz-header {     background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(20px);
+    padding: 16px 40px;
+    -webkit-backdrop-filter: blur(20px);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
+    position: sticky;
+    /* grid-template-columns: 1fr auto 1fr; */
+    top: 0;
+    z-index: 1000;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.5);
+    border-radius: 0 0 32px 32px;
+    box-shadow: 0 8px 32px rgba(15, 23, 42, 0.08), 0 2px 8px rgba(15, 23, 42, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.6);
+}
           .timer-pill { background: white; border: 1px solid #e2e8f0; padding: 8px 20px; border-radius: 50px; font-weight: 700; color: #1e293b; display: flex; align-items: center; gap: 8px; font-size: 1.1rem; }
           .center-brand { display: flex; align-items: center; gap: 12px; }
-          .quiz-logo { height: 44px; width: auto; }
+          .quiz-logo { height: 65px; width: auto; }
           .quiz-brand-name { font-weight: 800; color: #1e3a8a; font-size: 1.15rem; }
           .submit-quiz-btn { background: #3b82f6; color: white; border: none; padding: 10px 28px; border-radius: 14px; font-weight: 700; cursor: pointer; font-family: 'Cairo'; }
           .progress-container { height: 6px; background: #e2e8f0; width: 100%; }
@@ -701,11 +709,10 @@ const currentDegree = currentBlock.type === "passage"
         </div>
         <div className="center-brand">
           <img
-            src="https://i.imgur.com/hP8TbH5.png"
+            src="https://i.imgur.com/ETr3K2d.png"
             alt="Logo"
             className="quiz-logo"
           />
-          <span className="quiz-brand-name">مركز النخبة التعليمي</span>
         </div>
         {!isReviewMode ? (
           <button
@@ -926,13 +933,27 @@ const currentDegree = currentBlock.type === "passage"
 
         .quiz-page-wrapper { min-height: 100vh; display: flex; flex-direction: column; background: #f4f7fb; }
         
-        .quiz-header { background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(16px); padding: 16px 40px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 4px 20px rgba(0,0,0,0.03); position: sticky; top: 0; z-index: 100; border-bottom: 1px solid rgba(255,255,255,0.5); }
+        .quiz-header {     background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(20px);
+    padding: 16px 40px;
+    -webkit-backdrop-filter: blur(20px);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
+    position: sticky;
+    /* grid-template-columns: 1fr auto 1fr; */
+    top: 0;
+    z-index: 1000;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.5);
+    border-radius: 0 0 32px 32px;
+    box-shadow: 0 8px 32px rgba(15, 23, 42, 0.08), 0 2px 8px rgba(15, 23, 42, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.6); }
         .timer-pill { background: #ffffff; border: 1px solid #eef2f6; padding: 8px 20px; border-radius: 50px; font-weight: 700; color: #1e293b; display: flex; align-items: center; gap: 8px; font-size: 1.1rem; box-shadow: 0 2px 10px rgba(0,0,0,0.02); }
         .time-warning { color: #f59e0b; animation: pulse 1.5s infinite; }
         .time-critical { color: #ef4444; animation: pulse 0.5s infinite; font-weight: 800; }
         @keyframes pulse { 0% { opacity: 1; transform: scale(1); } 50% { opacity: 0.8; transform: scale(0.98); } 100% { opacity: 1; transform: scale(1); } }
         .center-brand { display: flex; align-items: center; gap: 12px; }
-        .quiz-logo { height: 44px; width: auto; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.05)); }
+        .quiz-logo { height: 65px; width: auto; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.05)); }
         .quiz-brand-name { font-weight: 800; color: #1e3a8a; font-size: 1.15rem; letter-spacing: -0.3px; }
         .submit-quiz-btn { background: #ef4444; color: white; border: none; padding: 12px 28px; border-radius: 14px; font-weight: 700; cursor: pointer; transition: all 0.2s cubic-bezier(0.4,0,0.2,1); font-family: 'Cairo', sans-serif; box-shadow: 0 4px 12px rgba(239,68,68,0.2); }
         .submit-quiz-btn:hover:not(:disabled) { background: #dc2626; transform: translateY(-2px); box-shadow: 0 6px 16px rgba(239,68,68,0.3); }
