@@ -1199,6 +1199,7 @@ const currentDegree = currentBlock.type === "passage"
           background: #f8fafc;
           border-radius: 8px;
         }
+
         .passage-box::-webkit-scrollbar-thumb {
           background: #cbd5e1;
           border-radius: 8px;
@@ -1212,6 +1213,7 @@ const currentDegree = currentBlock.type === "passage"
           .quiz-brand-name { display: none; }
           .question-card { padding: 24px 20px; border-radius: 24px; }
           .question-text { font-size: 1.2rem; }
+          .quiz-logo {height: 44px;}
           
           .quiz-nav-controls {
             gap: 8px;
@@ -1263,6 +1265,7 @@ const currentDegree = currentBlock.type === "passage"
           .nav-btn {
             flex: 1;
           }
+.quiz-logo {height: 44px;}
         }
       `}</style>
     </div>
