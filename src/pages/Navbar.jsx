@@ -20,22 +20,6 @@ const UserIcon = () => (
 
 export default function Navbar({ userName = 'مستخدم', role = 'student' }) {
   const navigate = useNavigate();
-  const [branch, setBranch] = useState('');
-
-  useEffect(() => {
-    const fetchBranch = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('branch')
-          .eq('id', user.id)
-          .maybeSingle();
-        setBranch(profile?.branch || '');
-      }
-    };
-    fetchBranch();
-  }, []);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -58,15 +42,11 @@ export default function Navbar({ userName = 'مستخدم', role = 'student' }) 
   return (
     <>
       <header className="dashboard-header">
-        {/* زر الخروج - اليسار */}
-        <div className="header-left">
-          <button onClick={handleLogout} className="logout-button">
-            <span className="logout-text">خروج</span>
-            <span className="logout-icon"><LogoutIcon /></span>
-          </button>
-        </div>
+        <button onClick={handleLogout} className="logout-button">
+          <span>خروج</span>
+          <span className="logout-icon"><LogoutIcon /></span>
+        </button>
 
-        {/* الشعار - المنتصف */}
         <div className="logo-section">
           <div className="logo-wrapper-dash">
             <div className="logo-glow"></div>
@@ -74,7 +54,6 @@ export default function Navbar({ userName = 'مستخدم', role = 'student' }) 
           </div>
         </div>
 
-        {/* معلومات المستخدم - اليمين */}
         <div className="user-section">
           <div className="user-info">
             <div className="user-text">
@@ -89,139 +68,65 @@ export default function Navbar({ userName = 'مستخدم', role = 'student' }) 
 
       <style>{`
         .dashboard-header {
-          background: rgba(255, 255, 255, 0.85);
+          background: rgba(255, 255, 255, 0.78);
           backdrop-filter: blur(20px);
           -webkit-backdrop-filter: blur(20px);
-          padding: 10px 24px;
+          padding: 12px 32px;
           display: grid;
-          /* تقسيم الشاشة لـ 3 أجزاء متساوية لضمان توسيط اللوجو */
           grid-template-columns: 1fr auto 1fr;
           align-items: center;
-          border-radius: 0 0 24px 24px;
-          border-bottom: 1px solid rgba(255, 255, 255, 0.5);
-          box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+          border-radius: 0 0 32px 32px;
+          border: 1px solid rgba(255, 255, 255, 0.5);
+          box-shadow: 0 8px 32px rgba(15, 23, 42, 0.08), 0 2px 8px rgba(15, 23, 42, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.6);
           position: sticky;
           top: 0;
           z-index: 1000;
           direction: rtl;
         }
 
-        .header-left { display: flex; justify-content: flex-start; }
-        .user-section { display: flex; justify-content: flex-end; }
-
         /* ========== Logo Section ========== */
-        .logo-section {
-          display: flex;
-          align-items: center;
-          justify-content: center;
-        }
-
-        .logo-wrapper-dash {
-          position: relative;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          padding: 5px;
-        }
-
-        .logo-img-dash {
-          height: 50px;
-          width: auto;
-          object-fit: contain;
-          position: relative;
-          z-index: 2;
-        }
+        .logo-section { justify-self: center; display: flex; align-items: center; justify-content: center; }
+        
+        .logo-img-dash { height: 64px; width: auto; object-fit: contain; position: relative; z-index: 2; }
 
         /* ========== User Section ========== */
-        .user-info {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-          max-width: 100%;
-        }
-
+        .user-section { justify-self: end; display: flex; align-items: center; gap: 20px; }
+        .user-info { display: flex; align-items: center; gap: 12px; }
+        
         .user-name {
-          font-weight: 700;
-          color: #1e293b;
-          font-size: 0.9rem;
-          font-family: 'Cairo', sans-serif;
-          /* ضمان سطر واحد */
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          max-width: 120px; /* لضمان عدم تداخل النص مع اللوجو في الموبايلات الصغيرة جداً */
+          font-weight: 700; color: #1e293b; font-size: 1rem; font-family: 'Cairo', sans-serif;
+          white-space: nowrap; /* ضمان ظهور الاسم في سطر واحد */
+          overflow: hidden; text-overflow: ellipsis; max-width: 150px;
         }
 
         .user-avatar {
-          width: 40px;
-          height: 40px;
-          border-radius: 50%;
-          background: #f1f5f9;
-          border: 2px solid #e2e8f0;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          color: #64748b;
-          flex-shrink: 0; /* منع انضغاط الصورة */
+          width: 44px; height: 44px; border-radius: 50%; background: linear-gradient(135deg, #f8fafc, #f1f5f9);
+          border: 2px solid #e2e8f0; display: flex; align-items: center; justify-content: center;
+          color: #64748b; flex-shrink: 0; /* ضمان عدم انضغاط الصورة */
         }
 
-        /* ========== Logout Button ========== */
+        /* ========== Logout Button (التصميم الأصلي) ========== */
         .logout-button {
-          display: flex;
-          align-items: center;
-          gap: 6px;
-          background-color: #fff;
-          border: 1px solid #fee2e2;
-          color: #dc2626;
-          padding: 8px 14px;
-          border-radius: 12px;
-          font-family: 'Cairo', sans-serif;
-          font-size: 0.85rem;
-          font-weight: 600;
-          cursor: pointer;
-          transition: all 0.2s;
+          display: flex; align-items: center; gap: 8px; background-color: #ffffff;
+          border: 1px solid #e2e8f0; color: #475569; padding: 10px 22px;
+          border-radius: 30px; font-family: 'Cairo', sans-serif;
+          font-size: 0.95rem; font-weight: 600; cursor: pointer;
+          transition: all 0.3s ease; justify-self: start; width: fit-content;
+          box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
         }
-
         .logout-button:hover {
-          background-color: #fef2f2;
-          transform: translateY(-1px);
+          background-color: #fef2f2; color: #dc2626; border-color: #fecaca;
+          box-shadow: 0 4px 16px rgba(220, 38, 38, 0.12); transform: translateY(-1px);
         }
 
         /* ========== Responsive - Mobile ========== */
         @media (max-width: 768px) {
-          .dashboard-header {
-            padding: 8px 12px;
-            grid-template-columns: 1fr auto 1fr; /* الحفاظ على التوزيعه لتوسيط اللوجو */
-          }
+          .dashboard-header { padding: 10px 16px; border-radius: 0 0 24px 24px; }
+          .logo-img-dash { height: 48px; }
           
-          .logo-img-dash {
-            height: 40px;
-          }
-
-          .logout-text {
-            display: inline-block; /* ضمان ظهور الكلمة */
-            font-size: 0.8rem;
-          }
-
-          .logout-button {
-            padding: 6px 10px;
-            border-radius: 10px;
-          }
-
-          .user-name {
-            font-size: 0.8rem;
-            max-width: 80px; /* تصغير المساحة المتاحة للاسم في الموبايل */
-          }
-
-          .user-avatar {
-            width: 35px;
-            height: 35px;
-          }
-        }
-
-        @media (max-width: 380px) {
-            .logout-text { font-size: 0.75rem; }
-            .user-name { display: none; } /* في الموبايلات الضيقة جداً، نكتفي بالأفاتار للحفاظ على اللوجو في النص */
+          /* تعديل بسيط لزر الخروج في الموبايل ليناسب المساحة مع بقاء الكلمة */
+          .logout-button { padding: 8px 12px; font-size: 0.85rem; gap: 5px; }
+          .user-name { font-size: 0.85rem; max-width: 80px; }
         }
       `}</style>
     </>
