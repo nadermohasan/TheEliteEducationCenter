@@ -119,15 +119,66 @@ export default function Navbar({ userName = 'مستخدم', role = 'student' }) 
           box-shadow: 0 4px 16px rgba(220, 38, 38, 0.12); transform: translateY(-1px);
         }
 
-        /* ========== Responsive - Mobile ========== */
-        @media (max-width: 768px) {
-          .dashboard-header { padding: 10px 16px; border-radius: 0 0 24px 24px; }
-          .logo-img-dash { height: 48px; }
-          
-          /* تعديل بسيط لزر الخروج في الموبايل ليناسب المساحة مع بقاء الكلمة */
-          .logout-button { padding: 8px 12px; font-size: 0.85rem; gap: 5px; }
-          .user-name { font-size: 0.85rem; max-width: 80px; }
-        }
+   /* ========== Responsive - Mobile ========== */
+@media (max-width: 768px) {
+  .dashboard-header {
+    padding: 10px 16px;
+    border-radius: 0 0 24px 24px;
+  }
+
+  .logo-img-dash {
+    height: 48px;
+  }
+
+  /* زر الخروج أيقونة فقط */
+  .logout-button {
+    width: 42px;
+    height: 42px;
+    padding: 0;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .logout-button span:first-child {
+    display: none;
+  }
+
+  .logout-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* الاسم */
+  .user-name {
+    font-size: 0.85rem;
+    max-width: 78px;
+
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* الصورة */
+  .user-avatar {
+    width: 40px;
+    height: 40px;
+
+    min-width: 40px;
+    min-height: 40px;
+
+    flex-shrink: 0;
+  }
+
+  .user-info {
+    gap: 8px;
+  }
+}
       `}</style>
     </>
   );
