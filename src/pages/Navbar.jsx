@@ -50,7 +50,7 @@ export default function Navbar({ userName = 'مستخدم', role = 'student' }) 
         <div className="logo-section">
           <div className="logo-wrapper-dash">
             <div className="logo-glow"></div>
-            <img src="https://i.imgur.com/hP8TbH5.png" alt="شعار المركز" className="logo-img-dash" />
+            <img src="https://i.imgur.com/ETr3K2d.png" alt="شعار المركز" className="logo-img-dash" />
           </div>
         </div>
 
@@ -85,7 +85,7 @@ export default function Navbar({ userName = 'مستخدم', role = 'student' }) 
         }
 
         .logo-section { justify-self: center; display: flex; align-items: center; justify-content: center; }
-        .logo-img-dash { height: 60px; width: auto; object-fit: contain; position: relative; z-index: 2; }
+        .logo-img-dash { height: 65px; width: auto; object-fit: contain; position: relative; z-index: 2; }
 
         .user-section { justify-self: end; display: flex; align-items: center; gap: 20px; }
         .user-info { display: flex; align-items: center; gap: 12px; }
