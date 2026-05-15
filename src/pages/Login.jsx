@@ -238,7 +238,7 @@ export default function Auth() {
       <div className="top-logo-container">
         <div className="premium-logo-wrapper">
           <img
-            src="https://i.imgur.com/dHEoE7L.png"
+            src="https://i.imgur.com/hP8TbH5.png"
             alt="النخبة"
             className="premium-logo-img"
           />
