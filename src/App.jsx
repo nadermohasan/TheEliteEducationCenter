@@ -6,7 +6,6 @@ import TeacherDashboard from './pages/TeacherDashboard';
 import Dashboard from "./pages/Dashboard";
 import QuizPage from './pages/QuizPage';
 import QuizResult from './pages/QuizResult';
-
 export default function App() {
   return (
     <>
@@ -15,7 +14,7 @@ export default function App() {
         reverseOrder={false}
         toastOptions={{
           duration: 4000,
-          style: { fontFamily: 'Cairo, sans-serif' },
+          style: { fontFamily: 'Cairo, sans-serif', direction: 'rtl', textAlign: 'right' },
         }}
       />
       <HashRouter>
