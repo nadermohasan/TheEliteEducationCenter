@@ -1,4 +1,4 @@
-import { HashRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { Toaster } from 'react-hot-toast';
 import Login from "./pages/Login";
 import AdminDashboard from './pages/AdminDashboard';
@@ -17,7 +17,7 @@ export default function App() {
           style: { fontFamily: 'Cairo, sans-serif', direction: 'rtl', textAlign: 'right' },
         }}
       />
-      <HashRouter>
+      <BrowserRouter>
         <Routes>
           <Route path="/" element={<Login />} />
           <Route path="/login" element={<Login />} />
@@ -30,11 +30,11 @@ export default function App() {
             <div style={{ textAlign: 'center', marginTop: '100px', fontFamily: 'Cairo' }}>
               <h1>404</h1>
               <p>عذراً، هذه الصفحة غير موجودة.</p>
-              <a href="#/">العودة للرئيسية</a>
+              <a href="/">العودة للرئيسية</a>
             </div>
           } />
         </Routes>
-      </HashRouter>
+      </BrowserRouter>
     </>
   );
 }

@@ -1,14 +1,10 @@
 {
-  "name": "quiz-center",
-  "private": true,
-  "version": "0.0.0",
-  "type": "module",
+  "name": "elnokhba-platform",
+  "version": "1.0.0",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "lint": "eslint .",
-    "preview": "vite preview",
-    "start": "vite preview --port 3000 --host 0.0.0.0"
+    "preview": "vite preview"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.100.1",

@@ -3,8 +3,9 @@ import react from '@vitejs/plugin-react'
 
 export default defineConfig({
   plugins: [react()],
-  base: './',  // أو '/' حسب احتياجك
+  base: '/', // مهم لـ BrowserRouter
   build: {
-    outDir: 'dist',  // هذا هو المجلد الافتراضي
+    outDir: 'dist',
+    assetsDir: 'assets',
   }
 })
