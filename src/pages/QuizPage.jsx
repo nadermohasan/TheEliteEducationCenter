@@ -1,4 +1,3 @@
-// QuizPage.jsx
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "../supabaseClient";
@@ -41,8 +40,10 @@ const formatDegree = (degree, isEnglish = false) => {
   if (isEnglish) {
     return degree === 1 ? "1 Point" : `${degree} Points`;
   }
+  // ابدأ بالقيم الخاصة أولاً
   if (degree === 1) return "درجة واحدة";
   if (degree === 2) return "درجتان";
+  if (degree === 2.5) return "درجتان ونصف";
   if (degree >= 3 && degree <= 10) return `${degree} درجات`;
   return `${degree} درجة`;
 };
@@ -78,6 +79,9 @@ export default function QuizPage() {
   const blocksRef = useRef([]);
   const selectedAnswersRef = useRef({});
   const numericSubjectIdRef = useRef(parseInt(subjectId, 10));
+  
+  // Ref جديد لحاوية الأرقام
+  const dotsContainerRef = useRef(null);
 
   useEffect(() => {
     blocksRef.current = blocks;
@@ -139,7 +143,7 @@ export default function QuizPage() {
     setConfirmState((prev) => ({ ...prev, isOpen: false }));
   };
 
-  // --- تسليم الاختبار (مُصحَّح) ---
+  // --- تسليم الاختبار ---
   const performSubmit = useCallback(
     async (isAuto = false) => {
       if (hasAutoSubmitted.current || submitting) return false;
@@ -188,7 +192,10 @@ export default function QuizPage() {
           const questionDegree = q.degree || 1;
           totalPossible += questionDegree;
           const userAns = currentAnswers[q.id];
-          if (userAns !== undefined && parseInt(userAns) === parseInt(q.correct_option))
+          if (
+            userAns !== undefined &&
+            parseInt(userAns) === parseInt(q.correct_option)
+          )
             finalScore += questionDegree;
         });
 
@@ -199,13 +206,13 @@ export default function QuizPage() {
           .eq("status", "active")
           .maybeSingle();
 
-        if (!activeAttempt) throw new Error("لا توجد محاولة نشطة لهذا الطالب");
+        if (!activeAttempt)
+          throw new Error("لا توجد محاولة نشطة لهذا الطالب");
 
-        // ✅ الإدراج مع student_id
         const { error: resultError } = await supabase.from("results").insert([
           {
             attempt_id: activeAttempt.id,
-            student_id: user.id,               // تمت إضافة معرف الطالب
+            student_id: user.id,
             subject_id: numericSubjectIdRef.current,
             student_answers: currentAnswers,
             score: finalScore,
@@ -219,7 +226,9 @@ export default function QuizPage() {
           .select("subject_id")
           .eq("attempt_id", activeAttempt.id);
 
-        const requiredSubjectIds = [...new Set(allQuestionsInAttempt.map((q) => q.subject_id))];
+        const requiredSubjectIds = [
+          ...new Set(allQuestionsInAttempt.map((q) => q.subject_id)),
+        ];
 
         const { data: finishedResults } = await supabase
           .from("results")
@@ -227,10 +236,15 @@ export default function QuizPage() {
           .eq("attempt_id", activeAttempt.id);
 
         const finishedSubjectIds = finishedResults.map((r) => r.subject_id);
-        const isLastSubject = requiredSubjectIds.every((id) => finishedSubjectIds.includes(id));
+        const isLastSubject = requiredSubjectIds.every((id) =>
+          finishedSubjectIds.includes(id)
+        );
 
         if (isLastSubject) {
-          await supabase.from("attempts").update({ status: "completed" }).eq("id", activeAttempt.id);
+          await supabase
+            .from("attempts")
+            .update({ status: "completed" })
+            .eq("id", activeAttempt.id);
         }
 
         navigate("/result", {
@@ -241,6 +255,7 @@ export default function QuizPage() {
             questions: allQuestions,
             selectedAnswers: currentAnswers,
             studentName,
+            subjectName,
           },
           replace: true,
         });
@@ -301,7 +316,13 @@ export default function QuizPage() {
 
   // --- حفظ المؤقت ---
   useEffect(() => {
-    if (timeLeft !== null && !loading && studentId && attemptId && !isReviewMode) {
+    if (
+      timeLeft !== null &&
+      !loading &&
+      studentId &&
+      attemptId &&
+      !isReviewMode
+    ) {
       saveTimerState(timeLeft);
     }
   }, [timeLeft, loading, studentId, attemptId, saveTimerState, isReviewMode]);
@@ -402,7 +423,9 @@ export default function QuizPage() {
           } catch (e) {}
         }
         const initialTime =
-          savedTime !== null && savedTime < defaultTime ? savedTime : defaultTime;
+          savedTime !== null && savedTime < defaultTime
+            ? savedTime
+            : defaultTime;
         setTimeLeft(initialTime);
       } else {
         setTimeLeft(null);
@@ -449,7 +472,10 @@ export default function QuizPage() {
           finalBlocks.push({ type: "single", question: q })
         );
       } else {
-        finalBlocks = questionsData.map((q) => ({ type: "single", question: q }));
+        finalBlocks = questionsData.map((q) => ({
+          type: "single",
+          question: q,
+        }));
       }
 
       setBlocks(finalBlocks);
@@ -471,6 +497,20 @@ export default function QuizPage() {
     };
   }, [subjectId, fetchQuizData, numericSubjectId]);
 
+  // تمرير الأرقام تلقائياً لتكون في المنتصف
+  useEffect(() => {
+    if (dotsContainerRef.current) {
+      const activeDot = dotsContainerRef.current.querySelector('.dot.active');
+      if (activeDot) {
+        activeDot.scrollIntoView({
+          behavior: 'smooth',
+          block: 'nearest',
+          inline: 'center'
+        });
+      }
+    }
+  }, [currentBlockIndex]);
+
   const handleSubmitQuiz = async () => {
     if (hasAutoSubmitted.current || submitting) return;
     const totalQuestions = blocks.reduce(
@@ -480,19 +520,15 @@ export default function QuizPage() {
     );
     const answeredCount = Object.keys(selectedAnswers).length;
     const unanswered = totalQuestions - answeredCount;
-    let msg = isEnglishSubject
-      ? "Are you sure you want to submit your quiz?"
-      : "هل أنت متأكد من إنهاء وتسليم الاختبار؟";
+    let msg = "هل أنت متأكد من إنهاء وتسليم الاختبار؟";
     if (unanswered > 0)
-      msg = isEnglishSubject
-        ? `You have ${unanswered} unanswered question(s).\n\n${msg}`
-        : `لديك ${unanswered} سؤال بدون إجابة.\n\n${msg}`;
+      msg = `لديك ${unanswered} سؤال بدون إجابة.\n\n${msg}`;
 
     const confirmed = await showConfirm({
-      title: isEnglishSubject ? "Submit Quiz" : "تسليم الاختبار",
+      title: "تسليم الاختبار",
       message: msg,
-      confirmText: isEnglishSubject ? "Submit" : "تسليم",
-      cancelText: isEnglishSubject ? "Review" : "مراجعة",
+      confirmText: "تسليم",
+      cancelText:  "مراجعة",
     });
     if (!confirmed) return;
     performSubmit(false);
@@ -522,16 +558,12 @@ export default function QuizPage() {
             <span>00:00</span>
           </div>
           <div className="center-brand">
-            <img src="https://i.imgur.com/p1hg12H.png" alt="Logo" className="quiz-logo" />
-            <span className="quiz-brand-name">مركز النخبة التعليمي</span>
+            <img
+              src="https://i.imgur.com/ETr3K2d.png"
+              alt="Logo"
+              className="quiz-logo"
+            />
           </div>
-          <button
-            onClick={() => navigate("/dashboard")}
-            className="submit-quiz-btn"
-            style={{ background: "#3b82f6" }}
-          >
-            {isEnglishSubject ? "Back to Dashboard" : "العودة للرئيسية"}
-          </button>
         </header>
         <div className="progress-container">
           <div className="progress-bar" style={{ width: "0%" }}></div>
@@ -563,7 +595,9 @@ export default function QuizPage() {
               onClick={() => navigate("/dashboard")}
               className="back-to-dashboard-btn"
             >
-              {isEnglishSubject ? "Back to Subjects" : "العودة إلى المواد الدراسية"}
+              {isEnglishSubject
+                ? "Back to Subjects"
+                : "العودة إلى المواد الدراسية"}
             </button>
           </div>
         </main>
@@ -573,10 +607,25 @@ export default function QuizPage() {
           * { box-sizing: border-box; margin: 0; }
           body { margin: 0; background-color: #f4f7fb; font-family: 'Cairo', sans-serif; direction: rtl; }
           .quiz-page-wrapper { min-height: 100vh; display: flex; flex-direction: column; background: #f4f7fb; }
-          .quiz-header { background: rgba(255,255,255,0.85); backdrop-filter: blur(12px); padding: 16px 40px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 4px 20px rgba(0,0,0,0.03); position: sticky; top: 0; z-index: 100; border-bottom: 1px solid rgba(255,255,255,0.5); }
+          .quiz-header {     background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(20px);
+    padding: 16px 40px;
+    -webkit-backdrop-filter: blur(20px);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
+    position: sticky;
+    /* grid-template-columns: 1fr auto 1fr; */
+    top: 0;
+    z-index: 1000;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.5);
+    border-radius: 0 0 32px 32px;
+    box-shadow: 0 8px 32px rgba(15, 23, 42, 0.08), 0 2px 8px rgba(15, 23, 42, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.6);
+}
           .timer-pill { background: white; border: 1px solid #e2e8f0; padding: 8px 20px; border-radius: 50px; font-weight: 700; color: #1e293b; display: flex; align-items: center; gap: 8px; font-size: 1.1rem; }
           .center-brand { display: flex; align-items: center; gap: 12px; }
-          .quiz-logo { height: 44px; width: auto; }
+          .quiz-logo { height: 65px; width: auto; }
           .quiz-brand-name { font-weight: 800; color: #1e3a8a; font-size: 1.15rem; }
           .submit-quiz-btn { background: #3b82f6; color: white; border: none; padding: 10px 28px; border-radius: 14px; font-weight: 700; cursor: pointer; font-family: 'Cairo'; }
           .progress-container { height: 6px; background: #e2e8f0; width: 100%; }
@@ -599,17 +648,18 @@ export default function QuizPage() {
 
   const totalBlocks = blocks.length;
   const passagesCount = blocks.filter((b) => b.type === "passage").length;
+  
+  // إجمالي الأسئلة الفعلية (مستخدم في شريط التقدم فقط)
   const totalQuestionsCount = blocks.reduce(
     (acc, b) => acc + (b.type === "passage" ? b.questions.length : 1),
     0
   );
 
-  let currentQuestionNumber = 0;
-  for (let i = 0; i < currentBlockIndex; i++) {
-    const b = blocks[i];
-    currentQuestionNumber += b.type === "passage" ? b.questions.length : 1;
-  }
-  currentQuestionNumber++;
+  // العدد الجديد للعرض: عدد الكتل (كل قطعة تعتبر وحدة واحدة)
+  const displayTotal = totalBlocks;
+
+  // رقم السؤال الحالي بنظام الكتل
+  const displayCurrent = currentBlockIndex + 1;
 
   const answeredCount = Object.keys(selectedAnswers).length;
   const progress =
@@ -618,19 +668,24 @@ export default function QuizPage() {
     ? ["A", "B", "C", "D"]
     : ["أ", "ب", "ج", "د"];
 
-  const currentQuestion = currentBlock.type === "passage"
-    ? currentBlock.questions[0]
-    : currentBlock.question;
+  const currentQuestion =
+    currentBlock.type === "passage"
+      ? currentBlock.questions[0]
+      : currentBlock.question;
   const questionDegree = currentQuestion?.degree || 1;
 
   const questionLabel = isEnglishSubject ? "Question" : "السؤال";
   const ofLabel = isEnglishSubject ? "of" : "من";
   const passageLabel = isEnglishSubject ? "Passage" : "القطعة";
-  const prevLabel = isEnglishSubject ? "Previous" : "السابق";
-  const nextLabel = isEnglishSubject ? "Next" : "التالي";
-  const submitLabel = isEnglishSubject
-    ? submitting ? "Submitting..." : "Submit Quiz"
-    : submitting ? "جاري التسليم..." : "إنهاء الاختبار";
+  const prevLabel = "السابق";
+  const nextLabel = "التالي";
+  const submitLabel = submitting
+    ? "...جاري التسليم"
+    : "إنهاء الاختبار";
+
+const currentDegree = currentBlock.type === "passage"
+  ? currentBlock.questions.reduce((sum, q) => sum + (q.degree || 1), 0)
+  : (currentQuestion?.degree || 1);
 
   return (
     <div
@@ -642,7 +697,11 @@ export default function QuizPage() {
           <span>⏱️</span>
           <span
             className={
-              timeLeft < 60 ? "time-critical" : timeLeft < 300 ? "time-warning" : ""
+              timeLeft < 60
+                ? "time-critical"
+                : timeLeft < 300
+                ? "time-warning"
+                : ""
             }
           >
             {isReviewMode ? "--:--" : formatTime(timeLeft)}
@@ -650,11 +709,10 @@ export default function QuizPage() {
         </div>
         <div className="center-brand">
           <img
-            src="https://i.imgur.com/p1hg12H.png"
+            src="https://i.imgur.com/ETr3K2d.png"
             alt="Logo"
             className="quiz-logo"
           />
-          <span className="quiz-brand-name">مركز النخبة التعليمي</span>
         </div>
         {!isReviewMode ? (
           <button
@@ -687,27 +745,23 @@ export default function QuizPage() {
                 {isEnglishSubject ? (
                   currentBlock.type === "passage" ? (
                     <>
-                      {passageLabel} {currentBlockIndex + 1} {ofLabel} {passagesCount}
-                      {" • "}
-                      {questionLabel} {currentQuestionNumber} {ofLabel} {totalQuestionsCount}
+                      {questionLabel} {displayCurrent} {ofLabel} {displayTotal}
                     </>
                   ) : (
-                    `${questionLabel} ${currentQuestionNumber} ${ofLabel} ${totalQuestionsCount}`
+                    `${questionLabel} ${displayCurrent} ${ofLabel} ${displayTotal}`
                   )
+                ) : currentBlock.type === "passage" ? (
+                  <>
+                    {passageLabel} {displayCurrent} من {passagesCount || displayTotal}
+                    {" • "}
+                    {questionLabel} {displayCurrent} {ofLabel} {displayTotal}
+                  </>
                 ) : (
-                  currentBlock.type === "passage" ? (
-                    <>
-                      {passageLabel} {currentBlockIndex + 1} من {passagesCount}
-                      {" • "}
-                      {questionLabel} {currentQuestionNumber} {ofLabel} {totalQuestionsCount}
-                    </>
-                  ) : (
-                    `${questionLabel} ${currentQuestionNumber} ${ofLabel} ${totalQuestionsCount}`
-                  )
+                  `${questionLabel} ${displayCurrent} ${ofLabel} ${displayTotal}`
                 )}
                 <span className="question-degree">
-                  ({formatDegree(questionDegree, isEnglishSubject)})
-                </span>
+  ({formatDegree(currentDegree, isEnglishSubject)})
+</span>
               </span>
             </div>
 
@@ -760,21 +814,34 @@ export default function QuizPage() {
                   )}
 
                   <div
-                    className={`options-grid ${isEnglishSubject ? "english-options" : ""}`}
+                    className={`options-grid ${
+                      isEnglishSubject ? "english-options" : ""
+                    }`}
                   >
                     {q.options?.map((opt, idx) => {
                       const englishLetter = ["a", "b", "c", "d"][idx];
                       const imageKey = `image_option_${englishLetter}`;
                       const optionImageUrl = q[imageKey];
                       const isSelected = selectedAnswers[q.id] === idx;
-                      const isCorrectAnswer = parseInt(q.correct_option) === idx;
+                      const isCorrectAnswer =
+                        parseInt(q.correct_option) === idx;
                       return (
                         <div
                           key={idx}
                           className={`option-item 
                             ${isSelected ? "selected" : ""} 
-                            ${isReviewMode && isCorrectAnswer ? "correct-answer-view" : ""}
-                            ${isReviewMode && isSelected && !isCorrectAnswer ? "wrong-answer-view" : ""}
+                            ${
+                              isReviewMode && isCorrectAnswer
+                                ? "correct-answer-view"
+                                : ""
+                            }
+                            ${
+                              isReviewMode &&
+                              isSelected &&
+                              !isCorrectAnswer
+                                ? "wrong-answer-view"
+                                : ""
+                            }
                           `}
                           onClick={() => handleAnswerSelect(q.id, idx)}
                         >
@@ -810,22 +877,24 @@ export default function QuizPage() {
             >
               {prevLabel}
             </button>
-            <div className="q-dots-nav">
+            
+            <div className="q-dots-scroll-container" ref={dotsContainerRef}>
               {blocks.map((block, idx) => {
                 let isCompleted = false;
                 if (block.type === "passage") {
-                  const allAnswered = block.questions.every(
+                  isCompleted = block.questions.every(
                     (q) => selectedAnswers[q.id] !== undefined
                   );
-                  isCompleted = allAnswered;
                 } else {
-                  isCompleted =
-                    selectedAnswers[block.question.id] !== undefined;
+                  isCompleted = selectedAnswers[block.question.id] !== undefined;
                 }
+
                 return (
                   <div
                     key={idx}
-                    className={`dot ${currentBlockIndex === idx ? "active" : ""} ${isCompleted ? "completed" : ""}`}
+                    className={`dot ${
+                      currentBlockIndex === idx ? "active" : ""
+                    } ${isCompleted ? "completed" : ""}`}
                     onClick={() => setCurrentBlockIndex(idx)}
                   >
                     {idx + 1}
@@ -833,6 +902,7 @@ export default function QuizPage() {
                 );
               })}
             </div>
+
             <button
               className="nav-btn next"
               disabled={currentBlockIndex === totalBlocks - 1}
@@ -863,13 +933,27 @@ export default function QuizPage() {
 
         .quiz-page-wrapper { min-height: 100vh; display: flex; flex-direction: column; background: #f4f7fb; }
         
-        .quiz-header { background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(16px); padding: 16px 40px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 4px 20px rgba(0,0,0,0.03); position: sticky; top: 0; z-index: 100; border-bottom: 1px solid rgba(255,255,255,0.5); }
+        .quiz-header {     background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(20px);
+    padding: 16px 40px;
+    -webkit-backdrop-filter: blur(20px);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
+    position: sticky;
+    /* grid-template-columns: 1fr auto 1fr; */
+    top: 0;
+    z-index: 1000;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.5);
+    border-radius: 0 0 32px 32px;
+    box-shadow: 0 8px 32px rgba(15, 23, 42, 0.08), 0 2px 8px rgba(15, 23, 42, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.6); }
         .timer-pill { background: #ffffff; border: 1px solid #eef2f6; padding: 8px 20px; border-radius: 50px; font-weight: 700; color: #1e293b; display: flex; align-items: center; gap: 8px; font-size: 1.1rem; box-shadow: 0 2px 10px rgba(0,0,0,0.02); }
         .time-warning { color: #f59e0b; animation: pulse 1.5s infinite; }
         .time-critical { color: #ef4444; animation: pulse 0.5s infinite; font-weight: 800; }
         @keyframes pulse { 0% { opacity: 1; transform: scale(1); } 50% { opacity: 0.8; transform: scale(0.98); } 100% { opacity: 1; transform: scale(1); } }
         .center-brand { display: flex; align-items: center; gap: 12px; }
-        .quiz-logo { height: 44px; width: auto; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.05)); }
+        .quiz-logo { height: 65px; width: auto; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.05)); }
         .quiz-brand-name { font-weight: 800; color: #1e3a8a; font-size: 1.15rem; letter-spacing: -0.3px; }
         .submit-quiz-btn { background: #ef4444; color: white; border: none; padding: 12px 28px; border-radius: 14px; font-weight: 700; cursor: pointer; transition: all 0.2s cubic-bezier(0.4,0,0.2,1); font-family: 'Cairo', sans-serif; box-shadow: 0 4px 12px rgba(239,68,68,0.2); }
         .submit-quiz-btn:hover:not(:disabled) { background: #dc2626; transform: translateY(-2px); box-shadow: 0 6px 16px rgba(239,68,68,0.3); }
@@ -883,13 +967,10 @@ export default function QuizPage() {
         .question-degree { margin-inline-start: 8px; font-size: 0.85rem; color: #64748b; }
         
         .passage-box { 
-          background: #f8fafc; 
           padding: 30px; 
           border-radius: 20px; 
           margin-bottom: 35px; 
-          position: relative; 
           overflow: hidden; 
-          border: 1px solid #f1f5f9; 
           text-align: start; 
         }
         .passage-accent { 
@@ -909,7 +990,7 @@ export default function QuizPage() {
         .single-question-wrapper:first-child { border-top: none; padding-top: 0; }
         .question-header { margin-bottom: 20px; }
         .question-number { background: #f1f5f9; color: #475569; padding: 6px 14px; border-radius: 100px; font-size: 0.85rem; font-weight: 700; display: inline-block; }
-        .question-text { color: #0f172a; line-height: 1.7; font-size: 1.45rem; font-weight: 700; margin-bottom: 32px; text-align: start; }
+        .question-text { color: #0f172a; line-height: 1.7; font-size: 1.45rem; font-weight: 600; margin-bottom: 32px; text-align: start; }
         .question-image-container { text-align: center; margin: 24px 0; }
         .question-image { max-width: 100%; max-height: 350px; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.08); border: 1px solid #f1f5f9; }
         .options-grid { display: flex; flex-direction: column; gap: 14px; }
@@ -983,47 +1064,208 @@ export default function QuizPage() {
           transform: translate(-50%, -50%);
         }
 
-        .quiz-nav-controls { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-top: 40px; padding-top: 20px; border-top: 1px solid #eef2f6; }
-        .nav-btn { padding: 14px 36px; border-radius: 16px; border: 1.5px solid #e2e8f0; background: white; font-family: 'Cairo'; font-weight: 700; cursor: pointer; transition: all 0.2s ease; color: #475569; font-size: 1.05rem; }
-        .nav-btn:hover:not(:disabled) { background: #f8fafc; border-color: #cbd5e1; color: #0f172a; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
-        .nav-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-        .q-dots-nav {
-          display: flex;
-          gap: 10px;
-          flex-wrap: wrap;
-          justify-content: center;
-          overflow-x: auto;
-          max-width: 100%;
-          padding: 4px 0;
-          -webkit-overflow-scrolling: touch;
-          scrollbar-width: none;
+        /* === أزرار التنقل وحاوية النقاط الديناميكية === */
+        .quiz-nav-controls { 
+          display: flex; 
+          align-items: center; 
+          justify-content: space-between; 
+          gap: 12px; 
+          margin-top: 40px; 
+          padding-top: 25px; 
+          border-top: 1px solid #eef2f6; 
+          width: 100%;
         }
-        .q-dots-nav::-webkit-scrollbar { display: none; }
-        .dot { background: white; border: 1.5px solid #e2e8f0; border-radius: 14px; min-width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.95rem; cursor: pointer; color: #64748b; padding: 0 10px; transition: all 0.2s; flex-shrink: 0; }
-        .dot.active { border-color: #3b82f6; color: #3b82f6; border-width: 2px; background: #eff6ff; transform: scale(1.08); box-shadow: 0 4px 12px rgba(59,130,246,0.15); }
-        .dot.completed { background: #ecfdf5; color: #10b981; border-color: #a7f3d0; }
-        .dot:hover:not(.active) { border-color: #cbd5e1; transform: translateY(-2px); }
+        
+        .nav-btn { 
+          padding: 12px 20px; 
+          border-radius: 16px; 
+          border: 1.5px solid #e2e8f0; 
+          background: white; 
+          font-family: 'Cairo'; 
+          font-weight: 700; 
+          cursor: pointer; 
+          transition: all 0.2s ease; 
+          color: #475569; 
+          font-size: 1rem; 
+          white-space: nowrap;
+          flex-shrink: 0;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 2;
+        }
+        
+        .nav-btn:hover:not(:disabled) { 
+          background: #f8fafc; 
+          border-color: #cbd5e1; 
+          color: #0f172a; 
+          transform: translateY(-2px); 
+          box-shadow: 0 4px 12px rgba(0,0,0,0.05); 
+        }
+        
+        .nav-btn:disabled { 
+          opacity: 0.4; 
+          cursor: not-allowed; 
+          background: #f8fafc;
+        }
+
+        .q-dots-scroll-container {
+          display: flex;
+          gap: 8px;
+          align-items: center;
+          flex: 1;
+          overflow-x: auto;
+          scroll-behavior: smooth;
+          padding: 10px 40px;
+          -ms-overflow-style: none;
+          scrollbar-width: none;
+          mask-image: linear-gradient(to right, transparent, black 5%, black 95%, transparent);
+          -webkit-mask-image: linear-gradient(to right, transparent, black 5%, black 95%, transparent);
+        }
+        .q-dots-scroll-container::-webkit-scrollbar {
+          display: none;
+        }
+
+        .dot { 
+          background: white; 
+          border: 2px solid #e2e8f0; 
+          border-radius: 30%;
+          min-width: 44px; 
+          height: 44px; 
+          display: flex; 
+          align-items: center; 
+          justify-content: center; 
+          font-weight: 700; 
+          font-size: 1rem; 
+          cursor: pointer; 
+          color: #64748b; 
+          transition: all 0.3s cubic-bezier(0.4,0,0.2,1); 
+          user-select: none;
+          flex-shrink: 0;
+        }
+
+        .dot.active { 
+          border-color: #3b82f6; 
+          color: white; 
+          background: #3b82f6; 
+          transform: scale(1.15); 
+          z-index: 10;
+        }
+
+        .dot.completed:not(.active) { 
+          background: #ecfdf5; 
+          color: #10b981; 
+          border-color: #a7f3d0; 
+        }
+
+        .dot:hover:not(.active) { 
+          border-color: #94a3b8; 
+          transform: translateY(-2px); 
+        }
+
+        * {
+          scrollbar-width: thin;
+          scrollbar-color: #cbd5e1 transparent;
+        }
+
+        ::-webkit-scrollbar {
+          width: 8px;
+          height: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+          background: rgba(241, 245, 249, 0.4); 
+          border-radius: 10px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+          background: linear-gradient(180deg, #94a3b8, #cbd5e1);
+          border-radius: 10px;
+          border: 2px solid transparent;
+          background-clip: padding-box;
+          transition: background 0.3s ease;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+          background: linear-gradient(180deg, #3b82f6, #60a5fa);
+          border: 1px solid transparent;
+          background-clip: padding-box;
+        }
+
+        .passage-box::-webkit-scrollbar {
+          width: 5px;
+        }
+        .passage-box::-webkit-scrollbar-track {
+          background: #f8fafc;
+          border-radius: 8px;
+        }
+
+        .passage-box::-webkit-scrollbar-thumb {
+          background: #cbd5e1;
+          border-radius: 8px;
+        }
+        .passage-box::-webkit-scrollbar-thumb:hover {
+          background: #3b82f6;
+        }
 
         @media (max-width: 768px) {
           .quiz-header { padding: 12px 20px; }
           .quiz-brand-name { display: none; }
-          .question-card { padding: 30px 24px; border-radius: 24px; }
-          .question-text { font-size: 1.25rem; }
-          .q-dots-nav {
-            display: flex;
-            flex-wrap: nowrap;
-            justify-content: flex-start;
-            overflow-x: auto;
-            max-width: 70vw;
-            margin: 0 auto;
+          .question-card { padding: 24px 20px; border-radius: 24px; }
+          .question-text { font-size: 1.2rem; }
+          .quiz-logo {height: 44px;}
+          
+          .quiz-nav-controls {
+            gap: 8px;
           }
-          .option-item { padding: 16px; gap: 10px; }
-          .option-label { width: 36px; height: 36px; font-size: 1rem; }
-          .option-value { font-size: 1rem; }
-          .option-image { max-height: 80px; }
-          .option-image-wrapper { max-width: 100px; }
-          .questions-container { gap: 35px; }
-          .nav-btn { padding: 12px 24px; font-size: 1rem; }
+          
+          .nav-btn {
+            padding: 10px 14px;
+            font-size: 0.9rem;
+            border-radius: 14px;
+          }
+
+          .q-dots-scroll-container {
+            gap: 8px;
+            padding: 10px 20px;
+            mask-image: none;
+            -webkit-mask-image: none;
+          }
+
+          .dot {
+            min-width: 38px;
+            height: 38px;
+            font-size: 0.9rem;
+            border-width: 1.5px;
+          }
+
+          .option-item { padding: 14px; gap: 8px; }
+          .option-label { width: 34px; height: 34px; font-size: 0.95rem; }
+          .option-value { font-size: 0.95rem; }
+          .questions-container { gap: 32px; }
+
+          .passage-box {
+            max-height: 350px;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+            padding: 16px;
+          }
+        }
+        
+        @media (max-width: 380px) {
+          .quiz-nav-controls {
+            flex-wrap: wrap;
+            justify-content: center;
+          }
+          .q-dots-scroll-container {
+            order: -1;
+            width: 100%;
+            margin-bottom: 12px;
+          }
+          .nav-btn {
+            flex: 1;
+          }
+.quiz-logo {height: 44px;}
         }
       `}</style>
     </div>
