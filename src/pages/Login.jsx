@@ -16,6 +16,12 @@ export default function Auth() {
   const [phone, setPhone] = useState('');
   const [loading, setLoading] = useState(false);
 
+  // النص التعاوني - يمكنك تغييره كما تريد
+  // النص التعاوني - يمكنك تغيير هذه القيم كما تريد
+const [partnerLabel, setPartnerLabel] = useState('بالتعاون مع:');
+const [partnerName, setPartnerName] = useState('مركز ماكـــس');
+const [partnerFont, setPartnerFont] = useState('GE SS Two');
+
   const navigate = useNavigate();
   const location = useLocation();
   const from = location.state?.from || '/dashboard';
@@ -245,6 +251,11 @@ export default function Auth() {
         </div>
       </div>
 
+<div className="partner-text" style={{ fontFamily: partnerFont }}>
+  <div className="partner-label">{partnerLabel}</div>
+  <div className="partner-name">{partnerName}</div>
+</div>
+
       <div className="auth-card">
         <h1 className="auth-title">
           {isAdminVerify ? 'تأكيد هوية الإدارة' : isLoginView ? 'تسجيل الدخول' : 'إنشاء حساب جديد'}
@@ -387,6 +398,24 @@ export default function Auth() {
 <style>{`
   @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700&display=swap');
 
+
+/* تعريف خط GE SS Two - صيغة OTF */
+@font-face {
+  font-family: 'GE SS Two';
+  src: url('/fonts/GE_SS_Tow/GE_SS_Two.otf') format('opentype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'GE SS Two';
+  src: url('/fonts/GE_SS_Tow/Bold.otf') format('opentype');
+  font-weight: bold;
+  font-style: normal;
+  font-display: swap;
+}
+
   :root { color-scheme: light only; }
   * { box-sizing: border-box; }
   
@@ -416,7 +445,7 @@ export default function Auth() {
 
   .top-logo-container {
     position: relative;
-    margin-bottom: 25px;
+    margin-bottom: 15px;
     z-index: 20;
     display: flex;
     justify-content: center;
@@ -424,7 +453,6 @@ export default function Auth() {
     animation: logoEntrance 1s ease-out both;
   }
 
-  /* الحاوية وتأثير القناع */
   .premium-logo-wrapper {
     position: relative;
     display: inline-block;
@@ -446,7 +474,6 @@ export default function Auth() {
     filter: drop-shadow(0 10px 20px rgba(74, 138, 218, 0.15));
   }
 
-  /* تعديل سرعة اللمعان هنا (7s تجعله أبطأ وأرقى) */
   .premium-logo-wrapper::after {
     content: "";
     position: absolute;
@@ -463,9 +490,34 @@ export default function Auth() {
     );
     
     transform: skewX(-25deg);
-    /* تم تغيير الوقت من 4s إلى 7s */
     animation: softShine 7s infinite ease-in-out;
   }
+
+  .partner-text {
+  text-align: center;
+  backdrop-filter: blur(4px);
+  padding: 8px 20px;
+  border-radius: 40px;
+  margin-bottom: 20px;
+  display: inline-block;
+  width: auto;
+  max-width: 90%;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
+  animation: fadeInUp 0.6s ease-out both;
+  }
+.partner-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: #4a8ada;
+  letter-spacing: 0.5px;
+  margin-bottom: -6px;
+}
+
+.partner-name {
+  font-size: 16px;
+  font-weight: 700;
+  color: #2c5282;
+}
 
   .auth-card {
     background: rgba(255, 255, 255, 0.96);
@@ -523,7 +575,6 @@ export default function Auth() {
   .toggle-view { text-align: center; margin-top: 20px; font-size: 14px; color: #4a5568; }
   .toggle-view span { color: #4a8ada; cursor: pointer; font-weight: 700; margin-right: 5px; }
 
-  /* الأنيميشن */
   @keyframes logoEntrance {
     from { opacity: 0; transform: translateY(-25px); }
     to { opacity: 1; transform: translateY(0); }
@@ -541,14 +592,25 @@ export default function Auth() {
 
   @keyframes softShine {
     0% { left: -150%; }
-    /* اللمعان يمر خلال أول 3 ثواني من السبعة، ثم ينتظر 4 ثواني هدوء */
     40% { left: 150%; } 
     100% { left: 150%; }
+  }
+
+  @keyframes fadeInUp {
+    from {
+      opacity: 0;
+      transform: translateY(15px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
   }
 
   @media (max-width: 480px) {
     .premium-logo-img { width: 140px; }
     .auth-card { padding: 25px 18px; margin: 10px; }
+    .partner-text { font-size: 12px; padding: 6px 16px; }
   }
 `}</style>
     </div>
