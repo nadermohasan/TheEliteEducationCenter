@@ -150,7 +150,7 @@ export default function Navbar({ userName = 'مستخدم', role = 'student' }) 
             border-radius: 0 0 24px 24px;
           }
 
-          .logo-img-dash { height: 42px; }
+          .logo-img-dash { height: 44px; }
 
           /* إخفاء نص "خروج" في الموبايل */
           .logout-text { display: none; }

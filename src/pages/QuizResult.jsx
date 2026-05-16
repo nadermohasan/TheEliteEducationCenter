@@ -66,7 +66,7 @@ export default function QuizResult() {
         {/* بطاقة النتيجة */}
         <div className="custom-card summary-card shadow-sm">
           <div className="doc-illustration">
-            <img
+            <img 
               src="https://i.imgur.com/N9qktIS.png" 
               alt="Score Logo" 
               width="150" 
@@ -85,9 +85,10 @@ export default function QuizResult() {
           <div className="score-section">
             <span className="label-text">الدرجة النهائية</span>
             <div className="score-display">
-               <span className="score-achieved">{score}</span>
+              
+              <span className="score-total">{totalPossible}</span>
                <span className="score-separator">/</span>
-               <span className="score-total">{totalPossible}</span>
+              <span className="score-achieved">{score}</span>
             </div>
           </div>
         </div>

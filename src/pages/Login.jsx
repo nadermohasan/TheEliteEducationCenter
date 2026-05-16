@@ -398,6 +398,24 @@ const [partnerFont, setPartnerFont] = useState('GE SS Two');
 <style>{`
   @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700&display=swap');
 
+@font-face {
+  font-family: 'GE SS Two';
+  src: url('/fonts/GE_SS_Two/GE_SS_Two.woff2') format('woff2'),
+       url('/fonts/GE_SS_Two/GE_SS_Two.otf') format('opentype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'GE SS Two';
+  src: url('/fonts/GE_SS_Two/Bold.woff2') format('woff2'),
+       url('/fonts/GE_SS_Two/Bold.otf') format('opentype');
+  font-weight: bold;
+  font-style: normal;
+  font-display: swap;
+}
+
   :root { color-scheme: light only; }
   * { box-sizing: border-box; }
   

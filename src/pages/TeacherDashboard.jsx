@@ -336,7 +336,7 @@ export default function TeacherDashboard() {
         image_option_d: formData.imageD || null,
         unit_number: formData.unit_number ? parseInt(formData.unit_number) : null,
         branch: finalBranch || null,
-        degree: parseFloat(formData.degree) || 1,
+        degree: parseInt(formData.degree) || 1, // استخدام القيمة الافتراضية 1
         is_active: true
       };
 
@@ -533,7 +533,8 @@ export default function TeacherDashboard() {
     const subject = subjects.find(s => s.id == subjectId);
     setIsEnglishBulk(subject?.name?.includes("إنجليزية") || false);
   };
-const processBulkQuestions = (rawData, fileType) => {
+
+  const processBulkQuestions = (rawData, fileType) => {
     const errors = [];
     const validQuestions = [];
     const rows = rawData.map((row, index) => ({ ...row, _row: index + 1 }));
@@ -563,10 +564,7 @@ const processBulkQuestions = (rawData, fileType) => {
         return;
       }
 
-      // ✅ تعديل قراءة الدرجة لتقبل الأعداد العشرية
-      const degreeValue = parseFloat(row.degree || row["الدرجة"] || 1);
-      const degree = isNaN(degreeValue) ? 1 : degreeValue;
-      
+      const degree = parseInt(row.degree || row["الدرجة"] || 1) || 1;
       const unit = row.unit_number || row["الوحدة"] || row["unit"] || "";
       const branch = row.branch || row["الفرع"] || "";
 
@@ -574,7 +572,7 @@ const processBulkQuestions = (rawData, fileType) => {
         question_text: questionText.trim(),
         options,
         correct_option: correctOption,
-        degree, // الآن يقبل 2.5
+        degree,
         unit_number: unit ? parseInt(unit) : null,
         branch: branch || null,
         image_url: row.image_url || row["الصورة"] || null,
@@ -828,9 +826,8 @@ const processBulkQuestions = (rawData, fileType) => {
     setEditDegree(question.degree?.toString() || "1");
   };
 
-// للأسئلة اليدوية
-const saveDegreeEdit = async (questionId) => {
-    const newDegree = parseFloat(editDegree) || 1; // ✅ استخدم parseFloat
+  const saveDegreeEdit = async (questionId) => {
+    const newDegree = parseInt(editDegree) || 1;
     try {
       await supabase.from("questions").update({ degree: newDegree }).eq("id", questionId);
       setEditingCellId(null);
@@ -1144,7 +1141,6 @@ const saveDegreeEdit = async (questionId) => {
                           {editingCellId === q.id ? (
                             <input
                               type="number"
-                              step= "0.1"
                               min="1"
                               max="100"
                               value={editDegree}
@@ -1895,7 +1891,7 @@ const saveDegreeEdit = async (questionId) => {
         .bg-slate { background: var(--c-secondary); color: var(--c-text-body); }
         .bg-light { background: #f8fafc; border: 1px solid var(--c-border); color: var(--c-text-muted); }
         .active-badge { color: #16a34a; }
-        .inactive-badge {color: #991b1b; }
+        .inactive-badge { background: var(--c-danger-light); color: #991b1b; border: 1px solid #fecaca; }
         .correct-badge { display: inline-flex; align-items: center; justify-content: center; background: var(--c-success-light); color: #16a34a; width: 32px; height: 32px; border-radius: 10px; font-weight: 800; font-size: 1rem; box-shadow: 0 2px 4px rgba(22, 163, 74, 0.1); }
         .media-badges { display: flex; gap: 8px; justify-content: center; }
         .media-badge { display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 8px; }
