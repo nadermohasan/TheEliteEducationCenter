@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 import { toast } from 'react-hot-toast';
@@ -16,11 +16,24 @@ export default function Auth() {
   const [phone, setPhone] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // النص التعاوني - يمكنك تغييره كما تريد
-  // النص التعاوني - يمكنك تغيير هذه القيم كما تريد
-const [partnerLabel, setPartnerLabel] = useState('بالتعاون مع:');
-const [partnerName, setPartnerName] = useState('مركز ماكـــس');
+const [partnerLabel, setPartnerLabel] = useState('');
+const [partnerName, setPartnerName] = useState('');
 const [partnerFont, setPartnerFont] = useState('GE SS Two');
+
+useEffect(() => {
+  fetch('/partner.json')
+    .then(res => res.json())
+    .then(data => {
+      setPartnerLabel(data.label);
+      setPartnerName(data.name);
+    })
+    .catch(err => {
+      console.error('خطأ في تحميل النص:', err);
+      // قيم افتراضية في حالة فشل التحميل
+      setPartnerLabel('بالتعاون مع:');
+      setPartnerName('مركز ماكس');
+    });
+}, []);
 
   const navigate = useNavigate();
   const location = useLocation();
