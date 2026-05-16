@@ -11,7 +11,6 @@ import {
   FlaskConical, BookOpen, Pencil, Check, X, Eye
 } from "lucide-react";
 import * as XLSX from "xlsx";
-
 // المواد حسب الفرع (للكشوف فقط)
 const scientificSubjects = ["اللغة الإنجليزية", "اللغة العربية", "الرياضيات", "تكنولوجيا المعلومات", "التربية الإسلامية", "الفيزياء", "الكيمياء", "الأحياء"];
 const literarySubjects = ["اللغة الإنجليزية", "اللغة العربية", "الرياضيات", "تكنولوجيا المعلومات", "التربية الإسلامية", "الجغرافيا", "التاريخ", "الثقافة العلمية"];
@@ -28,6 +27,12 @@ const AREA_MAP = {
   nsr: "النصر",
   nth: "الشمال",
 };
+
+// ============================================
+// متغيرات عامة لمنع إنشاء حزم متعددة عند التفعيل السريع
+// ============================================
+let currentActiveBatchId = null;      // يخزن الـ batch_id النشط حالياً
+let isActivatingLock = false;          // قفل لمنع التنفيذ المتزامن
 
 // توليد أسئلة محاولة جديدة بناءً على الفرع
 const generateAttemptQuestions = async (attemptId, studentBranch) => {
@@ -201,7 +206,7 @@ export default function AdminDashboard() {
         .eq("id", currentUser.id)
         .single();
       setAdminProfile(profile);
-      return profile; // نعيد البروفايل لفحص الصلاحية
+      return profile;
     }
     return null;
   }, []);
@@ -321,87 +326,102 @@ export default function AdminDashboard() {
     setAreaSaveLoadingId(null);
   };
 
-  // جلب الحزم (تجميع حسب batch_id) مع إضافة الفرع لكل حزمة
-  const fetchBatches = useCallback(async () => {
-    setResultsLoading(true);
-    try {
-      const { data: attemptsWithStudents } = await supabase
-        .from("attempts")
-        .select(`
-          id,
-          batch_id,
-          created_at,
-          profiles!inner (
-            branch
-          )
-        `)
-        .not("batch_id", "is", null);
+ // جلب الحزم (تجميع حسب batch_id) مع إضافة الفرع لكل حزمة
+const fetchBatches = useCallback(async () => {
+  setResultsLoading(true);
+  try {
+    const { data: attemptsWithStudents } = await supabase
+      .from("attempts")
+      .select(`
+        id,
+        batch_id,
+        created_at,
+        student_id,
+        profiles!inner (
+          branch,
+          name
+        )
+      `)
+      .not("batch_id", "is", null);
 
-      if (!attemptsWithStudents?.length) {
-        setBatches([]);
-        setResultsLoading(false);
-        return;
-      }
-
-      const batchMap = new Map();
-      
-      for (const attempt of attemptsWithStudents) {
-        const batchId = attempt.batch_id;
-        const studentBranch = attempt.profiles?.branch || "غير محدد";
-        
-        if (!batchMap.has(batchId)) {
-          batchMap.set(batchId, {
-            id: batchId,
-            createdAt: attempt.created_at,
-            students: new Map(),
-            subjects: new Set()
-          });
-        }
-        
-        const batch = batchMap.get(batchId);
-        if (!batch.students.has(attempt.id)) {
-          batch.students.set(attempt.id, studentBranch);
-        }
-      }
-      
-      for (const [batchId, batch] of batchMap.entries()) {
-        const attemptIds = Array.from(batch.students.keys());
-        const { data: results } = await supabase
-          .from("results")
-          .select("subject_id")
-          .in("attempt_id", attemptIds);
-        
-        const uniqueSubjects = new Set(results?.map(r => r.subject_id) || []);
-        batch.subjectCount = uniqueSubjects.size;
-        
-        const branchCounts = new Map();
-        for (const branch of batch.students.values()) {
-          branchCounts.set(branch, (branchCounts.get(branch) || 0) + 1);
-        }
-        let dominantBranch = "مختلط";
-        let maxCount = 0;
-        for (const [branch, count] of branchCounts.entries()) {
-          if (count > maxCount && branch !== "غير محدد") {
-            maxCount = count;
-            dominantBranch = branch;
-          }
-        }
-        if (dominantBranch === "مختلط" && maxCount === 0) dominantBranch = "غير محدد";
-        
-        batch.branch = dominantBranch;
-        batch.studentCount = batch.students.size;
-      }
-      
-      const batchesArray = Array.from(batchMap.values());
-      batchesArray.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-      setBatches(batchesArray);
-    } catch (error) {
-      console.error("Error fetching batches:", error);
-      toast.error("فشل جلب الحزم");
-    } finally {
+    if (!attemptsWithStudents?.length) {
+      setBatches([]);
       setResultsLoading(false);
+      return;
     }
-  }, []);
+
+    const batchMap = new Map();
+    
+    for (const attempt of attemptsWithStudents) {
+      const batchId = attempt.batch_id;
+      const studentBranch = attempt.profiles?.branch || "غير محدد";
+      const studentId = attempt.student_id;
+      
+      if (!batchMap.has(batchId)) {
+        batchMap.set(batchId, {
+          id: batchId,
+          createdAt: attempt.created_at,
+          students: new Map(),        // تخزين الطلاب (معرف الطالب كمفتاح)
+          studentIds: new Set(),      // ✅ إضافة Set لتتبع الطلاب الفريدين
+          subjects: new Set()
+        });
+      }
+      
+      const batch = batchMap.get(batchId);
+      
+      // ✅ تخزين الطالب بشكل فريد باستخدام student_id
+      if (!batch.students.has(studentId)) {
+        batch.students.set(studentId, {
+          branch: studentBranch,
+          attemptId: attempt.id
+        });
+      }
+      
+      // ✅ إضافة student_id إلى Set للتأكد من العدد الفريد
+      batch.studentIds.add(studentId);
+    }
+    
+    for (const [batchId, batch] of batchMap.entries()) {
+      const attemptIds = Array.from(batch.students.values()).map(s => s.attemptId);
+      const { data: results } = await supabase
+        .from("results")
+        .select("subject_id")
+        .in("attempt_id", attemptIds);
+      
+      const uniqueSubjects = new Set(results?.map(r => r.subject_id) || []);
+      batch.subjectCount = uniqueSubjects.size;
+      
+      const branchCounts = new Map();
+      for (const student of batch.students.values()) {
+        const branch = student.branch;
+        branchCounts.set(branch, (branchCounts.get(branch) || 0) + 1);
+      }
+      
+      let dominantBranch = "مختلط";
+      let maxCount = 0;
+      for (const [branch, count] of branchCounts.entries()) {
+        if (count > maxCount && branch !== "غير محدد") {
+          maxCount = count;
+          dominantBranch = branch;
+        }
+      }
+      if (dominantBranch === "مختلط" && maxCount === 0) dominantBranch = "غير محدد";
+      
+      batch.branch = dominantBranch;
+      // ✅ استخدم عدد الطلاب الفريدين (وليس عدد المحاولات)
+      batch.studentCount = batch.studentIds.size;
+    }
+    
+    const batchesArray = Array.from(batchMap.values());
+    batchesArray.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    setBatches(batchesArray);
+  } catch (error) {
+    console.error("Error fetching batches:", error);
+    toast.error("فشل جلب الحزم");
+  } finally {
+    setResultsLoading(false);
+  }
+}, []);
 
   const fetchBatchResults = useCallback(async (batchId, selectedBranch = null) => {
     setResultsLoading(true);
@@ -563,9 +583,22 @@ export default function AdminDashboard() {
     XLSX.writeFile(wb, `نتائج_${branchName}_${new Date().toISOString().slice(0, 10)}.xlsx`);
   };
 
+  // ============================================
+  // الدالة المعدلة لتفعيل محاولة فردية (مع القفل)
+  // ============================================
   const handleActivateAttempt = async (studentId) => {
+    // منع التنفيذ إذا كان هناك قفل نشط
+    if (isActivatingLock) {
+      toast.loading("جاري معالجة طلب سابق، انتظر قليلاً...", { duration: 1500 });
+      return;
+    }
+    
     setProcessingId(studentId);
+    
     try {
+      isActivatingLock = true;
+      
+      // جلب فرع الطالب
       const { data: studentProfile } = await supabase
         .from("profiles")
         .select("branch")
@@ -573,55 +606,135 @@ export default function AdminDashboard() {
         .single();
       const studentBranch = studentProfile?.branch?.trim() || null;
 
+      // إنهاء أي محاولة نشطة سابقة لنفس الطالب فقط
       await supabase
         .from("attempts")
         .update({ status: "completed" })
         .eq("student_id", studentId)
         .eq("status", "active");
 
-      const { data: activeBatchAttempt } = await supabase
-        .from("attempts")
-        .select("id, batch_id")
-        .eq("status", "active")
-        .not("batch_id", "is", null)
-        .maybeSingle();
-
       let batchId;
-      let newAttempt;
-
-      if (activeBatchAttempt?.batch_id) {
-        batchId = activeBatchAttempt.batch_id;
-        const { data: attempt, error: attemptError } = await supabase
-          .from("attempts")
-          .insert([{ student_id: studentId, status: "active", batch_id: batchId }])
-          .select()
-          .single();
-        if (attemptError) throw attemptError;
-        newAttempt = attempt;
-        await generateAttemptQuestions(newAttempt.id, studentBranch);
+      
+      // الخطوة 1: استخدام المتغير العام إذا كان موجوداً
+      if (currentActiveBatchId) {
+        batchId = currentActiveBatchId;
+        console.log(`📦 استخدام الحزمة الموجودة (متغير عام): ${batchId}`);
       } else {
-        batchId = crypto.randomUUID();
-        const { data: attempt, error: attemptError } = await supabase
+        // الخطوة 2: البحث في قاعدة البيانات عن حزمة نشطة
+        const { data: existingActiveAttempt, error: searchError } = await supabase
           .from("attempts")
-          .insert([{ student_id: studentId, status: "active", batch_id: batchId }])
-          .select()
-          .single();
-        if (attemptError) throw attemptError;
-        newAttempt = attempt;
-        await generateAttemptQuestions(newAttempt.id, studentBranch);
+          .select("batch_id")
+          .eq("status", "active")
+          .not("batch_id", "is", null)
+          .limit(1)
+          .maybeSingle();
+        
+        if (searchError) {
+          console.error("خطأ في البحث عن حزمة نشطة:", searchError);
+        }
+        
+        if (existingActiveAttempt?.batch_id) {
+          batchId = existingActiveAttempt.batch_id;
+          currentActiveBatchId = batchId;
+          console.log(`📦 استخدام الحزمة الموجودة (من قاعدة البيانات): ${batchId}`);
+        } else {
+          // الخطوة 3: إنشاء حزمة جديدة
+          batchId = crypto.randomUUID();
+          currentActiveBatchId = batchId;
+          console.log(`✨ إنشاء حزمة جديدة: ${batchId}`);
+        }
       }
-
+      
+      // إنشاء المحاولة الجديدة
+      const { data: newAttempt, error: insertError } = await supabase
+        .from("attempts")
+        .insert([{ 
+          student_id: studentId, 
+          status: "active", 
+          batch_id: batchId 
+        }])
+        .select()
+        .single();
+      
+      if (insertError) throw insertError;
+      
+      // توليد الأسئلة للمحاولة
+      await generateAttemptQuestions(newAttempt.id, studentBranch);
+      
       toast.success("تم تفعيل المحاولة بنجاح!");
+      
+      // تحديث البيانات
       await fetchStats();
       await fetchActiveAttempts();
+      await fetchBatches();
+      
     } catch (e) {
+      console.error("خطأ في تفعيل المحاولة:", e);
       toast.error("خطأ: " + e.message);
     } finally {
       setProcessingId(null);
+      isActivatingLock = false;
     }
   };
 
-  const handleActivateAll = async () => {
+// ============================================
+// دالة مساعدة: تفعيل طالب واحد (للاستخدام في التفعيل المتوازي)
+// ============================================
+const activateSingleStudent = async (student, unifiedBatchId) => {
+  try {
+    // جلب فرع الطالب
+    const { data: studentProfile, error: profileError } = await supabase
+      .from("profiles")
+      .select("branch")
+      .eq("id", student.id)
+      .single();
+    
+    if (profileError) {
+      return { success: false, name: student.name, error: profileError.message };
+    }
+    
+    const studentBranch = studentProfile?.branch?.trim() || null;
+    
+    // إنشاء محاولة جديدة بنفس unifiedBatchId
+    const { data: newAttempt, error: insertError } = await supabase
+      .from("attempts")
+      .insert([{ 
+        student_id: student.id, 
+        status: "active", 
+        batch_id: unifiedBatchId
+      }])
+      .select()
+      .single();
+    
+    if (insertError) {
+      return { success: false, name: student.name, error: insertError.message };
+    }
+    
+    // توليد الأسئلة للمحاولة الجديدة
+    await generateAttemptQuestions(newAttempt.id, studentBranch);
+    
+    return { success: true, name: student.name };
+    
+  } catch (err) {
+    return { success: false, name: student.name, error: err.message };
+  }
+};
+
+
+  // ============================================
+  // الدالة المعدلة لتفعيل جميع الطلاب (حزمة واحدة مضمونة)
+  // ============================================
+  // ============================================
+// الدالة المحسّنة لتفعيل جميع الطلاب (بسرعة عالية)
+// ============================================
+const handleActivateAll = async () => {
+  // منع التنفيذ إذا كان هناك قفل نشط
+  if (isActivatingLock) {
+    toast.loading("جاري معالجة طلب سابق، انتظر قليلاً...", { duration: 1500 });
+    return;
+  }
+  
+  // تصفية الطلاب الذين ليس لديهم محاولة نشطة
   const studentsToActivate = filteredUsers.filter(u => !activeAttemptsMap[u.id]);
   
   if (studentsToActivate.length === 0) {
@@ -630,67 +743,118 @@ export default function AdminDashboard() {
   }
   
   setActivatingAll(true);
-  let success = 0;
-  let failed = 0;
   
-  for (const student of studentsToActivate) {
-    try {
-      const { data: studentProfile } = await supabase
-        .from("profiles")
-        .select("branch")
-        .eq("id", student.id)
-        .single();
-      const studentBranch = studentProfile?.branch?.trim() || null;
-
-      await supabase
+  // عرض رسالة انتظار
+  const loadingToast = toast.loading(`جاري تفعيل ${studentsToActivate.length} طالب...`);
+  
+  try {
+    isActivatingLock = true;
+    
+    // ==========================================
+    // الخطوة 1: تحديد batch_id واحد للجميع (تتم مرة واحدة فقط)
+    // ==========================================
+    let unifiedBatchId = null;
+    
+    // 1.1 استخدام المتغير العام إذا كان موجوداً
+    if (currentActiveBatchId) {
+      unifiedBatchId = currentActiveBatchId;
+      console.log(`📦 استخدام الحزمة الموجودة (متغير عام): ${unifiedBatchId}`);
+    } else {
+      // 1.2 البحث في قاعدة البيانات عن حزمة نشطة
+      const { data: existingActiveAttempt, error: searchError } = await supabase
         .from("attempts")
-        .update({ status: "completed" })
-        .eq("student_id", student.id)
-        .eq("status", "active");
-
-      const { data: activeBatchAttempt } = await supabase
-        .from("attempts")
-        .select("id, batch_id")
+        .select("batch_id")
         .eq("status", "active")
         .not("batch_id", "is", null)
+        .limit(1)
         .maybeSingle();
-
-      let batchId;
-      let newAttempt;
       
-      if (activeBatchAttempt?.batch_id) {
-        batchId = activeBatchAttempt.batch_id;
-        const { data: attempt, error } = await supabase
-          .from("attempts")
-          .insert([{ student_id: student.id, status: "active", batch_id: batchId }])
-          .select()
-          .single();
-        if (error) throw error;
-        newAttempt = attempt;
-        await generateAttemptQuestions(newAttempt.id, studentBranch);
-      } else {
-        batchId = crypto.randomUUID();
-        const { data: attempt, error } = await supabase
-          .from("attempts")
-          .insert([{ student_id: student.id, status: "active", batch_id: batchId }])
-          .select()
-          .single();
-        if (error) throw error;
-        newAttempt = attempt;
-        await generateAttemptQuestions(newAttempt.id, studentBranch);
+      if (searchError) {
+        console.error("خطأ في البحث عن حزمة نشطة:", searchError);
       }
-      success++;
-    } catch (e) {
-      failed++;
-      console.error("فشل تفعيل الطالب", student.name, e);
+      
+      if (existingActiveAttempt?.batch_id) {
+        unifiedBatchId = existingActiveAttempt.batch_id;
+        currentActiveBatchId = unifiedBatchId;
+        console.log(`📦 استخدام الحزمة الموجودة (من قاعدة البيانات): ${unifiedBatchId}`);
+      } else {
+        // 1.3 إنشاء حزمة جديدة
+        unifiedBatchId = crypto.randomUUID();
+        currentActiveBatchId = unifiedBatchId;
+        console.log(`✨ إنشاء حزمة جديدة: ${unifiedBatchId}`);
+      }
     }
+    
+    // ==========================================
+    // الخطوة 2: إنهاء المحاولات القديمة لجميع الطلاب المحددين دفعة واحدة
+    // ==========================================
+    const studentIds = studentsToActivate.map(s => s.id);
+    
+    const { error: updateError } = await supabase
+      .from("attempts")
+      .update({ status: "completed" })
+      .in("student_id", studentIds)
+      .eq("status", "active");
+    
+    if (updateError) {
+      console.error("خطأ في إنهاء المحاولات القديمة:", updateError);
+      throw new Error("فشل في إنهاء المحاولات القديمة");
+    }
+    
+    console.log(`✅ تم إنهاء المحاولات القديمة لـ ${studentIds.length} طالب`);
+    
+    // ==========================================
+    // الخطوة 3: تفعيل جميع الطلاب بالتوازي (الجزء السريع)
+    // ==========================================
+    
+    // إنشاء مصفوفة من المهام المتوازية
+    const activationPromises = studentsToActivate.map(student => 
+      activateSingleStudent(student, unifiedBatchId)
+    );
+    
+    // تنفيذ جميع المهام بالتوازي وانتظار انتهائها
+    const results = await Promise.all(activationPromises);
+    
+    // ==========================================
+    // الخطوة 4: تحليل النتائج
+    // ==========================================
+    const successCount = results.filter(r => r.success).length;
+    const failedCount = results.filter(r => !r.success).length;
+    const failedStudents = results.filter(r => !r.success).map(r => ({ name: r.name, error: r.error }));
+    
+    // ==========================================
+    // الخطوة 5: تحديث واجهة المستخدم
+    // ==========================================
+    
+    await fetchStats();
+    await fetchActiveAttempts();
+    await fetchBatches();
+    
+    // إخفاء رسالة الانتظار
+    toast.dismiss(loadingToast);
+    
+    // عرض النتيجة النهائية
+    if (successCount > 0) {
+      let message = `تم تفعيل ${successCount} طالب بنجاح!`;
+      if (failedCount > 0) {
+        message += ` فشل تفعيل ${failedCount} طالب`;
+        console.error("الطلاب الذين فشل تفعيلهم:", failedStudents);
+      }
+      toast.success(message, { duration: 4000 });
+    } else {
+      toast.error("❌ فشل تفعيل جميع الطلاب");
+    }
+    
+  } catch (error) {
+    console.error("خطأ عام في عملية التفعيل الجماعي:", error);
+    toast.dismiss(loadingToast);
+    toast.error("حدث خطأ غير متوقع: " + error.message);
+  } finally {
+    setActivatingAll(false);
+    isActivatingLock = false;
   }
-  
-  await fetchStats();
-  await fetchActiveAttempts();
-  setActivatingAll(false);
-  toast.success(`تم تفعيل ${success} طالب بنجاح${failed > 0 ? `، فشل ${failed}` : ""}`);
 };
+
 
   // فلترة الطلاب مع الأخذ بعين الاعتبار فلتر المنطقة الجديد
   const filteredUsers = users.filter((u) => {
@@ -724,20 +888,28 @@ export default function AdminDashboard() {
     (!subjectFilter || s.subjects[subjectFilter]) &&
     (!areaFilter || s.areaCode === areaFilter)
   );
-
+const resetActivationLock = () => {
+  currentActiveBatchId = null;
+  isActivatingLock = false;
+  console.log("🔓 تم إعادة تعيين قفل التفعيل");
+};
   // التحقق من صلاحية المدير عند تحميل الصفحة
-  useEffect(() => {
-    const checkAdmin = async () => {
-      const profile = await fetchAdminProfile();
-      if (!profile || profile.role !== 'admin') {
-        toast.error("غير مصرح لك بالدخول");
-        navigate("/login");
-      } else {
-        setAuthChecked(true);
-      }
-    };
-    checkAdmin();
-  }, [fetchAdminProfile, navigate]);
+  // التحقق من صلاحية المدير عند تحميل الصفحة
+useEffect(() => {
+  const checkAdmin = async () => {
+    const profile = await fetchAdminProfile();
+    if (!profile || profile.role !== 'admin') {
+      toast.error("غير مصرح لك بالدخول");
+      navigate("/login");
+    } else {
+      setAuthChecked(true);
+    }
+  };
+  checkAdmin();
+  
+  // إعادة تعيين القفل عند تحميل الصفحة
+  resetActivationLock();
+}, [fetchAdminProfile, navigate]);
 
   // جلب البيانات بعد التأكد من الصلاحية
   useEffect(() => {
@@ -933,12 +1105,16 @@ export default function AdminDashboard() {
                           {hasActiveAttempt ? (
                             <button className="btn-attempt active" disabled>✔ محاولة مفعلة</button>
                           ) : (
-                            <button className="btn-attempt" onClick={() => handleActivateAttempt(user.id)} disabled={processingId === user.id}>
-                              {processingId === user.id ? (<><span className="spinner-small"></span>جاري...</>) : ("✚ تفعيل محاولـة")}
-                            </button>
+                            <button 
+  className="btn-attempt" 
+  onClick={() => handleActivateAttempt(user.id)} 
+  disabled={processingId === user.id || isActivatingLock}
+>
+  {processingId === user.id ? (<><span className="spinner-small"></span>جاري...</>) : ("✚ تفعيل محاولـة")}
+</button>
                           )}
-                        </td>
-                      </tr>
+                         </td>
+                       </tr>
                     );
                   })}
                 </tbody>
@@ -1099,7 +1275,6 @@ export default function AdminDashboard() {
                       {batches.map((batch, idx) => (
                         <tr key={batch.id}>
                           <td>حزمة {batches.length - idx}</td>
-                          
                           <td>{batch.studentCount} طالب</td>
                           <td>{batch.subjectCount} مادة</td>
                           <td>{new Date(batch.createdAt).toLocaleDateString("ar-EG")}</td>
@@ -1119,7 +1294,6 @@ export default function AdminDashboard() {
                               >
                                 <BookOpen size={16} /> أدبي
                               </button>
-                              {/* زر حذف الحزمة */}
                               <button
                                 className="btn-view-branch delete-batch-btn"
                                 onClick={() => handleDeleteBatch(batch.id)}
@@ -1157,6 +1331,7 @@ export default function AdminDashboard() {
       />
 
       <Footer />
+      
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap');
         
@@ -1208,7 +1383,6 @@ export default function AdminDashboard() {
         .modern-table tbody tr:hover { background: #f8fafc; }
         
         .user-cell { display: flex; align-items: center; gap: 12px; justify-content: center; }
-        .user-avatar { width: 34px; height: 34px; background: #e0f2fe; color: #0284c7; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.9rem; flex-shrink: 0; }
         .user-name-cell { font-weight: 600; color: #1e293b; }
         .subject-badge { padding: 4px 10px; border-radius: 6px; font-size: 0.85rem; font-weight: 600; }
         
@@ -1268,29 +1442,14 @@ export default function AdminDashboard() {
         
         .batches-list { padding: 20px; }
         
-        .branch-badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 0.8rem; font-weight: 600; }
-        .branch-badge.branch-scientific { background: #dbeafe; color: #1e3a8a; }
-        .branch-badge.branch-literary { background: #fee2e2; color: #991b1b; }
-        .branch-badge.branch-mixed { background: #f3e8ff; color: #6b21a5; }
-        
         .batch-actions { display: flex; gap: 8px; justify-content: center; }
         .btn-view-branch { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; background: #f1f5f9; border: none; border-radius: 8px; font-family: inherit; font-size: 0.75rem; font-weight: 500; cursor: pointer; transition: 0.2s; color: #334155; }
         .btn-view-branch:hover { background: #e2e8f0; }
         .btn-view-branch.literary:hover { background: #fee2e2; color: #991b1b; }
         .btn-view-branch:first-child:hover { background: #dbeafe; color: #1e3a8a; }
-        /* زر حذف الحزمة */
-        .btn-view-branch.delete-batch-btn {
-          background: #fee2e2;
-          color: #dc2626;
-        }
-        .btn-view-branch.delete-batch-btn:hover:not(:disabled) {
-          background: #fecaca;
-          color: #b91c1c;
-        }
-        .btn-view-branch.delete-batch-btn:disabled {
-          opacity: 0.5;
-          cursor: not-allowed;
-        }
+        .btn-view-branch.delete-batch-btn { background: #fee2e2; color: #dc2626; }
+        .btn-view-branch.delete-batch-btn:hover:not(:disabled) { background: #fecaca; color: #b91c1c; }
+        .btn-view-branch.delete-batch-btn:disabled { opacity: 0.5; cursor: not-allowed; }
         
         .spinner { border: 3px solid #f3f3f3; border-top: 3px solid #3b82f6; border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; margin: 0 auto 10px; }
         .spinner-small { border: 2px solid rgba(255,255,255,0.3); border-top: 2px solid white; border-radius: 50%; width: 14px; height: 14px; animation: spin 1s linear infinite; display: inline-block; }
