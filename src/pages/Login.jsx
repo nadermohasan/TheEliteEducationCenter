@@ -398,11 +398,9 @@ const [partnerFont, setPartnerFont] = useState('GE SS Two');
 <style>{`
   @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700&display=swap');
 
-
-/* تعريف خط GE SS Two - صيغة OTF */
 @font-face {
   font-family: 'GE SS Two';
-  src: url('/fonts/GE_SS_Tow/GE_SS_Two.otf') format('opentype');
+  src: url('/fonts/GE_SS_Two/GE_SS_Two.otf') format('opentype');
   font-weight: normal;
   font-style: normal;
   font-display: swap;
@@ -410,7 +408,7 @@ const [partnerFont, setPartnerFont] = useState('GE SS Two');
 
 @font-face {
   font-family: 'GE SS Two';
-  src: url('/fonts/GE_SS_Tow/Bold.otf') format('opentype');
+  src: url('/fonts/GE_SS_Two/Bold.otf') format('opentype');
   font-weight: bold;
   font-style: normal;
   font-display: swap;
@@ -502,7 +500,6 @@ const [partnerFont, setPartnerFont] = useState('GE SS Two');
   display: inline-block;
   width: auto;
   max-width: 90%;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
   animation: fadeInUp 0.6s ease-out both;
   }
 .partner-label {
