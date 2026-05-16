@@ -13,9 +13,6 @@ import Footer from "./Footer";
 import Navbar from "./Navbar";
 import ConfirmDialog from "./ConfirmDialog";
 
-const TEACHER_UUID = "ea65e52c-061e-4794-b923-d301dd040df5";
-const TEACHER_EMAIL = "597780880@nokhba.local";
-const TEACHER_PASSWORD = "All4One";
 // دوال تحويل الإجابة الصحيحة للرفع الجماعي
 const mapCorrectOption = (value, isEnglish = false) => {
   if (value === undefined || value === "") return null;
@@ -158,35 +155,12 @@ export default function TeacherDashboard() {
   };
 
   useEffect(() => {
-  const init = async () => {
-    try {
-      // 1. نجرب نجيب الجلسة الحالية
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      // 2. لو مفيش جلسة، نسجل دخول المعلم تلقائياً
-      if (!user) {
-        const { error: signInError } = await supabase.auth.signInWithPassword({
-          email: TEACHER_EMAIL,
-          password: TEACHER_PASSWORD,
-        });
-        if (signInError) {
-          setFetchError("تعذر تسجيل الدخول تلقائياً. يرجى التواصل مع المسؤول.");
-          return;
-        }
-      }
-      
-      // 3. تحميل البيانات
-      loadUploadBatches();
-      fetchTeacherProfile();
-      fetchSubjects();
-      fetchQuestions();
-      fetchPassages();
-    } catch (err) {
-      setFetchError("حدث خطأ أثناء تحميل الصفحة");
-    }
-  };
-  init();
-}, []);
+    loadUploadBatches();
+    fetchTeacherProfile();
+    fetchSubjects();
+    fetchQuestions();
+    fetchPassages();
+  }, []);
 
   useEffect(() => {
     setStats({ totalQuestions: questions.length, totalPassages: passages.length });
@@ -209,10 +183,7 @@ export default function TeacherDashboard() {
   const fetchTeacherProfile = async () => {
     const { data: { user: currentUser } } = await supabase.auth.getUser();
     if (currentUser) {
-      const { data: profile } = await supabase.from("profiles")
-    .select("name")
-    .eq("id", TEACHER_UUID)
-    .single();
+      const { data: profile } = await supabase.from("profiles").select("name").eq("id", currentUser.id).single();
       setTeacherProfile(profile);
     }
   };
@@ -249,8 +220,7 @@ export default function TeacherDashboard() {
       const { data: questionsData, error: questionsError } = await supabase
         .from("questions")
         .select("*")
-        //.eq("teacher_id", user.id)
-        .eq("teacher_id", TEACHER_UUID)
+        .eq("teacher_id", user.id)
         .is("bulk_batch_id", null)
         .order("created_at", { ascending: false });
 
@@ -321,8 +291,7 @@ export default function TeacherDashboard() {
       else if (isLiteraryOnly()) finalBranch = "الأدبي";
 
       const newQuestion = {
-        //teacher_id: user.id,
-        teacher_id: TEACHER_UUID,
+        teacher_id: user.id,
         subject_id: formData.subject_id,
         question_text: formData.question_text,
         options: [formData.optionA, formData.optionB, formData.optionC, formData.optionD],
@@ -647,8 +616,7 @@ export default function TeacherDashboard() {
 
       const batchId = Date.now().toString();
       const questionsToInsert = bulkPreview.map(q => ({
-        //teacher_id: user.id,
-        teacher_id: TEACHER_UUID,
+        teacher_id: user.id,
         subject_id: selectedBulkSubject,
         question_text: q.question_text,
         options: q.options,
@@ -741,8 +709,11 @@ export default function TeacherDashboard() {
     }
   };
 
-  // تفعيل / تعطيل سؤال داخل دفعة
-  const toggleBatchQuestionActive = async (questionId, currentlyActive, batchId) => {
+  // تفعيل / تعطيل سؤال داخل دفعة (تم تعديلها)
+  const toggleBatchQuestionActive = async (questionId, currentlyActive, batchId, e) => {
+    // منع انتشار الحدث (حماية إضافية إذا استُدعيت مع الحدث)
+    if (e) e.stopPropagation();
+
     try {
       const { error } = await supabase
         .from("questions")
@@ -750,10 +721,17 @@ export default function TeacherDashboard() {
         .eq("id", questionId);
 
       if (error) throw error;
-      fetchBatchQuestions(batchId);
+
+      // تحديث حالة السؤال محلياً فوراً لتجربة أفضل
+      setBatchQuestions(prev =>
+        prev.map(q => (q.id === questionId ? { ...q, is_active: !currentlyActive } : q))
+      );
+
       toast.success(`تم ${!currentlyActive ? "تفعيل" : "تعطيل"} السؤال`);
     } catch (error) {
       toast.error("فشل تحديث السؤال: " + error.message);
+      // إعادة التحميل في حالة الفشل لضمان تناسق الواجهة
+      fetchBatchQuestions(batchId);
     }
   };
 
@@ -986,8 +964,9 @@ export default function TeacherDashboard() {
 
   {isSharedSubject() && (
   <div className="form-group">
-    <label>الفرع الدراسي</label>
+    <label>الفرع الدراسي <span className="required">*</span></label>
     <select
+      required
       className="modern-input"
       value={formData.branch}
       onChange={(e) => setFormData({ ...formData, branch: e.target.value })}
@@ -1263,7 +1242,11 @@ export default function TeacherDashboard() {
                                           const hasImage = q.image_url ? true : false;
                                           const imagesCount = [q.image_option_a, q.image_option_b, q.image_option_c, q.image_option_d].filter(Boolean).length;
                                           return (
-                                            <tr key={q.id} className={q.is_active ? '' : 'inactive-row'}>
+                                            <tr
+                                              key={q.id}
+                                              className={q.is_active ? '' : 'inactive-row'}
+                                              onClick={(e) => e.stopPropagation()} // منع انتشار الحدث للصف الأب
+                                            >
                                               <td className="q-text-cell" title={q.question_text}>
                                                 {q.question_text}
                                                 {hasImage && <ImageIcon size={12} style={{ marginRight: '6px', color: '#3b82f6', verticalAlign: 'middle' }} />}
@@ -1306,7 +1289,10 @@ export default function TeacherDashboard() {
                                                 <button
                                                   className="btn-icon"
                                                   style={{ color: q.is_active ? '#f59e0b' : '#10b981', width: '32px', height: '32px' }}
-                                                  onClick={() => toggleBatchQuestionActive(q.id, q.is_active, batch.id)}
+                                                  onClick={(e) => {
+                                                    e.stopPropagation(); // ⬅️ منع انتشار الحدث
+                                                    toggleBatchQuestionActive(q.id, q.is_active, batch.id, e);
+                                                  }}
                                                   title={q.is_active ? "تعطيل السؤال" : "تفعيل السؤال"}
                                                 >
                                                   {q.is_active ? <PowerOff size={15} /> : <Power size={15} />}
@@ -1457,231 +1443,122 @@ export default function TeacherDashboard() {
       )}
 
       {/* Bulk Modal */}
-{/* Bulk Modal */}
-{/* Bulk Modal */}
-{showBulkModal && (
-  <div className="modal-backdrop" onClick={handleCancelBulk}>
-    <div className="modal-container bulk-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '95vw', width: '1200px' }}>
-      <div className="modal-header">
-        <h3><Upload size={20} className="icon-accent"/> رفع مجموعة أسئلة</h3>
-        <button className="btn-close" onClick={handleCancelBulk}><X size={20} /></button>
-      </div>
-      <div className="modal-body" style={{ maxHeight: '80vh', overflowY: 'auto', padding: '24px' }}>
-        <div className="form-group" style={{ textAlign: 'center', marginBottom: '20px' }}>
-          <label style={{ marginBottom: '12px', display: 'block', fontWeight: 600, fontSize: '0.95rem' }}>
-            اختر المادة المستهدفة <span className="required">*</span>
-          </label>
-          <div style={{ 
-            display: 'flex', 
-            flexWrap: 'wrap', 
-            justifyContent: 'center', 
-            gap: '8px', 
-            marginTop: '8px' 
-          }}>
-            {subjects.map(s => (
-              <button 
-                key={s.id} 
-                type="button" 
-                onClick={() => handleSubjectSelectForBulk(s.id)}
-                style={{
-                  padding: '8px 16px',
-                  borderRadius: '20px',
-                  border: selectedBulkSubject == s.id ? '2px solid var(--c-primary)' : '1px solid var(--c-border)',
-                  background: selectedBulkSubject == s.id ? 'var(--c-primary)' : 'var(--c-surface)',
-                  color: selectedBulkSubject == s.id ? '#fff' : 'var(--c-text-body)',
-                  fontWeight: selectedBulkSubject == s.id ? 700 : 500,
-                  fontSize: '13px',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s',
-                  fontFamily: "'Cairo', sans-serif",
-                  lineHeight: '1.2',
-                  textAlign: 'center',
-                  whiteSpace: 'nowrap',
-                  flexShrink: 0
-                }}>
-                {s.name}
-              </button>
-            ))}
-          </div>
-        </div>
-
-       <div className="form-group" style={{ marginTop: '16px', marginBottom: '16px' }}>
-  <label style={{ marginBottom: '8px', display: 'block', fontWeight: 600, fontSize: '0.95rem' }}>
-    رفع ملف الأسئلة (Excel أو JSON) <span className="required">*</span>
-  </label>
-  <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginTop: '6px', justifyContent: 'center' }}>
-    <label className="btn-secondary" style={{ cursor: 'pointer', padding: '10px 18px', fontSize: '0.9rem', display: 'inline-flex', alignItems: 'center', gap: '8px', borderRadius: '10px' }}>
-      <FileSpreadsheet size={18} />
-      <input type="file" accept=".xlsx,.xls" style={{ display: 'none'}} onChange={(e) => e.target.files[0] && handleBulkFileUpload(e.target.files[0])} />
-      رفع إكسل
-    </label>
-    <label className="btn-secondary" style={{ cursor: 'pointer', padding: '10px 18px', fontSize: '0.9rem', display: 'inline-flex', alignItems: 'center', gap: '8px', borderRadius: '10px' }}>
-      <FileJson size={18} />
-      <input type="file" accept=".json" style={{ display: 'none' }} onChange={(e) => e.target.files[0] && handleBulkJsonUpload(e.target.files[0])} />
-      رفع JSON
-    </label>
-    <label className="btn-secondary" onClick={downloadTemplate} style={{ cursor: 'pointer', padding: '10px 18px', fontSize: '0.9rem', display: 'inline-flex', alignItems: 'center', gap: '8px', borderRadius: '10px' }}>
-      <Download size={18} /> تحميل قالب
-    </label>
-  </div>
-  {bulkFileName && (
-    <p style={{ marginTop: '8px', color: 'var(--c-text-muted)', fontSize: '0.85rem', background: '#f1f5f9', padding: '8px 12px', borderRadius: '8px', display: 'inline-block' }}>
-      📄 الملف المحدد: <strong>{bulkFileName}</strong>
-    </p>
-  )}
-</div>
-
-        {bulkErrors.length > 0 && (
-          <div className="error-banner" style={{ marginTop: '20px', marginBottom: '20px' }}>
-            <AlertCircle size={20} />
-            <div style={{ flex: 1 }}>
-              <strong>أخطاء في الملف:</strong>
-              <ul style={{ margin: '8px 0 0 20px', maxHeight: '150px', overflowY: 'auto' }}>
-                {bulkErrors.map((err, i) => <li key={i} style={{ marginBottom: '4px' }}>{err}</li>)}
-              </ul>
+      {showBulkModal && (
+        <div className="modal-backdrop" onClick={handleCancelBulk}>
+          <div className="modal-container bulk-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '900px' }}>
+            <div className="modal-header">
+              <h3><Upload size={20} className="icon-accent"/> رفع مجموعة أسئلة</h3>
+              <button className="btn-close" onClick={handleCancelBulk}><X size={20} /></button>
             </div>
-          </div>
-        )}
-
-        {showBulkPreview && bulkPreview.length > 0 && (
-          <div style={{ marginTop: '20px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-              <h4 style={{ fontSize: '1.05rem', fontWeight: 700, color: '#1e293b' }}>
-                📋 معاينة الأسئلة ({bulkPreview.length} سؤال)
-              </h4>
-              <span style={{ fontSize: '0.8rem', color: '#64748b', background: '#f1f5f9', padding: '4px 12px', borderRadius: '20px' }}>
-                إجمالي {bulkPreview.length} سؤال
-              </span>
-            </div>
-            <div className="table-responsive" style={{ 
-              maxHeight: '50vh', 
-              overflowY: 'auto', 
-              overflowX: 'auto', 
-              scrollbarWidth: 'thin',
-              border: '1px solid #e2e8f0',
-              borderRadius: '12px'
-            }}>
-              <table className={`modern-table bulk-preview-table ${isEnglishBulk ? 'english-content' : ''}`} style={{ minWidth: '900px', fontSize: '0.85rem', marginBottom: '0' }}>
-                <thead style={{ position: 'sticky', top: 0, zIndex: 2 }}>
-                  <tr>
-                    <th style={{ width: '50px', background: '#f8fafc' }}>#</th>
-                    <th style={{ minWidth: '250px', maxWidth: '350px', background: '#f8fafc' }}>النص</th>
-                    <th style={{ minWidth: '250px', maxWidth: '350px', background: '#f8fafc' }}>الخيارات</th>
-                    <th style={{ width: '90px', background: '#f8fafc' }}>الإجابة</th>
-                    <th style={{ width: '80px', background: '#f8fafc' }}>الوحدة</th>
-                    <th style={{ width: '90px', background: '#f8fafc' }}>الفرع</th>
-                    <th style={{ width: '80px', background: '#f8fafc' }}>الدرجة</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {bulkPreview.map((q, idx) => {
-                    const optionLabels = isEnglishBulk ? ["A", "B", "C", "D"] : ["أ", "ب", "ج", "د"];
-                    const correctLetter = getCorrectOptionLetter(q.correct_option, isEnglishBulk);
-                    return (
-                      <tr key={idx} style={{ 
-                        background: idx % 2 === 0 ? '#ffffff' : '#f8fafc',
-                        borderLeft: correctLetter ? '3px solid #10b981' : '3px solid transparent'
+            <div className="modal-body" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
+              <div className="form-group" style={{ textAlign: 'center', marginBottom: '16px' }}>
+                <label style={{ marginBottom: '8px' }}>اختر المادة المستهدفة <span className="required">*</span></label>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '8px', marginTop: '4px' }}>
+                  {subjects.map(s => (
+                    <button key={s.id} type="button" onClick={() => handleSubjectSelectForBulk(s.id)}
+                      style={{
+                        padding: '10px 15px', borderRadius: '24px',
+                        border: selectedBulkSubject == s.id ? '2px solid var(--c-primary)' : '1px solid var(--c-border)',
+                        background: selectedBulkSubject == s.id ? 'var(--c-primary)' : 'var(--c-surface)',
+                        color: selectedBulkSubject == s.id ? '#fff' : 'var(--c-text-body)',
+                        fontWeight: selectedBulkSubject == s.id ? 700 : 500,
+                        fontSize: '14px', cursor: 'pointer', transition: 'all 0.2s',
+                        fontFamily: "'Cairo', sans-serif", lineHeight: '1.3', textAlign: 'center'
                       }}>
-                        <td style={{ fontWeight: 600, color: '#64748b', textAlign: 'center' }}>{idx + 1}</td>
-                        <td className="question-text-cell" style={{ 
-                          whiteSpace: 'normal', 
-                          wordBreak: 'break-word', 
-                          lineHeight: '1.6',
-                          padding: '12px 16px',
-                          ...(isEnglishBulk ? { textAlign: 'left', direction: 'ltr' } : { textAlign: 'right', direction: 'rtl' })
-                        }}>
-                          {q.question_text}
-                        </td>
-                        <td className="options-cell" style={{ 
-                          whiteSpace: 'normal', 
-                          wordBreak: 'break-word', 
-                          lineHeight: '1.6',
-                          padding: '12px 16px',
-                          ...(isEnglishBulk ? { textAlign: 'left', direction: 'ltr' } : { textAlign: 'right', direction: 'rtl' })
-                        }}>
-                          {q.options.map((opt, i) => (
-                            <div key={i} style={{ 
-                              marginBottom: '6px',
-                              padding: '6px 10px',
-                              borderRadius: '6px',
-                              background: i === q.correct_option ? '#dcfce7' : 'transparent',
-                              color: i === q.correct_option ? '#166534' : '#475569',
-                              fontWeight: i === q.correct_option ? 600 : 400,
-                              border: i === q.correct_option ? '1px solid #bbf7d0' : '1px solid transparent',
-                              ...(isEnglishBulk ? { textAlign: 'left', direction: 'ltr' } : { textAlign: 'right', direction: 'rtl' })
-                            }}>
-                              {optionLabels[i]}) {opt}
-                            </div>
-                          ))}
-                        </td>
-                        <td style={{ 
-                          fontWeight: 'bold', 
-                          color: '#10b981',
-                          fontSize: '1rem',
-                          textAlign: 'center'
-                        }}>
-                          {correctLetter}
-                        </td>
-                        <td style={{ 
-                          textAlign: 'center',
-                          color: q.unit_number ? '#475569' : '#94a3b8'
-                        }}>
-                          {q.unit_number || '—'}
-                        </td>
-                        <td style={{ textAlign: 'center' }}>
-                          <span style={{
-                            padding: '3px 10px',
-                            borderRadius: '12px',
-                            fontSize: '0.8rem',
-                            fontWeight: 600,
-                            background: q.branch === 'العلمي' ? '#dbeafe' : q.branch === 'الأدبي' ? '#fee2e2' : '#f1f5f9',
-                            color: q.branch === 'العلمي' ? '#1e40af' : q.branch === 'الأدبي' ? '#991b1b' : '#475569'
-                          }}>
-                            {q.branch || 'عام'}
-                          </span>
-                        </td>
-                        <td style={{ 
-                          textAlign: 'center',
-                          fontWeight: 600,
-                          color: '#6366f1'
-                        }}>
-                          {q.degree}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                      {s.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="form-group" style={{ marginTop: '12px', marginBottom: '12px' }}>
+                <label style={{ marginBottom: '0' }}>رفع ملف الأسئلة (Excel أو JSON) <span className="required">*</span></label>
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '6px', marginRight:'28%'}}>
+                  <label className="btn-secondary" style={{ cursor: 'pointer', padding: '6px 14px', fontSize: '0.85rem', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                    <FileSpreadsheet size={16} />
+                    <input type="file" accept=".xlsx,.xls" style={{ display: 'none'}} onChange={(e) => e.target.files[0] && handleBulkFileUpload(e.target.files[0])} />
+                    رفع إكسل
+                  </label>
+                  <label className="btn-secondary" style={{ cursor: 'pointer', padding: '6px 14px', fontSize: '0.85rem', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                    <FileJson size={16} />
+                    <input type="file" accept=".json" style={{ display: 'none' }} onChange={(e) => e.target.files[0] && handleBulkJsonUpload(e.target.files[0])} />
+                    رفع JSON
+                  </label>
+                  <label className="btn-secondary" onClick={downloadTemplate} style={{ cursor: 'pointer', padding: '6px 14px', fontSize: '0.85rem', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                    <Download size={16} /> تحميل قالب
+                  </label>
+                </div>
+                {bulkFileName && <p style={{ marginTop: '4px', color: 'var(--c-text-muted)', fontSize: '0.85rem' }}>الملف المحدد: {bulkFileName}</p>}
+              </div>
+
+              {bulkErrors.length > 0 && (
+                <div className="error-banner" style={{ marginTop: '20px' }}>
+                  <AlertCircle size={18} />
+                  <div>
+                    <strong>أخطاء في الملف:</strong>
+                    <ul style={{ margin: '8px 0 0 20px' }}>
+                      {bulkErrors.slice(0, 5).map((err, i) => <li key={i}>{err}</li>)}
+                      {bulkErrors.length > 5 && <li>... و {bulkErrors.length - 5} أخطاء أخرى</li>}
+                    </ul>
+                  </div>
+                </div>
+              )}
+
+              {showBulkPreview && bulkPreview.length > 0 && (
+                <div style={{ marginTop: '12px' }}>
+                  <h4 style={{ marginBottom: '8px', fontSize: '0.95rem' }}>معاينة {bulkPreview.length} سؤال</h4>
+                  <div className="table-responsive" style={{ maxHeight: '200px', overflowY: 'auto', overflowX: 'auto', scrollbarWidth: 'thin' }}>
+                    <table className="modern-table" style={{ minWidth: '700px', fontSize: '0.85rem' }}>
+                      <thead>
+                        <tr>
+                          <th>#</th>
+                          <th>النص</th>
+                          <th>الخيارات</th>
+                          <th>الإجابة</th>
+                          <th>الوحدة</th>
+                          <th>الفرع</th>
+                          <th>الدرجة</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {bulkPreview.slice(0, 10).map((q, idx) => {
+                          const optionLabels = isEnglishBulk ? ["A", "B", "C", "D"] : ["أ", "ب", "ج", "د"];
+                          const optionsText = q.options.map((opt, i) => `${optionLabels[i]}) ${opt}`).join('، ');
+                          return (
+                            <tr key={idx}>
+                              <td>{idx + 1}</td>
+                              <td className="q-text-cell" style={{ maxWidth: '180px' }}>{q.question_text}</td>
+                              <td style={{ maxWidth: '220px', whiteSpace: 'normal', wordBreak: 'break-word', lineHeight: '1.3' }}>{optionsText}</td>
+                              <td style={{ fontWeight: 'bold' }}>{getCorrectOptionLetter(q.correct_option, isEnglishBulk)}</td>
+                              <td>{q.unit_number || '—'}</td>
+                              <td>{q.branch || 'عام'}</td>
+                              <td>{q.degree}</td>
+                            </tr>
+                          );
+                        })}
+                        {bulkPreview.length > 10 && (
+                          <tr>
+                            <td colSpan="7" style={{ textAlign: 'center', fontStyle: 'italic' }}>
+                              ... بالإضافة إلى {bulkPreview.length - 10} أسئلة أخرى
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              <div className="modal-footer" style={{ padding: '0', marginTop: '20px', border: 'none', display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+                <button className="btn-secondary" onClick={handleCancelBulk}>إلغاء</button>
+                <button className="btn-primary" onClick={handleBulkSubmit} disabled={bulkUploading || bulkPreview.length === 0 || !selectedBulkSubject}>
+                  <UploadCloud size={18} /> {bulkUploading ? "جاري الرفع..." : `رفع ${bulkPreview.length} سؤال`}
+                </button>
+              </div>
             </div>
           </div>
-        )}
-
-        <div className="modal-footer" style={{ 
-          padding: '16px 0 0 0', 
-          marginTop: '24px', 
-          border: 'none', 
-          borderTop: '1px solid #e2e8f0',
-          display: 'flex', 
-          justifyContent: 'flex-end', 
-          gap: '12px' 
-        }}>
-          <button className="btn-secondary" onClick={handleCancelBulk} style={{ padding: '10px 24px' }}>
-            إلغاء
-          </button>
-          <button 
-            className="btn-primary" 
-            onClick={handleBulkSubmit} 
-            disabled={bulkUploading || bulkPreview.length === 0 || !selectedBulkSubject}
-            style={{ padding: '10px 28px' }}
-          >
-            <UploadCloud size={18} /> 
-            {bulkUploading ? "جاري الرفع..." : `رفع ${bulkPreview.length} سؤال`}
-          </button>
         </div>
-      </div>
-    </div>
-  </div>
-)}
+      )}
 
       {/* Settings Modal */}
       {showSettingsModal && (
@@ -1935,31 +1812,6 @@ export default function TeacherDashboard() {
         .settings-input { width: 100px; padding: 10px 8px; border: 1px solid var(--c-border); border-radius: var(--radius-md); font-family: 'Cairo'; text-align: center; font-weight: 700; font-size: 1rem; color: var(--c-text-main); background: var(--c-surface); transition: 0.2s; }
         .settings-input:focus { outline: none; border-color: var(--c-primary); box-shadow: 0 0 0 3px var(--c-primary-light); }
         .settings-input:hover { border-color: #cbd5e1; }
-/* تنسيق خاص لجدول معاينة الأسئلة الإنجليزية */
-.bulk-preview-table.english-content td.question-text-cell,
-.bulk-preview-table.english-content td.options-cell {
-  text-align: left !important;
-  direction: ltr !important;
-}
-
-.bulk-preview-table.english-content td.options-cell > div {
-  text-align: left !important;
-  direction: ltr !important;
-}
-
-/* تحسين المسافات للخلايا */
-.bulk-preview-table td {
-  padding: 16px 24px !important;
-  border-bottom: 1px solid #e2e8f0;
-  color: #475569;
-  vertical-align: middle;
-  transition: background 0.2s;
-}
-
-/* تنسيق خاص للنص الإنجليزي */
-.bulk-preview-table.english-content td {
-  font-family: 'Cairo', 'Segoe UI', sans-serif;
-}
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         @keyframes slideUp { from { opacity: 0; transform: translateY(20px) scale(0.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
         @media (max-width: 1024px) { .form-grid { grid-template-columns: 1fr; } }
