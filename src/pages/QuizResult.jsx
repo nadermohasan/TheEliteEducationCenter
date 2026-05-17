@@ -6,7 +6,7 @@ export default function QuizResult() {
   const location = useLocation();
   const navigate = useNavigate();
   const state = location.state;
-
+ 
   useEffect(() => {
     if (!state) {
       navigate("/dashboard", { replace: true });
