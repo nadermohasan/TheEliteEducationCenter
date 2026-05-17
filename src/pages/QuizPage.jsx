@@ -40,7 +40,6 @@ const formatDegree = (degree, isEnglish = false) => {
   if (isEnglish) {
     return degree === 1 ? "1 Point" : `${degree} Points`;
   }
-  // ابدأ بالقيم الخاصة أولاً
   if (degree === 1) return "درجة واحدة";
   if (degree === 2) return "درجتان";
   if (degree === 2.5) return "درجتان ونصف";
@@ -80,7 +79,6 @@ export default function QuizPage() {
   const selectedAnswersRef = useRef({});
   const numericSubjectIdRef = useRef(parseInt(subjectId, 10));
   
-  // Ref جديد لحاوية الأرقام
   const dotsContainerRef = useRef(null);
 
   useEffect(() => {
@@ -119,6 +117,17 @@ export default function QuizPage() {
     if (key) localStorage.removeItem(key);
   }, [getTimerStorageKey]);
 
+  // --- دوال مساعدة لإدارة إجابات الذاكرة المحلية (إضافة برمجية لحماية الإجابات) ---
+  const getAnswersStorageKey = useCallback(() => {
+    if (!studentId || !attemptId) return null;
+    return `quiz_answers_${studentId}_${numericSubjectId}_${attemptId}`;
+  }, [studentId, numericSubjectId, attemptId]);
+
+  const clearAnswersState = useCallback(() => {
+    const key = getAnswersStorageKey();
+    if (key) localStorage.removeItem(key);
+  }, [getAnswersStorageKey]);
+
   // --- مودال التأكيد ---
   const showConfirm = (options) => {
     return new Promise((resolve) => {
@@ -150,6 +159,7 @@ export default function QuizPage() {
       hasAutoSubmitted.current = true;
       setSubmitting(true);
       clearTimerState();
+      clearAnswersState(); // تنظيف إجابات الذاكرة المحلية عند التسليم بنجاح
 
       if (timerRef.current) {
         clearInterval(timerRef.current);
@@ -220,7 +230,6 @@ export default function QuizPage() {
         ]);
         if (resultError) throw resultError;
 
-        // التحقق من اكتمال جميع مواد المحاولة لإغلاقها
         const { data: allQuestionsInAttempt } = await supabase
           .from("attempt_questions")
           .select("subject_id")
@@ -268,7 +277,7 @@ export default function QuizPage() {
         return false;
       }
     },
-    [navigate, submitting, clearTimerState]
+    [navigate, submitting, clearTimerState, clearAnswersState]
   );
 
   const handleAutoSubmit = useCallback(() => {
@@ -314,7 +323,7 @@ export default function QuizPage() {
     }
   }, [isReviewMode, clearTimerState]);
 
-  // --- حفظ المؤقت ---
+  // --- حفظ المؤقت تلقائياً ---
   useEffect(() => {
     if (
       timeLeft !== null &&
@@ -327,7 +336,17 @@ export default function QuizPage() {
     }
   }, [timeLeft, loading, studentId, attemptId, saveTimerState, isReviewMode]);
 
-  // --- جلب بيانات الاختبار ---
+  // --- خطاف الحفظ التلقائي الفوري للإجابات (إضافة برمجية) ---
+  useEffect(() => {
+    if (!loading && studentId && attemptId && !isReviewMode && Object.keys(selectedAnswers).length > 0) {
+      const key = getAnswersStorageKey();
+      if (key) {
+        localStorage.setItem(key, JSON.stringify(selectedAnswers));
+      }
+    }
+  }, [selectedAnswers, loading, studentId, attemptId, isReviewMode, getAnswersStorageKey]);
+
+  // --- جلب بيانات الاختبار واستعادة الحالة ---
   const fetchQuizData = useCallback(async () => {
     setLoading(true);
     try {
@@ -368,6 +387,17 @@ export default function QuizPage() {
       } else if (attemptData.status === "completed") {
         setError("attempt_closed");
         return;
+      } else {
+        // استعادة الإجابات المحفوظة محلياً إن وجدت للمحاولة الحالية الحية
+        const answersKey = `quiz_answers_${currentStudentId}_${numericSubjectId}_${attemptData.id}`;
+        const savedAnswers = localStorage.getItem(answersKey);
+        if (savedAnswers) {
+          try {
+            setSelectedAnswers(JSON.parse(savedAnswers));
+          } catch (e) {
+            console.error("Error parsing saved answers:", e);
+          }
+        }
       }
 
       // 3. جلب معرفات الأسئلة من attempt_questions
@@ -570,9 +600,7 @@ export default function QuizPage() {
         </div>
         <main className="quiz-main-content">
           <div className="empty-state-card">
-            <div className="empty-state-icon">
-              {error === "no_questions" ? "" : ""}
-            </div>
+            <div className="empty-state-icon"></div>
             <h2 className="empty-state-title">
               {error === "no_questions"
                 ? isEnglishSubject
@@ -616,7 +644,6 @@ export default function QuizPage() {
     align-items: center;
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
     position: sticky;
-    /* grid-template-columns: 1fr auto 1fr; */
     top: 0;
     z-index: 1000;
     border-bottom: 1px solid rgba(255, 255, 255, 0.5);
@@ -649,16 +676,12 @@ export default function QuizPage() {
   const totalBlocks = blocks.length;
   const passagesCount = blocks.filter((b) => b.type === "passage").length;
   
-  // إجمالي الأسئلة الفعلية (مستخدم في شريط التقدم فقط)
   const totalQuestionsCount = blocks.reduce(
     (acc, b) => acc + (b.type === "passage" ? b.questions.length : 1),
     0
   );
 
-  // العدد الجديد للعرض: عدد الكتل (كل قطعة تعتبر وحدة واحدة)
   const displayTotal = totalBlocks;
-
-  // رقم السؤال الحالي بنظام الكتل
   const displayCurrent = currentBlockIndex + 1;
 
   const answeredCount = Object.keys(selectedAnswers).length;
@@ -672,7 +695,6 @@ export default function QuizPage() {
     currentBlock.type === "passage"
       ? currentBlock.questions[0]
       : currentBlock.question;
-  const questionDegree = currentQuestion?.degree || 1;
 
   const questionLabel = isEnglishSubject ? "Question" : "السؤال";
   const ofLabel = isEnglishSubject ? "of" : "من";
@@ -683,9 +705,9 @@ export default function QuizPage() {
     ? "...جاري التسليم"
     : "إنهاء الاختبار";
 
-const currentDegree = currentBlock.type === "passage"
-  ? currentBlock.questions.reduce((sum, q) => sum + (q.degree || 1), 0)
-  : (currentQuestion?.degree || 1);
+  const currentDegree = currentBlock.type === "passage"
+    ? currentBlock.questions.reduce((sum, q) => sum + (q.degree || 1), 0)
+    : (currentQuestion?.degree || 1);
 
   return (
     <div
@@ -760,8 +782,8 @@ const currentDegree = currentBlock.type === "passage"
                   `${questionLabel} ${displayCurrent} ${ofLabel} ${displayTotal}`
                 )}
                 <span className="question-degree">
-  ({formatDegree(currentDegree, isEnglishSubject)})
-</span>
+                  ({formatDegree(currentDegree, isEnglishSubject)})
+                </span>
               </span>
             </div>
 
@@ -942,7 +964,6 @@ const currentDegree = currentBlock.type === "passage"
     align-items: center;
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
     position: sticky;
-    /* grid-template-columns: 1fr auto 1fr; */
     top: 0;
     z-index: 1000;
     border-bottom: 1px solid rgba(255, 255, 255, 0.5);
@@ -1064,7 +1085,6 @@ const currentDegree = currentBlock.type === "passage"
           transform: translate(-50%, -50%);
         }
 
-        /* === أزرار التنقل وحاوية النقاط الديناميكية === */
         .quiz-nav-controls { 
           display: flex; 
           align-items: center; 
@@ -1213,17 +1233,10 @@ const currentDegree = currentBlock.type === "passage"
           .quiz-brand-name { display: none; }
           .question-card { padding: 24px 20px; border-radius: 24px; }
           .question-text { font-size: 1.2rem; }
-          .quiz-logo {height: 44px;}
+          .quiz-logo { height: 44px; }
           
-          .quiz-nav-controls {
-            gap: 8px;
-          }
-          
-          .nav-btn {
-            padding: 10px 14px;
-            font-size: 0.9rem;
-            border-radius: 14px;
-          }
+          .quiz-nav-controls { gap: 8px; }
+          .nav-btn { padding: 10px 14px; font-size: 0.9rem; border-radius: 14px; }
 
           .q-dots-scroll-container {
             gap: 8px;
@@ -1253,19 +1266,10 @@ const currentDegree = currentBlock.type === "passage"
         }
         
         @media (max-width: 380px) {
-          .quiz-nav-controls {
-            flex-wrap: wrap;
-            justify-content: center;
-          }
-          .q-dots-scroll-container {
-            order: -1;
-            width: 100%;
-            margin-bottom: 12px;
-          }
-          .nav-btn {
-            flex: 1;
-          }
-.quiz-logo {height: 44px;}
+          .quiz-nav-controls { flex-wrap: wrap; justify-content: center; }
+          .q-dots-scroll-container { order: -1; width: 100%; margin-bottom: 12px; }
+          .nav-btn { flex: 1; }
+          .quiz-logo { height: 44px; }
         }
       `}</style>
     </div>
