@@ -277,7 +277,7 @@ export default function QuizResult() {
 
         .item-spacer { height: 3px; background: #f1f5f9; margin-top: 25px; margin-left: -20px; margin-right: -20px }
 
-        .ltr { direction: ltr; text-align: left; }
+        .ltr { direction: rtl; text-align: left; }
 
         @media (max-width: 480px) {
           .score-achieved { font-size: 35px; }
