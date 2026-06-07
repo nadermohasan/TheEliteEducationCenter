@@ -420,8 +420,8 @@ export default function AdminDashboard() {
   }, []);
 
   // ============================================================
-  // الدالة المعدلة بشكل كامل: fetchBatchResults
-  // التعديل: حساب الدرجة العظمى من مجموع درجات الأسئلة
+  // الدالة المعدلة: fetchBatchResults
+  // تم تصحيح اسم عمود الدرجة في جدول questions إلى degree
   // ============================================================
   const fetchBatchResults = useCallback(async (batchId, selectedBranch = null) => {
     setResultsLoading(true);
@@ -444,14 +444,14 @@ export default function AdminDashboard() {
       const attemptIds = attempts.map(a => a.id);
 
       // الخطوة 2: جلب أسئلة المحاولات مع درجاتها
-      // نفترض أن جدول questions يحتوي على عمود score لتخزين درجة كل سؤال
+      // تم التصحيح: استخدام degree بدلاً من score
       const { data: attemptQuestions, error: questionsError } = await supabase
         .from("attempt_questions")
         .select(`
           attempt_id,
           subject_id,
           questions!inner (
-            score
+            degree
           )
         `)
         .in("attempt_id", attemptIds);
@@ -467,13 +467,13 @@ export default function AdminDashboard() {
       
       attemptQuestions?.forEach(item => {
         const key = `${item.attempt_id}_${item.subject_id}`;
-        const questionScore = item.questions?.score || 1; // إذا لم توجد درجة، افتراضياً 1
-        totalMarksMap.set(key, (totalMarksMap.get(key) || 0) + questionScore);
+        const questionDegree = item.questions?.degree || 1; // إذا لم توجد درجة، افتراضياً 1
+        totalMarksMap.set(key, (totalMarksMap.get(key) || 0) + questionDegree);
       });
 
-      console.log("📊 خريطة الدرجات العظمى:", Object.fromEntries(totalMarksMap));
+      console.log("📊 خريطة الدرجات العظمى (تم حسابها من degree):", Object.fromEntries(totalMarksMap));
 
-      // الخطوة 4: جلب النتائج
+      // الخطوة 4: جلب النتائج (العمود score في جدول results كما هو)
       const { data, error } = await supabase
         .from("results")
         .select(`
@@ -527,8 +527,8 @@ export default function AdminDashboard() {
 
         if (!studentRecord.subjects[subjectName]) {
           studentRecord.subjects[subjectName] = {
-            score: result.score,
-            totalMarks: totalMarks, // تم التعديل هنا: استخدام إجمالي الدرجات
+            score: result.score,        // درجة الطالب من جدول results
+            totalMarks: totalMarks,      // إجمالي الدرجات المحسوب من questions.degree
           };
         }
 
@@ -647,7 +647,7 @@ export default function AdminDashboard() {
       `${idx + 1}. ${s.studentName}`,
       ...filteredSubjects.map(subj => {
         const subjData = s.subjects[subj];
-        // تم التعديل هنا: عرض الدرجة/إجمالي الدرجات بدلاً من الدرجة/عدد الأسئلة
+        // عرض الدرجة/إجمالي الدرجات
         return subjData ? `${subjData.score}/${subjData.totalMarks}` : "—";
       })
     ]);
@@ -685,9 +685,8 @@ export default function AdminDashboard() {
       
       if (currentActiveBatchId) {
         batchId = currentActiveBatchId;
-        console.log(`📦 استخدام الحزمة الموجودة (متغير عام): ${batchId}`);
       } else {
-        const { data: existingActiveAttempt, error: searchError } = await supabase
+        const { data: existingActiveAttempt } = await supabase
           .from("attempts")
           .select("batch_id")
           .eq("status", "active")
@@ -695,18 +694,12 @@ export default function AdminDashboard() {
           .limit(1)
           .maybeSingle();
         
-        if (searchError) {
-          console.error("خطأ في البحث عن حزمة نشطة:", searchError);
-        }
-        
         if (existingActiveAttempt?.batch_id) {
           batchId = existingActiveAttempt.batch_id;
           currentActiveBatchId = batchId;
-          console.log(`📦 استخدام الحزمة الموجودة (من قاعدة البيانات): ${batchId}`);
         } else {
           batchId = crypto.randomUUID();
           currentActiveBatchId = batchId;
-          console.log(`✨ إنشاء حزمة جديدة: ${batchId}`);
         }
       }
       
@@ -741,14 +734,14 @@ export default function AdminDashboard() {
 
   const activateSingleStudent = async (student, unifiedBatchId) => {
     try {
-      const { data: studentProfile, error: profileError } = await supabase
+      const { data: studentProfile } = await supabase
         .from("profiles")
         .select("branch")
         .eq("id", student.id)
         .single();
       
-      if (profileError) {
-        return { success: false, name: student.name, error: profileError.message };
+      if (studentProfile?.error) {
+        return { success: false, name: student.name, error: studentProfile.error.message };
       }
       
       const studentBranch = studentProfile?.branch?.trim() || null;
@@ -800,9 +793,8 @@ export default function AdminDashboard() {
       
       if (currentActiveBatchId) {
         unifiedBatchId = currentActiveBatchId;
-        console.log(`📦 استخدام الحزمة الموجودة (متغير عام): ${unifiedBatchId}`);
       } else {
-        const { data: existingActiveAttempt, error: searchError } = await supabase
+        const { data: existingActiveAttempt } = await supabase
           .from("attempts")
           .select("batch_id")
           .eq("status", "active")
@@ -810,18 +802,12 @@ export default function AdminDashboard() {
           .limit(1)
           .maybeSingle();
         
-        if (searchError) {
-          console.error("خطأ في البحث عن حزمة نشطة:", searchError);
-        }
-        
         if (existingActiveAttempt?.batch_id) {
           unifiedBatchId = existingActiveAttempt.batch_id;
           currentActiveBatchId = unifiedBatchId;
-          console.log(`📦 استخدام الحزمة الموجودة (من قاعدة البيانات): ${unifiedBatchId}`);
         } else {
           unifiedBatchId = crypto.randomUUID();
           currentActiveBatchId = unifiedBatchId;
-          console.log(`✨ إنشاء حزمة جديدة: ${unifiedBatchId}`);
         }
       }
       
@@ -838,8 +824,6 @@ export default function AdminDashboard() {
         throw new Error("فشل في إنهاء المحاولات القديمة");
       }
       
-      console.log(`✅ تم إنهاء المحاولات القديمة لـ ${studentIds.length} طالب`);
-      
       const activationPromises = studentsToActivate.map(student => 
         activateSingleStudent(student, unifiedBatchId)
       );
@@ -848,7 +832,6 @@ export default function AdminDashboard() {
       
       const successCount = results.filter(r => r.success).length;
       const failedCount = results.filter(r => !r.success).length;
-      const failedStudents = results.filter(r => !r.success).map(r => ({ name: r.name, error: r.error }));
       
       await fetchStats();
       await fetchActiveAttempts();
@@ -860,7 +843,6 @@ export default function AdminDashboard() {
         let message = `تم تفعيل ${successCount} طالب بنجاح!`;
         if (failedCount > 0) {
           message += ` فشل تفعيل ${failedCount} طالب`;
-          console.error("الطلاب الذين فشل تفعيلهم:", failedStudents);
         }
         toast.success(message, { duration: 4000 });
       } else {
@@ -913,7 +895,6 @@ export default function AdminDashboard() {
   const resetActivationLock = () => {
     currentActiveBatchId = null;
     isActivatingLock = false;
-    console.log("🔓 تم إعادة تعيين قفل التفعيل");
   };
 
   // التحقق من صلاحية المدير عند تحميل الصفحة
@@ -929,7 +910,6 @@ export default function AdminDashboard() {
     };
     checkAdmin();
     
-    // إعادة تعيين القفل عند تحميل الصفحة
     resetActivationLock();
   }, [fetchAdminProfile, navigate]);
 
@@ -980,7 +960,6 @@ export default function AdminDashboard() {
             />
           </div>
 
-          {/* فلتر المنطقة الجديد */}
           <div className="filter-input-wrapper" style={{ maxWidth: "200px" }}>
             <select
               value={studentAreaFilter}
@@ -1041,7 +1020,6 @@ export default function AdminDashboard() {
                         <td>
                           <span className="subject-badge" style={{ color: "#475569" }}>{user.branch || "—"}</span>
                         </td>
-                        {/* خلية المنطقة – قابلة للتعديل */}
                         <td>
                           {editingAreaId === user.id ? (
                             <div className="phone-edit-row">
@@ -1265,7 +1243,7 @@ export default function AdminDashboard() {
                                   {filteredDisplaySubjects.map(subj => {
                                     const subjData = student.subjects[subj];
                                     // ============================================================
-                                    // التعديل هنا: عرض score/totalMarks بدلاً من score/questionsCount
+                                    // عرض: درجة الطالب / إجمالي الدرجات
                                     // ============================================================
                                     return (
                                       <td key={subj}>
