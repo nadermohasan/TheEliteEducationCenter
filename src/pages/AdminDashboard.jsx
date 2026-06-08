@@ -45,7 +45,7 @@ const generateAttemptQuestions = async (attemptId, studentBranch) => {
     const targetCount = subject.questions_count || 40;
     let query = supabase
       .from("questions")
-      .select("id, passage_id, unit_number")
+      .select("id, passage_id, unit_number, degree")
       .eq("subject_id", subject.id)
       .eq("is_active", true);
 
@@ -350,12 +350,12 @@ export default function AdminDashboard() {
       }
 
       const batchMap = new Map();
-      
+
       for (const attempt of attemptsWithStudents) {
         const batchId = attempt.batch_id;
         const studentBranch = attempt.profiles?.branch || "غير محدد";
         const studentId = attempt.student_id;
-        
+
         if (!batchMap.has(batchId)) {
           batchMap.set(batchId, {
             id: batchId,
@@ -365,35 +365,35 @@ export default function AdminDashboard() {
             subjects: new Set()
           });
         }
-        
+
         const batch = batchMap.get(batchId);
-        
+
         if (!batch.students.has(studentId)) {
           batch.students.set(studentId, {
             branch: studentBranch,
             attemptId: attempt.id
           });
         }
-        
+
         batch.studentIds.add(studentId);
       }
-      
+
       for (const [batchId, batch] of batchMap.entries()) {
         const attemptIds = Array.from(batch.students.values()).map(s => s.attemptId);
         const { data: results } = await supabase
           .from("results")
           .select("subject_id")
           .in("attempt_id", attemptIds);
-        
+
         const uniqueSubjects = new Set(results?.map(r => r.subject_id) || []);
         batch.subjectCount = uniqueSubjects.size;
-        
+
         const branchCounts = new Map();
         for (const student of batch.students.values()) {
           const branch = student.branch;
           branchCounts.set(branch, (branchCounts.get(branch) || 0) + 1);
         }
-        
+
         let dominantBranch = "مختلط";
         let maxCount = 0;
         for (const [branch, count] of branchCounts.entries()) {
@@ -403,11 +403,11 @@ export default function AdminDashboard() {
           }
         }
         if (dominantBranch === "مختلط" && maxCount === 0) dominantBranch = "غير محدد";
-        
+
         batch.branch = dominantBranch;
         batch.studentCount = batch.studentIds.size;
       }
-      
+
       const batchesArray = Array.from(batchMap.values());
       batchesArray.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
       setBatches(batchesArray);
@@ -420,32 +420,36 @@ export default function AdminDashboard() {
   }, []);
 
   // ============================================================
-  // الدالة المعدلة: fetchBatchResults
-  // تم تصحيح اسم عمود الدرجة في جدول questions إلى degree
+  // الدالة المعدلة بالكامل: fetchBatchResults
+  // تعتمد على حساب إجمالي الدرجات من جدول questions (عمود degree)
+  // وليس على questions_count من جدول subjects
   // ============================================================
   const fetchBatchResults = useCallback(async (batchId, selectedBranch = null) => {
     setResultsLoading(true);
     setSelectedBranchView(selectedBranch);
     try {
-      // الخطوة 1: جلب المحاولات المرتبطة بالحزمة
-      const { data: attempts } = await supabase
+      // الخطوة 1: جلب المحاولات المرتبطة بالحزمة مع بيانات الطالب
+      const { data: attempts, error: attemptsError } = await supabase
         .from("attempts")
         .select(`
           id,
+          student_id,
           profiles!inner (
             name,
-            branch
+            branch,
+            area_code
           )
         `)
         .eq("batch_id", batchId);
-        
-      if (!attempts?.length) throw new Error("لا توجد محاولات");
+
+      if (attemptsError) throw attemptsError;
+      if (!attempts?.length) throw new Error("لا توجد محاولات في هذه الحزمة");
 
       const attemptIds = attempts.map(a => a.id);
-
-      // الخطوة 2: جلب أسئلة المحاولات مع درجاتها
-      // تم التصحيح: استخدام degree بدلاً من score
-      const { data: attemptQuestions, error: questionsError } = await supabase
+      
+      // الخطوة 2: جلب جميع أسئلة المحاولات لحساب الدرجة العظمى لكل مادة
+      // نستخدم left join مع questions للحصول على degree
+      const { data: attemptQuestions, error: aqError } = await supabase
         .from("attempt_questions")
         .select(`
           attempt_id,
@@ -456,108 +460,131 @@ export default function AdminDashboard() {
         `)
         .in("attempt_id", attemptIds);
 
-      if (questionsError) {
-        console.error("خطأ في جلب أسئلة المحاولات:", questionsError);
-        throw questionsError;
-      }
+      if (aqError) throw aqError;
 
-      // الخطوة 3: حساب إجمالي الدرجة العظمى لكل مادة داخل كل محاولة
-      // المفتاح: attempt_id + "_" + subject_id
-      const totalMarksMap = new Map();
+      // الخطوة 3: حساب إجمالي الدرجة العظمى (totalMarks) لكل (attempt_id + subject_id)
+      const totalMarksMap = new Map(); // المفتاح: `${attempt_id}_${subject_id}`
       
       attemptQuestions?.forEach(item => {
         const key = `${item.attempt_id}_${item.subject_id}`;
-        const questionDegree = item.questions?.degree || 1; // إذا لم توجد درجة، افتراضياً 1
-        totalMarksMap.set(key, (totalMarksMap.get(key) || 0) + questionDegree);
+        const questionDegree = item.questions?.degree || 0; // درجة السؤال من جدول questions
+        const currentTotal = totalMarksMap.get(key) || 0;
+        totalMarksMap.set(key, currentTotal + questionDegree);
       });
 
-      console.log("📊 خريطة الدرجات العظمى (تم حسابها من degree):", Object.fromEntries(totalMarksMap));
+      console.log("📊 إجمالي الدرجات لكل مادة (محسوب من degree):", Object.fromEntries(totalMarksMap));
 
-      // الخطوة 4: جلب النتائج (العمود score في جدول results كما هو)
-      const { data, error } = await supabase
+      // الخطوة 4: جلب النتائج (درجات الطالب الفعلية)
+      const { data: resultsData, error: resultsError } = await supabase
         .from("results")
         .select(`
           id,
           score,
-          created_at,
           student_id,
           subject_id,
           attempt_id,
-          profiles!inner (
-            name,
-            branch,
-            area_code
-          ),
-          subjects (
-            name,
-            questions_count
+          subjects!inner (
+            name
           )
         `)
-        .in("attempt_id", attemptIds)
-        .order("created_at", { ascending: true });
+        .in("attempt_id", attemptIds);
 
-      if (error) throw error;
+      if (resultsError) throw resultsError;
 
-      // الخطوة 5: تجميع البيانات لكل طالب
-      const studentMap = new Map();
-      const allSubjects = new Set();
-      
-      data?.forEach((result) => {
+      if (!resultsData || resultsData.length === 0) {
+        toast.info("لا توجد نتائج محفوظة لهذه الحزمة بعد");
+        setScientificResults({ subjects: [], students: [] });
+        setLiteraryResults({ subjects: [], students: [] });
+        setSelectedBatch(batchId);
+        if (selectedBranch === 'scientific' || selectedBranch === 'literary') {
+          setSelectedBranchView(selectedBranch);
+        }
+        setResultsLoading(false);
+        return;
+      }
+
+      // إنشاء خريطة سريعة للوصول إلى بيانات الطالب من جدول المحاولات
+      const attemptStudentMap = new Map();
+      attempts.forEach(attempt => {
+        attemptStudentMap.set(attempt.id, {
+          name: attempt.profiles?.name || "غير معروف",
+          branch: attempt.profiles?.branch || "",
+          areaCode: attempt.profiles?.area_code || ""
+        });
+      });
+
+      // الخطوة 5: تجميع البيانات النهائية
+      const allSubjectsSet = new Set();
+      const studentMap = new Map(); // المفتاح: student_id
+
+      resultsData.forEach((result) => {
         const studentId = result.student_id;
-        const studentName = result.profiles?.name || "غير معروف";
-        const branch = result.profiles?.branch || "";
-        const areaCode = result.profiles?.area_code || "";
-        const subjectName = result.subjects?.name || "غير معروف";
-        allSubjects.add(subjectName);
+        const attemptId = result.attempt_id;
+        const studentInfo = attemptStudentMap.get(attemptId);
+        
+        if (!studentInfo) return;
+
+        const subjectName = result.subjects?.name;
+        if (!subjectName) return;
+        
+        allSubjectsSet.add(subjectName);
+
+        // الحصول على الدرجة العظمى المحسوبة لهذه المادة في هذه المحاولة
+        const marksKey = `${attemptId}_${result.subject_id}`;
+        const totalMarks = totalMarksMap.get(marksKey) || 0; // إذا لم نجد، تكون 0
+        
+        const studentScore = result.score;
 
         if (!studentMap.has(studentId)) {
           studentMap.set(studentId, {
             studentId,
-            studentName,
-            branch,
-            areaCode,
+            studentName: studentInfo.name,
+            branch: studentInfo.branch,
+            areaCode: studentInfo.areaCode,
             subjects: {}
           });
         }
+
         const studentRecord = studentMap.get(studentId);
-
-        // حساب إجمالي الدرجة العظمى لهذه المادة في هذه المحاولة
-        const marksKey = `${result.attempt_id}_${result.subject_id}`;
-        const totalMarks = totalMarksMap.get(marksKey) || result.subjects?.questions_count || 40;
-
+        
+        // تخزين بيانات المادة لهذا الطالب (نأخذ أول مرة فقط، حيث أن المادة واحدة لكل محاولة)
         if (!studentRecord.subjects[subjectName]) {
           studentRecord.subjects[subjectName] = {
-            score: result.score,        // درجة الطالب من جدول results
-            totalMarks: totalMarks,      // إجمالي الدرجات المحسوب من questions.degree
+            score: studentScore,
+            totalMarks: totalMarks  // الدرجة العظمى المحسوبة من مجموع degree
           };
         }
-
-        console.log(
-          `📝 طالب: ${studentName} | مادة: ${subjectName} | الدرجة: ${result.score}/${totalMarks}`
-        );
       });
-      
-      // الخطوة 6: توزيع الطلاب حسب الفرع
-      const subjectsList = Array.from(allSubjects).sort();
+
+      // الخطوة 6: تحضير البيانات للعرض وتوزيعها حسب الفرع
+      const subjectsList = Array.from(allSubjectsSet).sort();
       const scientific = [];
       const literary = [];
-      
+
       studentMap.forEach((student) => {
+        if (Object.keys(student.subjects).length === 0) return;
+
         const row = {
           studentName: student.studentName,
           areaCode: student.areaCode,
           subjects: student.subjects
         };
+        
         if (student.branch === "العلمي") {
           scientific.push(row);
         } else if (student.branch === "الأدبي") {
           literary.push(row);
+        } else {
+          // طلاب بدون فرع محدد - يمكن تجاهلهم أو عرضهم في قسم منفصل
+          console.log(`طالب بدون فرع: ${student.studentName}`);
         }
       });
-      
+
+      // ترتيب الطلاب أبجدياً
       scientific.sort((a, b) => a.studentName.localeCompare(b.studentName));
       literary.sort((a, b) => a.studentName.localeCompare(b.studentName));
 
+      // تحديث الحالة
       setScientificResults({
         subjects: getBranchSubjects(subjectsList, "العلمي"),
         students: scientific
@@ -566,15 +593,22 @@ export default function AdminDashboard() {
         subjects: getBranchSubjects(subjectsList, "الأدبي"),
         students: literary
       });
-      
+
       setStudentFilter("");
       setSubjectFilter("");
       setAreaFilter("");
       setSelectedBatch(batchId);
-      
+
       if (selectedBranch === 'scientific' || selectedBranch === 'literary') {
         setSelectedBranchView(selectedBranch);
       }
+
+      if (scientific.length === 0 && literary.length === 0) {
+        toast.info("لا توجد نتائج للطلاب في هذه الحزمة");
+      } else {
+        toast.success(`تم تحميل نتائج ${scientific.length + literary.length} طالب بنجاح`);
+      }
+
     } catch (error) {
       console.error("Error fetching batch results:", error);
       toast.error("فشل جلب نتائج الحزمة: " + error.message);
@@ -594,7 +628,7 @@ export default function AdminDashboard() {
   const handleConfirmDelete = async () => {
     const batchId = confirmDialog.batchId;
     setConfirmDialog({ isOpen: false, batchId: null, message: "" });
-    
+
     setDeletingBatch(batchId);
     try {
       const { data: attempts } = await supabase.from("attempts").select("id").eq("batch_id", batchId);
@@ -662,12 +696,12 @@ export default function AdminDashboard() {
       toast.loading("جاري معالجة طلب سابق، انتظر قليلاً...", { duration: 1500 });
       return;
     }
-    
+
     setProcessingId(studentId);
-    
+
     try {
       isActivatingLock = true;
-      
+
       const { data: studentProfile } = await supabase
         .from("profiles")
         .select("branch")
@@ -682,7 +716,7 @@ export default function AdminDashboard() {
         .eq("status", "active");
 
       let batchId;
-      
+
       if (currentActiveBatchId) {
         batchId = currentActiveBatchId;
       } else {
@@ -693,7 +727,7 @@ export default function AdminDashboard() {
           .not("batch_id", "is", null)
           .limit(1)
           .maybeSingle();
-        
+
         if (existingActiveAttempt?.batch_id) {
           batchId = existingActiveAttempt.batch_id;
           currentActiveBatchId = batchId;
@@ -702,7 +736,7 @@ export default function AdminDashboard() {
           currentActiveBatchId = batchId;
         }
       }
-      
+
       const { data: newAttempt, error: insertError } = await supabase
         .from("attempts")
         .insert([{ 
@@ -712,17 +746,17 @@ export default function AdminDashboard() {
         }])
         .select()
         .single();
-      
+
       if (insertError) throw insertError;
-      
+
       await generateAttemptQuestions(newAttempt.id, studentBranch);
-      
+
       toast.success("تم تفعيل المحاولة بنجاح!");
-      
+
       await fetchStats();
       await fetchActiveAttempts();
       await fetchBatches();
-      
+
     } catch (e) {
       console.error("خطأ في تفعيل المحاولة:", e);
       toast.error("خطأ: " + e.message);
@@ -739,13 +773,13 @@ export default function AdminDashboard() {
         .select("branch")
         .eq("id", student.id)
         .single();
-      
+
       if (studentProfile?.error) {
         return { success: false, name: student.name, error: studentProfile.error.message };
       }
-      
+
       const studentBranch = studentProfile?.branch?.trim() || null;
-      
+
       const { data: newAttempt, error: insertError } = await supabase
         .from("attempts")
         .insert([{ 
@@ -755,15 +789,15 @@ export default function AdminDashboard() {
         }])
         .select()
         .single();
-      
+
       if (insertError) {
         return { success: false, name: student.name, error: insertError.message };
       }
-      
+
       await generateAttemptQuestions(newAttempt.id, studentBranch);
-      
+
       return { success: true, name: student.name };
-      
+
     } catch (err) {
       return { success: false, name: student.name, error: err.message };
     }
@@ -774,23 +808,23 @@ export default function AdminDashboard() {
       toast.loading("جاري معالجة طلب سابق، انتظر قليلاً...", { duration: 1500 });
       return;
     }
-    
+
     const studentsToActivate = filteredUsers.filter(u => !activeAttemptsMap[u.id]);
-    
+
     if (studentsToActivate.length === 0) {
       toast("لا يوجد طلاب بحاجة إلى تفعيل (وفقاً للفلاتر الحالية)", { icon: "ℹ️" });
       return;
     }
-    
+
     setActivatingAll(true);
-    
+
     const loadingToast = toast.loading(`جاري تفعيل ${studentsToActivate.length} طالب...`);
-    
+
     try {
       isActivatingLock = true;
-      
+
       let unifiedBatchId = null;
-      
+
       if (currentActiveBatchId) {
         unifiedBatchId = currentActiveBatchId;
       } else {
@@ -801,7 +835,7 @@ export default function AdminDashboard() {
           .not("batch_id", "is", null)
           .limit(1)
           .maybeSingle();
-        
+
         if (existingActiveAttempt?.batch_id) {
           unifiedBatchId = existingActiveAttempt.batch_id;
           currentActiveBatchId = unifiedBatchId;
@@ -810,35 +844,35 @@ export default function AdminDashboard() {
           currentActiveBatchId = unifiedBatchId;
         }
       }
-      
+
       const studentIds = studentsToActivate.map(s => s.id);
-      
+
       const { error: updateError } = await supabase
         .from("attempts")
         .update({ status: "completed" })
         .in("student_id", studentIds)
         .eq("status", "active");
-      
+
       if (updateError) {
         console.error("خطأ في إنهاء المحاولات القديمة:", updateError);
         throw new Error("فشل في إنهاء المحاولات القديمة");
       }
-      
+
       const activationPromises = studentsToActivate.map(student => 
         activateSingleStudent(student, unifiedBatchId)
       );
-      
+
       const results = await Promise.all(activationPromises);
-      
+
       const successCount = results.filter(r => r.success).length;
       const failedCount = results.filter(r => !r.success).length;
-      
+
       await fetchStats();
       await fetchActiveAttempts();
       await fetchBatches();
-      
+
       toast.dismiss(loadingToast);
-      
+
       if (successCount > 0) {
         let message = `تم تفعيل ${successCount} طالب بنجاح!`;
         if (failedCount > 0) {
@@ -848,7 +882,7 @@ export default function AdminDashboard() {
       } else {
         toast.error("❌ فشل تفعيل جميع الطلاب");
       }
-      
+
     } catch (error) {
       console.error("خطأ عام في عملية التفعيل الجماعي:", error);
       toast.dismiss(loadingToast);
@@ -909,7 +943,7 @@ export default function AdminDashboard() {
       }
     };
     checkAdmin();
-    
+
     resetActivationLock();
   }, [fetchAdminProfile, navigate]);
 
@@ -1243,7 +1277,7 @@ export default function AdminDashboard() {
                                   {filteredDisplaySubjects.map(subj => {
                                     const subjData = student.subjects[subj];
                                     // ============================================================
-                                    // عرض: درجة الطالب / إجمالي الدرجات
+                                    // عرض: درجة الطالب / إجمالي الدرجات (المحسوب من degree)
                                     // ============================================================
                                     return (
                                       <td key={subj}>
@@ -1338,7 +1372,7 @@ export default function AdminDashboard() {
       />
 
       <Footer />
-      
+
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap');
         
