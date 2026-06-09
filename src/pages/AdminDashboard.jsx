@@ -420,202 +420,227 @@ export default function AdminDashboard() {
   }, []);
 
   // ============================================================
-  // الدالة المعدلة بالكامل: fetchBatchResults
-  // تعتمد على حساب إجمالي الدرجات من جدول questions (عمود degree)
-  // وليس على questions_count من جدول subjects
-  // ============================================================
-  const fetchBatchResults = useCallback(async (batchId, selectedBranch = null) => {
+// الدالة النهائية: fetchBatchResults
+// تحسب إجمالي الدرجة العظمى من جدول questions (عمود degree)
+// ============================================================
+const fetchBatchResults = useCallback(async (batchId, selectedBranch = null) => {
     setResultsLoading(true);
     setSelectedBranchView(selectedBranch);
     try {
-      // الخطوة 1: جلب المحاولات المرتبطة بالحزمة مع بيانات الطالب
-      const { data: attempts, error: attemptsError } = await supabase
-        .from("attempts")
-        .select(`
-          id,
-          student_id,
-          profiles!inner (
-            name,
-            branch,
-            area_code
-          )
-        `)
-        .eq("batch_id", batchId);
+        // الخطوة 1: جلب المحاولات المرتبطة بالحزمة مع بيانات الطالب
+        const { data: attempts, error: attemptsError } = await supabase
+            .from("attempts")
+            .select(`
+                id,
+                student_id,
+                profiles!inner (
+                    name,
+                    branch,
+                    area_code
+                )
+            `)
+            .eq("batch_id", batchId);
 
-      if (attemptsError) throw attemptsError;
-      if (!attempts?.length) throw new Error("لا توجد محاولات في هذه الحزمة");
+        if (attemptsError) throw attemptsError;
+        if (!attempts?.length) throw new Error("لا توجد محاولات في هذه الحزمة");
 
-      const attemptIds = attempts.map(a => a.id);
-      
-      // الخطوة 2: جلب جميع أسئلة المحاولات لحساب الدرجة العظمى لكل مادة
-      // نستخدم left join مع questions للحصول على degree
-      const { data: attemptQuestions, error: aqError } = await supabase
-        .from("attempt_questions")
-        .select(`
-          attempt_id,
-          subject_id,
-          questions!inner (
-            degree
-          )
-        `)
-        .in("attempt_id", attemptIds);
+        const attemptIds = attempts.map(a => a.id);
+        
+        // الخطوة 2: جلب النتائج مع بيانات المادة
+        const { data: resultsData, error: resultsError } = await supabase
+            .from("results")
+            .select(`
+                id,
+                score,
+                student_id,
+                subject_id,
+                attempt_id,
+                subjects!inner (
+                    id,
+                    name
+                )
+            `)
+            .in("attempt_id", attemptIds);
 
-      if (aqError) throw aqError;
+        if (resultsError) throw resultsError;
 
-      // الخطوة 3: حساب إجمالي الدرجة العظمى (totalMarks) لكل (attempt_id + subject_id)
-      const totalMarksMap = new Map(); // المفتاح: `${attempt_id}_${subject_id}`
-      
-      attemptQuestions?.forEach(item => {
-        const key = `${item.attempt_id}_${item.subject_id}`;
-        const questionDegree = item.questions?.degree || 0; // درجة السؤال من جدول questions
-        const currentTotal = totalMarksMap.get(key) || 0;
-        totalMarksMap.set(key, currentTotal + questionDegree);
-      });
-
-      console.log("📊 إجمالي الدرجات لكل مادة (محسوب من degree):", Object.fromEntries(totalMarksMap));
-
-      // الخطوة 4: جلب النتائج (درجات الطالب الفعلية)
-      const { data: resultsData, error: resultsError } = await supabase
-        .from("results")
-        .select(`
-          id,
-          score,
-          student_id,
-          subject_id,
-          attempt_id,
-          subjects!inner (
-            name
-          )
-        `)
-        .in("attempt_id", attemptIds);
-
-      if (resultsError) throw resultsError;
-
-      if (!resultsData || resultsData.length === 0) {
-        toast.info("لا توجد نتائج محفوظة لهذه الحزمة بعد");
-        setScientificResults({ subjects: [], students: [] });
-        setLiteraryResults({ subjects: [], students: [] });
-        setSelectedBatch(batchId);
-        if (selectedBranch === 'scientific' || selectedBranch === 'literary') {
-          setSelectedBranchView(selectedBranch);
+        if (!resultsData || resultsData.length === 0) {
+            toast.info("لا توجد نتائج محفوظة لهذه الحزمة بعد");
+            setScientificResults({ subjects: [], students: [] });
+            setLiteraryResults({ subjects: [], students: [] });
+            setSelectedBatch(batchId);
+            if (selectedBranch === 'scientific' || selectedBranch === 'literary') {
+                setSelectedBranchView(selectedBranch);
+            }
+            setResultsLoading(false);
+            return;
         }
-        setResultsLoading(false);
-        return;
-      }
 
-      // إنشاء خريطة سريعة للوصول إلى بيانات الطالب من جدول المحاولات
-      const attemptStudentMap = new Map();
-      attempts.forEach(attempt => {
-        attemptStudentMap.set(attempt.id, {
-          name: attempt.profiles?.name || "غير معروف",
-          branch: attempt.profiles?.branch || "",
-          areaCode: attempt.profiles?.area_code || ""
+        // الخطوة 3: الحصول على جميع المواد الفريدة من النتائج
+        const uniqueSubjectIds = [...new Set(resultsData.map(r => r.subject_id))];
+        
+        // الخطوة 4: حساب إجمالي الدرجة العظمى لكل مادة من جدول questions مباشرة
+        const subjectTotalMarksMap = new Map(); // subject_id -> total_degree
+        
+        for (const subjectId of uniqueSubjectIds) {
+            const { data: questionsData, error: questionsError } = await supabase
+                .from("questions")
+                .select("degree")
+                .eq("subject_id", subjectId)
+                .eq("is_active", true);
+            
+            if (questionsError) {
+                console.error(`خطأ في جلب أسئلة المادة ${subjectId}:`, questionsError);
+                subjectTotalMarksMap.set(subjectId, 40);
+                continue;
+            }
+            
+            let totalDegree = 0;
+            if (questionsData && questionsData.length > 0) {
+                totalDegree = questionsData.reduce((sum, q) => sum + (q.degree || 0), 0);
+            }
+            
+            if (totalDegree === 0) {
+                totalDegree = 40;
+            }
+            
+            subjectTotalMarksMap.set(subjectId, totalDegree);
+            console.log(`📊 المادة ID ${subjectId}: إجمالي الدرجات = ${totalDegree}`);
+        }
+
+        // الخطوة 5: إنشاء خريطة لبيانات الطلاب من المحاولات
+        const attemptStudentMap = new Map();
+        attempts.forEach(attempt => {
+            attemptStudentMap.set(attempt.id, {
+                name: attempt.profiles?.name || "غير معروف",
+                branch: attempt.profiles?.branch || "",
+                areaCode: attempt.profiles?.area_code || ""
+            });
         });
-      });
 
-      // الخطوة 5: تجميع البيانات النهائية
-      const allSubjectsSet = new Set();
-      const studentMap = new Map(); // المفتاح: student_id
+        // الخطوة 6: تجميع البيانات النهائية للطلاب
+        const allSubjectsSet = new Set();
+        const studentMap = new Map();
 
-      resultsData.forEach((result) => {
-        const studentId = result.student_id;
-        const attemptId = result.attempt_id;
-        const studentInfo = attemptStudentMap.get(attemptId);
-        
-        if (!studentInfo) return;
+        resultsData.forEach((result) => {
+            const studentId = result.student_id;
+            const attemptId = result.attempt_id;
+            const studentInfo = attemptStudentMap.get(attemptId);
+            
+            if (!studentInfo) return;
 
-        const subjectName = result.subjects?.name;
-        if (!subjectName) return;
-        
-        allSubjectsSet.add(subjectName);
+            const subjectId = result.subject_id;
+            const subjectName = result.subjects?.name;
+            if (!subjectName) return;
+            
+            allSubjectsSet.add(subjectName);
 
-        // الحصول على الدرجة العظمى المحسوبة لهذه المادة في هذه المحاولة
-        const marksKey = `${attemptId}_${result.subject_id}`;
-        const totalMarks = totalMarksMap.get(marksKey) || 0; // إذا لم نجد، تكون 0
-        
-        const studentScore = result.score;
+            const totalMarks = subjectTotalMarksMap.get(subjectId) || 40;
+            const studentScore = result.score;
 
-        if (!studentMap.has(studentId)) {
-          studentMap.set(studentId, {
-            studentId,
-            studentName: studentInfo.name,
-            branch: studentInfo.branch,
-            areaCode: studentInfo.areaCode,
-            subjects: {}
-          });
+            if (!studentMap.has(studentId)) {
+                studentMap.set(studentId, {
+                    studentId,
+                    studentName: studentInfo.name,
+                    branch: studentInfo.branch,
+                    areaCode: studentInfo.areaCode,
+                    subjects: {}
+                });
+            }
+
+            const studentRecord = studentMap.get(studentId);
+            
+            if (!studentRecord.subjects[subjectName]) {
+                studentRecord.subjects[subjectName] = {
+                    score: studentScore,
+                    totalMarks: totalMarks
+                };
+            }
+        });
+
+        // الخطوة 7: تحضير البيانات للعرض وتوزيعها حسب الفرع
+        const subjectsList = Array.from(allSubjectsSet).sort();
+        const scientific = [];
+        const literary = [];
+
+        studentMap.forEach((student) => {
+            if (Object.keys(student.subjects).length === 0) return;
+
+            const row = {
+                studentName: student.studentName,
+                areaCode: student.areaCode,
+                subjects: student.subjects
+            };
+            
+            if (student.branch === "العلمي") {
+                scientific.push(row);
+            } else if (student.branch === "الأدبي") {
+                literary.push(row);
+            }
+        });
+
+        scientific.sort((a, b) => a.studentName.localeCompare(b.studentName));
+        literary.sort((a, b) => a.studentName.localeCompare(b.studentName));
+
+        setScientificResults({
+            subjects: getBranchSubjects(subjectsList, "العلمي"),
+            students: scientific
+        });
+        setLiteraryResults({
+            subjects: getBranchSubjects(subjectsList, "الأدبي"),
+            students: literary
+        });
+
+        setStudentFilter("");
+        setSubjectFilter("");
+        setAreaFilter("");
+        setSelectedBatch(batchId);
+
+        if (selectedBranch === 'scientific' || selectedBranch === 'literary') {
+            setSelectedBranchView(selectedBranch);
         }
 
-        const studentRecord = studentMap.get(studentId);
-        
-        // تخزين بيانات المادة لهذا الطالب (نأخذ أول مرة فقط، حيث أن المادة واحدة لكل محاولة)
-        if (!studentRecord.subjects[subjectName]) {
-          studentRecord.subjects[subjectName] = {
-            score: studentScore,
-            totalMarks: totalMarks  // الدرجة العظمى المحسوبة من مجموع degree
-          };
-        }
-      });
-
-      // الخطوة 6: تحضير البيانات للعرض وتوزيعها حسب الفرع
-      const subjectsList = Array.from(allSubjectsSet).sort();
-      const scientific = [];
-      const literary = [];
-
-      studentMap.forEach((student) => {
-        if (Object.keys(student.subjects).length === 0) return;
-
-        const row = {
-          studentName: student.studentName,
-          areaCode: student.areaCode,
-          subjects: student.subjects
-        };
-        
-        if (student.branch === "العلمي") {
-          scientific.push(row);
-        } else if (student.branch === "الأدبي") {
-          literary.push(row);
+        // ============================================================
+        // عرض رسالة نجاح مناسبة حسب الفرع المختار
+        // ============================================================
+        if (scientific.length === 0 && literary.length === 0) {
+            toast.info("لا توجد نتائج للطلاب في هذه الحزمة");
+        } else if (selectedBranch === 'scientific') {
+            // إذا تم اختيار الفرع العلمي
+            if (scientific.length > 0) {
+                toast.success(`تم رصد نتائج ${scientific.length} طالب في الفرع العلمي`);
+            } else {
+                toast.info("لا يوجد طلاب في الفرع العلمي لهذه الحزمة");
+            }
+        } else if (selectedBranch === 'literary') {
+            // إذا تم اختيار الفرع الأدبي
+            if (literary.length > 0) {
+                toast.success(`تم رصد نتائج ${literary.length} طالب في الفرع الأدبي`);
+            } else {
+                toast.info("لا يوجد طلاب في الفرع الأدبي لهذه الحزمة");
+            }
         } else {
-          // طلاب بدون فرع محدد - يمكن تجاهلهم أو عرضهم في قسم منفصل
-          console.log(`طالب بدون فرع: ${student.studentName}`);
+            // إذا لم يتم اختيار فرع (عند تحميل البيانات لأول مرة)
+            let message = "";
+            if (scientific.length > 0 && literary.length > 0) {
+                message = `تم رصد نتائج ${scientific.length} طالب في العلمي و ${literary.length} طالب في الأدبي`;
+            } else if (scientific.length > 0) {
+                message = `تم رصد نتائج ${scientific.length} طالب في الفرع العلمي`;
+            } else if (literary.length > 0) {
+                message = `تم رصد نتائج ${literary.length} طالب في الفرع الأدبي`;
+            }
+            if (message) {
+                toast.success(`${message}`);
+            }
         }
-      });
-
-      // ترتيب الطلاب أبجدياً
-      scientific.sort((a, b) => a.studentName.localeCompare(b.studentName));
-      literary.sort((a, b) => a.studentName.localeCompare(b.studentName));
-
-      // تحديث الحالة
-      setScientificResults({
-        subjects: getBranchSubjects(subjectsList, "العلمي"),
-        students: scientific
-      });
-      setLiteraryResults({
-        subjects: getBranchSubjects(subjectsList, "الأدبي"),
-        students: literary
-      });
-
-      setStudentFilter("");
-      setSubjectFilter("");
-      setAreaFilter("");
-      setSelectedBatch(batchId);
-
-      if (selectedBranch === 'scientific' || selectedBranch === 'literary') {
-        setSelectedBranchView(selectedBranch);
-      }
-
-      if (scientific.length === 0 && literary.length === 0) {
-        toast.info("لا توجد نتائج للطلاب في هذه الحزمة");
-      } else {
-        toast.success(`تم تحميل نتائج ${scientific.length + literary.length} طالب بنجاح`);
-      }
 
     } catch (error) {
-      console.error("Error fetching batch results:", error);
-      toast.error("فشل جلب نتائج الحزمة: " + error.message);
+        console.error("Error fetching batch results:", error);
+        toast.error("فشل جلب نتائج الحزمة: " + error.message);
     } finally {
-      setResultsLoading(false);
+        setResultsLoading(false);
     }
-  }, []);
+}, []);
 
   const handleDeleteBatch = (batchId) => {
     setConfirmDialog({
@@ -681,7 +706,7 @@ export default function AdminDashboard() {
       `${idx + 1}. ${s.studentName}`,
       ...filteredSubjects.map(subj => {
         const subjData = s.subjects[subj];
-        // عرض الدرجة/إجمالي الدرجات
+        // عرض الدرجة/إجمالي الدرجات (المحسوب من degree)
         return subjData ? `${subjData.score}/${subjData.totalMarks}` : "—";
       })
     ]);
@@ -1276,9 +1301,7 @@ export default function AdminDashboard() {
                                   <td className="sticky-col-right-name">{student.studentName}</td>
                                   {filteredDisplaySubjects.map(subj => {
                                     const subjData = student.subjects[subj];
-                                    // ============================================================
                                     // عرض: درجة الطالب / إجمالي الدرجات (المحسوب من degree)
-                                    // ============================================================
                                     return (
                                       <td key={subj}>
                                         {subjData ? `${subjData.score}/${subjData.totalMarks}` : "—"}
